@@ -23,14 +23,14 @@ interface SkylineSegment {
 }
 
 export const STAMP_COLORS = [
-  "#F5D0B0",  // Soft Orange
-  "#A5D4F5",  // Soft Blue
-  "#A5E8C5",  // Soft Green
-  "#D4C5F5",  // Soft Purple
-  "#F5C5E5",  // Soft Pink
-  "#F5E0B0",  // Soft Amber
-  "#B0E8F5",  // Soft Cyan
-  "#F5B0B0",  // Soft Red
+  "#FF9E4D",  // Vibrant Orange
+  "#6DB3F2",  // Vibrant Blue
+  "#5FD3BC",  // Vibrant Green
+  "#C9A3FF",  // Vibrant Purple
+  "#FF8FD6",  // Vibrant Pink
+  "#FFD580",  // Vibrant Amber
+  "#66E3FF",  // Vibrant Cyan
+  "#FF7070",  // Vibrant Red
 ];
 
 export interface PackResult {

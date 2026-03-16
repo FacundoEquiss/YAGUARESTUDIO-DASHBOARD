@@ -19,6 +19,7 @@ export function CalculatorPage() {
   const { toast } = useToast();
 
   const [clientName, setClientName] = useState("");
+  const [orderName, setOrderName] = useState("");
   const [notes, setNotes] = useState("");
   const [stamps, setStamps] = useState<StampItem[]>([
     { id: uuidv4(), w: 28, h: 32, qty: 1 } // Initial empty state
@@ -108,7 +109,7 @@ export function CalculatorPage() {
           Cotizador DTF
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          powered by <span className="font-black">YAGUAR</span>STUDIO
+          powered by <span className="font-black">YAGUAR</span> ESTUDIO
         </p>
       </div>
 
@@ -122,6 +123,15 @@ export function CalculatorPage() {
               placeholder="Ej: Juan Pérez" 
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="orderName" className="text-foreground font-bold">Nombre del Pedido <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <Input 
+              id="orderName" 
+              placeholder="Ej: Camisetas Azules" 
+              value={orderName}
+              onChange={(e) => setOrderName(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
@@ -160,7 +170,10 @@ export function CalculatorPage() {
                 transition={{ duration: 0.2 }}
                 className="bg-white rounded-2xl p-4 shadow-sm border border-border flex flex-col gap-3 relative overflow-hidden group"
               >
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-200 to-primary"></div>
+                <div 
+                  className="absolute left-0 top-0 bottom-0 w-1"
+                  style={{ backgroundColor: STAMP_COLORS[index % STAMP_COLORS.length] }}
+                ></div>
                 
                 <div className="flex justify-between items-center pl-2">
                   <div className="flex items-center gap-2">

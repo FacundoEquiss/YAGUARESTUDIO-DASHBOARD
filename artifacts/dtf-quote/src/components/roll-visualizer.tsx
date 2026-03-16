@@ -36,6 +36,14 @@ export function RollVisualizer({
     return (rollWidth - maxUsedX) / 2;
   }, [placements, rollWidth]);
 
+  const getDarkerColor = (hexColor: string): string => {
+    const hex = hexColor.replace("#", "");
+    const r = Math.max(0, parseInt(hex.slice(0, 2), 16) - 40);
+    const g = Math.max(0, parseInt(hex.slice(2, 4), 16) - 40);
+    const b = Math.max(0, parseInt(hex.slice(4, 6), 16) - 40);
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  };
+
   return (
     <div className={cn("w-full bg-white rounded-2xl border border-border shadow-inner overflow-hidden flex flex-col", className)}>
       {/* Header */}
@@ -67,6 +75,15 @@ export function RollVisualizer({
               className="w-full h-auto origin-top transition-all duration-500 ease-out"
               preserveAspectRatio="xMidYMin meet"
             >
+              <defs>
+                {placements.map((p, idx) => (
+                  <linearGradient key={`grad-${idx}`} id={`stampGradient-${idx}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style={{ stopColor: p.color, stopOpacity: 0.9 }} />
+                    <stop offset="100%" style={{ stopColor: p.color, stopOpacity: 1 }} />
+                  </linearGradient>
+                ))}
+              </defs>
+
               {/* Roll background — straight corners */}
               <rect
                 x={padding}
@@ -79,19 +96,21 @@ export function RollVisualizer({
                 rx="0"
               />
 
-              {/* Stamps — centered horizontally */}
-              {placements.map((p) => (
+              {/* Stamps — centered horizontally with gradient and contour */}
+              {placements.map((p, idx) => (
                 <g key={p.id}>
+                  {/* Gradient fill */}
                   <rect
                     x={padding + p.x + centerOffsetX}
                     y={padding + p.y}
                     width={p.w}
                     height={p.h}
-                    fill={p.color}
-                    stroke="rgba(0,0,0,0.08)"
-                    strokeWidth="0.3"
+                    fill={`url(#stampGradient-${idx})`}
+                    stroke={getDarkerColor(p.color)}
+                    strokeWidth="0.4"
                     rx="0.5"
                   />
+                  {/* Text label */}
                   {p.w > 3 && p.h > 2.5 && (
                     <text
                       x={padding + p.x + centerOffsetX + p.w / 2}
