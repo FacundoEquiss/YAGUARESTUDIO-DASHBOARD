@@ -71,9 +71,9 @@ export function RollVisualizer({
                 y={padding}
                 width={rollWidth}
                 height={totalHeight}
-                fill="#FFFFFF"
-                stroke="#D4A574"
-                strokeWidth="1.5"
+                fill="#FFFAF5"
+                stroke="#E8D4C0"
+                strokeWidth="1"
                 rx="2"
               />
 
@@ -101,16 +101,17 @@ export function RollVisualizer({
                   rx="0.5"
                 />
                 {/* Only show text if box is big enough to read comfortably */}
-                {p.w > 4 && p.h > 3 && (
+                {p.w > 3 && p.h > 2.5 && (
                   <text
                     x={padding + p.x + p.w / 2}
                     y={padding + p.y + p.h / 2}
-                    fill="#7C5A3A"
-                    fontSize={Math.min(p.w * 0.18, p.h * 0.25, 5)}
+                    fill="#9B8B7E"
+                    fontSize={Math.min(p.w * 0.12, p.h * 0.18, 2.2)}
                     fontFamily="Outfit, sans-serif"
-                    fontWeight="600"
+                    fontWeight="500"
                     textAnchor="middle"
                     dominantBaseline="central"
+                    opacity="0.8"
                   >
                     {Math.round(p.w)}×{Math.round(p.h)}
                   </text>
