@@ -7,10 +7,18 @@ import { Layout } from "@/components/layout";
 import { CalculatorPage } from "@/pages/calculator";
 import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
+import { AuthPage } from "@/pages/auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 
 const queryClient = new QueryClient();
 
 function Router() {
+  const { currentUser } = useAuth();
+
+  if (!currentUser) {
+    return <AuthPage />;
+  }
+
   return (
     <Layout>
       <Switch>
@@ -27,9 +35,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </AuthProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

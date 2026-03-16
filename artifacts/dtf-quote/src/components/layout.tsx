@@ -3,15 +3,19 @@ import { Link, useLocation } from "wouter";
 import { Calculator, Clock, Settings, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { isDark, toggleTheme } = useTheme();
+  const { currentUser } = useAuth();
+
+  const isMaster = currentUser?.role === "master";
 
   const navItems = [
     { href: "/", label: "Cotizador", icon: Calculator },
     { href: "/history", label: "Historial", icon: Clock },
-    { href: "/settings", label: "Ajustes", icon: Settings },
+    ...(isMaster ? [{ href: "/settings", label: "Ajustes", icon: Settings }] : []),
   ];
 
   return (
@@ -20,12 +24,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Bottom Navigation - Fixed */}
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel border-t border-border rounded-t-[2rem] px-4 py-4 flex items-center justify-between z-50">
         {navItems.map((item) => {
           const isActive = location === item.href;
           const Icon = item.icon;
-          
+
           return (
             <Link
               key={item.href}
@@ -51,7 +54,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           );
         })}
 
-        {/* Dark mode toggle */}
         <button
           onClick={toggleTheme}
           className="flex flex-col items-center justify-center gap-1.5 min-w-[4rem] text-muted-foreground hover:text-foreground transition-all duration-300"

@@ -25,7 +25,6 @@ export interface Quote {
 }
 
 const SETTINGS_KEY = "dtf-settings";
-const QUOTES_KEY = "dtf-quotes";
 
 const DEFAULT_SETTINGS: DTFSettings = {
   pricePerMeter: 10000,
@@ -48,10 +47,16 @@ export function useDTFSettings() {
   return { settings, setSettings };
 }
 
-export function useDTFQuotes() {
+export function useDTFQuotes(userId: string = "guest") {
+  const quotesKey = `dtf-quotes-${userId}`;
+
   const [quotes, setQuotesState] = useState<Quote[]>(() =>
-    getStorage(QUOTES_KEY, [])
+    getStorage(quotesKey, [])
   );
+
+  useEffect(() => {
+    setQuotesState(getStorage(quotesKey, []));
+  }, [quotesKey]);
 
   const saveQuote = useCallback((quoteData: Omit<Quote, "id" | "createdAt">) => {
     const newQuote: Quote = {
@@ -59,23 +64,23 @@ export function useDTFQuotes() {
       id: uuidv4(),
       createdAt: Date.now(),
     };
-    
+
     setQuotesState((prev) => {
       const updated = [newQuote, ...prev];
-      setStorage(QUOTES_KEY, updated);
+      setStorage(quotesKey, updated);
       return updated;
     });
-    
+
     return newQuote;
-  }, []);
+  }, [quotesKey]);
 
   const deleteQuote = useCallback((id: string) => {
     setQuotesState((prev) => {
       const updated = prev.filter((q) => q.id !== id);
-      setStorage(QUOTES_KEY, updated);
+      setStorage(quotesKey, updated);
       return updated;
     });
-  }, []);
+  }, [quotesKey]);
 
   return { quotes, saveQuote, deleteQuote };
 }
