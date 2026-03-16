@@ -80,13 +80,14 @@ export function packStamps(
     }
   });
 
-  // Sort keeping all instances of the same stamp type together (by itemIndex),
-  // then order groups by max dimension descending (larger stamps first)
+  // Respect the user's stamp order: the stamp defined first occupies the roll
+  // from the top, later stamps fill remaining gaps. This prevents a later small
+  // stamp from appearing "inside" an earlier group just because it has a larger
+  // max dimension. Secondary sort by max(w,h) within the same item type is a
+  // no-op (all instances share the same dimensions) but keeps the sort stable.
   toPack.sort((a, b) => {
-    const aDim = Math.max(a.w, a.h);
-    const bDim = Math.max(b.w, b.h);
-    if (Math.abs(aDim - bDim) > 0.001) return bDim - aDim;
-    return a.itemIndex - b.itemIndex;
+    if (a.itemIndex !== b.itemIndex) return a.itemIndex - b.itemIndex;
+    return Math.max(b.w, b.h) - Math.max(a.w, a.h);
   });
 
   for (const box of toPack) {
