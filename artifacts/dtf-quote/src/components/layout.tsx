@@ -13,13 +13,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto bg-background shadow-2xl overflow-hidden relative">
+    <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto bg-background shadow-2xl overflow-hidden">
       <main className="flex-1 overflow-y-auto pb-24 custom-scrollbar">
         {children}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="absolute bottom-0 w-full glass-panel border-t border-border rounded-t-[2rem] px-6 py-4 flex items-center justify-between z-50">
+      {/* Bottom Navigation - Fixed */}
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel border-t border-border rounded-t-[2rem] px-6 py-4 flex items-center justify-between z-50">
         {navItems.map((item) => {
           const isActive = location === item.href;
           const Icon = item.icon;

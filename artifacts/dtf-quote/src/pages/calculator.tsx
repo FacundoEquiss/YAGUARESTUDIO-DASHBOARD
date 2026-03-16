@@ -169,7 +169,13 @@ export function CalculatorPage() {
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-200 to-primary"></div>
                 
                 <div className="flex justify-between items-center pl-2">
-                  <span className="text-sm font-bold text-muted-foreground">Item {index + 1}</span>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full border border-opacity-30 border-black"
+                      style={{ backgroundColor: STAMP_COLORS[index % STAMP_COLORS.length] }}
+                    />
+                    <span className="text-sm font-bold">Estampa {index + 1}</span>
+                  </div>
                   {stamps.length > 1 && (
                     <button 
                       onClick={() => removeStamp(stamp.id)}

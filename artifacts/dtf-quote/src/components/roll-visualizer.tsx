@@ -52,28 +52,30 @@ export function RollVisualizer({
       </div>
 
       {/* SVG Canvas wrapper */}
-      <div className="relative w-full max-h-[500px] overflow-y-auto custom-scrollbar p-4 bg-[#FCFBF8]">
+      <div className="relative w-full max-h-[500px] overflow-y-auto custom-scrollbar p-6 bg-gradient-to-b from-white to-secondary/30">
         {placements.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-muted-foreground text-sm font-medium">
             Agrega estampas para ver la previsualización
           </div>
         ) : (
-          <svg
-            viewBox={`0 0 ${vWidth} ${vHeight}`}
-            className="w-full h-auto drop-shadow-md origin-top transition-all duration-500 ease-out"
-            preserveAspectRatio="xMidYMin meet"
-          >
-            {/* The Roll Background */}
-            <rect
-              x={padding}
-              y={padding}
-              width={rollWidth}
-              height={totalHeight}
-              fill="#FFFFFF"
-              stroke="#EBE6E0"
-              strokeWidth="0.5"
-              rx="1"
-            />
+          <div className="rounded-3xl p-6 bg-gray-900 shadow-2xl inline-block">
+            <svg
+              viewBox={`0 0 ${vWidth} ${vHeight}`}
+              className="w-full h-auto origin-top transition-all duration-500 ease-out drop-shadow-xl"
+              preserveAspectRatio="xMidYMin meet"
+              style={{ maxWidth: "100%", height: "auto" }}
+            >
+              {/* The Roll Background */}
+              <rect
+                x={padding}
+                y={padding}
+                width={rollWidth}
+                height={totalHeight}
+                fill="#FFFFFF"
+                stroke="#D4A574"
+                strokeWidth="1.5"
+                rx="2"
+              />
 
             {/* Grid Lines (Optional, for scale) */}
             <g stroke="#F3F0EC" strokeWidth="0.2">
@@ -115,7 +117,8 @@ export function RollVisualizer({
                 )}
               </g>
             ))}
-          </svg>
+            </svg>
+          </div>
         )}
       </div>
 
