@@ -21,7 +21,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
+│   ├── api-server/         # Express API server
+│   └── dtf-quote/          # DTF Quote App (React + Vite, frontend-only)
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
@@ -49,6 +50,31 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 - `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
 
 ## Packages
+
+### `artifacts/dtf-quote` (`@workspace/dtf-quote`)
+
+DTF (Direct to Film) printing quote calculator — frontend-only React + Vite app. All data stored in localStorage, no backend needed.
+
+**Key Features:**
+- Quote calculator with multiple stamp types (width, height, quantity)
+- Skyline 2D strip packing algorithm for optimal stamp placement on a fixed-width roll
+- Roll visualizer (SVG) showing stamps packed with absolute positions
+- Cost calculation: linear meters × price per meter (default $10,000 CLP)
+- Quote history with detail view and roll visualization
+- Settings: configurable price per meter and roll width
+
+**Key Files:**
+- `src/lib/skyline.ts` — Skyline 2D strip packing algorithm
+- `src/components/roll-visualizer.tsx` — SVG roll preview component
+- `src/pages/calculator.tsx` — Main quote calculator page
+- `src/pages/history.tsx` — Saved quotes history
+- `src/pages/settings.tsx` — App settings (price, roll width)
+- `src/hooks/use-dtf-store.ts` — localStorage hooks for settings and quotes
+- `src/lib/storage.ts` — localStorage utility functions
+
+**Navigation:** Bottom tab bar with 3 tabs (Cotizador, Historial, Ajustes) using wouter routing.
+
+**Design:** Warm cream/beige background (#FAF8F5), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design.
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 

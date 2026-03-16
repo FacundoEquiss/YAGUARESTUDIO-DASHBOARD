@@ -1,0 +1,16 @@
+packages:
+  "framer-motion": "For smooth page transitions and interactive element animations"
+  "uuid": "For generating unique IDs for stamps and quotes"
+  "date-fns": "For formatting quote creation dates in the history view"
+  "lucide-react": "For beautiful UI icons"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for merging Tailwind CSS classes safely"
+
+images:
+  - path: "artifacts/dtf-quote/public/images/logo.png"
+    description: "Minimalist modern logo mark for a printing app, abstract geometric roll shape in warm orange and beige tones, transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - The app is 100% frontend with no backend API. All state is managed locally and persisted via localStorage.
+  - The Skyline 2D strip packing algorithm handles the logic for arranging rectangles (stamps) into the fixed-width roll (58cm).

@@ -1,0 +1,54 @@
+import React from "react";
+import { Link, useLocation } from "wouter";
+import { Calculator, Clock, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+
+  const navItems = [
+    { href: "/", label: "Cotizador", icon: Calculator },
+    { href: "/history", label: "Historial", icon: Clock },
+    { href: "/settings", label: "Ajustes", icon: Settings },
+  ];
+
+  return (
+    <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto bg-background shadow-2xl overflow-hidden relative">
+      <main className="flex-1 overflow-y-auto pb-24 custom-scrollbar">
+        {children}
+      </main>
+
+      {/* Bottom Navigation */}
+      <nav className="absolute bottom-0 w-full glass-panel border-t border-border rounded-t-[2rem] px-6 py-4 flex items-center justify-between z-50">
+        {navItems.map((item) => {
+          const isActive = location === item.href;
+          const Icon = item.icon;
+          
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1.5 min-w-[4.5rem] transition-all duration-300",
+                isActive ? "text-primary scale-105" : "text-muted-foreground hover:text-foreground hover:scale-100"
+              )}
+            >
+              <div className={cn(
+                "p-3 rounded-2xl transition-colors duration-300",
+                isActive ? "bg-primary/10" : "bg-transparent"
+              )}>
+                <Icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
+              </div>
+              <span className={cn(
+                "text-[10px] font-medium transition-all duration-300",
+                isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1 absolute bottom-1"
+              )}>
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
