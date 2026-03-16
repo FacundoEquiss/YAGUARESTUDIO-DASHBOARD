@@ -1,10 +1,7 @@
-// 2D Strip Packing using a Skyline heuristic
-// Objective: Pack rectangles (stamps) into a fixed-width continuous roll minimizing the total height used.
-
 export interface StampItem {
   id: string;
-  w: number; // width in cm
-  h: number; // height in cm
+  w: number;
+  h: number;
   qty: number;
   color?: string;
 }
@@ -36,114 +33,111 @@ export const STAMP_COLORS = [
   "#D4A07A",
 ];
 
+export interface PackResult {
+  placements: PlacedStamp[];
+  totalHeight: number;
+  errors: string[];
+}
+
 export function packStamps(
   rollWidth: number,
   items: StampItem[],
   gap: number = 0.1
-): { placements: PlacedStamp[]; totalHeight: number } {
-  // Initialize skyline with a single flat segment at y=0 spanning the roll width
-  const skyline: SkylineSegment[] = [{ x: 0, w: rollWidth, h: 0 }];
+): PackResult {
+  const usableWidth = rollWidth - gap * 2;
+  const skyline: SkylineSegment[] = [{ x: 0, w: usableWidth, h: 0 }];
   const placements: PlacedStamp[] = [];
+  const errors: string[] = [];
   let maxHeight = 0;
 
-  // Flatten items based on quantity
   const toPack: {
     w: number;
     h: number;
-    originalW: number;
-    originalH: number;
     itemIndex: number;
     id: string;
     color: string;
+    label: string;
   }[] = [];
 
   items.forEach((item, index) => {
     const color = STAMP_COLORS[index % STAMP_COLORS.length];
+
+    if (item.w > usableWidth || item.h > usableWidth) {
+      if (item.w > usableWidth) {
+        errors.push(`La estampa ${item.w}×${item.h}cm es más ancha que el rollo (máx ${(usableWidth).toFixed(1)}cm).`);
+      }
+    }
+
     for (let i = 0; i < (item.qty || 0); i++) {
       toPack.push({
-        w: item.w + gap,
-        h: item.h + gap,
-        originalW: item.w,
-        originalH: item.h,
+        w: item.w,
+        h: item.h,
         itemIndex: index,
         id: `${item.id}-${i}`,
         color,
+        label: `${item.w}×${item.h}`,
       });
     }
   });
 
-  // Sort pieces. A common good heuristic for bottom-left skyline is sorting by height descending, then width descending.
-  // Alternatively, max dimension descending. Let's use max dimension to pack big items first.
   toPack.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h));
 
   for (const box of toPack) {
-    // Try both orientations and pick the one that results in the lowest placement
-    const p1 = findBestPlacement(skyline, rollWidth, box.w, box.h);
-    const p2 = findBestPlacement(skyline, rollWidth, box.h, box.w);
+    const stampW = box.w + gap;
+    const stampH = box.h + gap;
 
-    let chosen: { x: number; y: number; w: number; h: number } | null = null;
+    const placement = findBestPlacement(skyline, usableWidth, stampW, stampH);
 
-    if (p1 && p2) {
-      if (p1.y <= p2.y) chosen = { ...p1, w: box.w, h: box.h };
-      else chosen = { ...p2, w: box.h, h: box.w };
-    } else if (p1) {
-      chosen = { ...p1, w: box.w, h: box.h };
-    } else if (p2) {
-      chosen = { ...p2, w: box.h, h: box.w };
-    }
+    if (placement) {
+      const absX = gap + placement.x;
+      const absY = gap + placement.y;
 
-    if (chosen) {
       placements.push({
         id: box.id,
         itemIndex: box.itemIndex,
-        x: chosen.x,
-        y: chosen.y,
-        w: chosen.w - gap, // store original size for rendering
-        h: chosen.h - gap, // store original size for rendering
+        x: absX,
+        y: absY,
+        w: box.w,
+        h: box.h,
         color: box.color,
       });
 
-      updateSkyline(skyline, chosen.x, chosen.w, chosen.y + chosen.h);
-      maxHeight = Math.max(maxHeight, chosen.y + chosen.h);
+      updateSkyline(skyline, placement.x, stampW, placement.y + stampH);
+      maxHeight = Math.max(maxHeight, placement.y + stampH);
     } else {
-      console.warn(`Could not fit box ${box.w}x${box.h} in roll width ${rollWidth}`);
+      errors.push(`No se pudo ubicar la estampa ${box.label}cm en el rollo.`);
     }
   }
 
-  // Round up to nearest mm (0.1cm) for cleanliness
-  const finalHeight = Math.ceil(maxHeight * 10) / 10;
-  return { placements, totalHeight: finalHeight };
+  const finalHeight = Math.ceil((maxHeight + gap) * 10) / 10;
+  return { placements, totalHeight: finalHeight, errors };
 }
 
 function findBestPlacement(
   skyline: SkylineSegment[],
-  rollWidth: number,
+  usableWidth: number,
   w: number,
   h: number
 ): { x: number; y: number } | null {
-  if (w > rollWidth) return null;
+  if (w > usableWidth + 0.0001) return null;
 
   let bestY = Infinity;
   let bestX = -1;
 
   for (let i = 0; i < skyline.length; i++) {
     const seg = skyline[i];
-    
-    // Can we place it starting at this segment's x?
-    if (seg.x + w <= rollWidth + 0.0001) { // Floating point tolerance
-      let maxY = 0;
-      let canPlace = true;
 
-      // Check all segments that overlap with [seg.x, seg.x + w]
+    if (seg.x + w <= usableWidth + 0.0001) {
+      let maxY = 0;
+
       for (let j = 0; j < skyline.length; j++) {
         const s = skyline[j];
-        // Overlap condition: start of one is before end of other, AND end of one is after start of other
         if (s.x < seg.x + w - 0.0001 && s.x + s.w > seg.x + 0.0001) {
           maxY = Math.max(maxY, s.h);
         }
       }
 
-      if (canPlace && maxY < bestY) {
+      if (maxY < bestY) {
         bestY = maxY;
         bestX = seg.x;
       }
@@ -161,34 +155,23 @@ function updateSkyline(skyline: SkylineSegment[], x: number, w: number, newH: nu
   for (const seg of skyline) {
     const segEndX = seg.x + seg.w;
 
-    // Segment completely before insertion
     if (segEndX <= x + 0.0001) {
       newSkyline.push(seg);
-    }
-    // Segment completely after insertion
-    else if (seg.x >= endX - 0.0001) {
+    } else if (seg.x >= endX - 0.0001) {
       newSkyline.push(seg);
-    }
-    // Segment overlaps
-    else {
+    } else {
       if (seg.x < x - 0.0001) {
-        // Left leftover
         newSkyline.push({ x: seg.x, w: x - seg.x, h: seg.h });
       }
       if (segEndX > endX + 0.0001) {
-        // Right leftover
         newSkyline.push({ x: endX, w: segEndX - endX, h: seg.h });
       }
     }
   }
 
-  // Add the new horizontal segment
   newSkyline.push({ x, w, h: newH });
-
-  // Sort from left to right
   newSkyline.sort((a, b) => a.x - b.x);
 
-  // Merge adjacent segments with the same height to optimize
   const merged: SkylineSegment[] = [newSkyline[0]];
   for (let i = 1; i < newSkyline.length; i++) {
     const last = merged[merged.length - 1];
@@ -201,7 +184,6 @@ function updateSkyline(skyline: SkylineSegment[], x: number, w: number, newH: nu
     }
   }
 
-  // Mutate original array
   skyline.length = 0;
   skyline.push(...merged);
 }

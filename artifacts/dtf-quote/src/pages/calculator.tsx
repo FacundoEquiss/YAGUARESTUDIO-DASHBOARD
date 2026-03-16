@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Plus, Trash2, Save, Scissors } from "lucide-react";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
@@ -38,11 +38,9 @@ export function CalculatorPage() {
     }
   };
 
-  // Run packing algorithm whenever stamps or roll width changes
   const packedResult = useMemo(() => {
-    // Filter out invalid stamps before packing
     const validStamps = stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0);
-    if (validStamps.length === 0) return { placements: [], totalHeight: 0 };
+    if (validStamps.length === 0) return { placements: [], totalHeight: 0, errors: [] };
     
     return packStamps(settings.rollWidth, validStamps);
   }, [stamps, settings.rollWidth]);
@@ -64,6 +62,15 @@ export function CalculatorPage() {
       toast({
         title: "Cotización vacía",
         description: "Agrega al menos una estampa válida para cotizar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (packedResult.errors.length > 0) {
+      toast({
+        title: "Error en estampas",
+        description: packedResult.errors[0],
         variant: "destructive"
       });
       return;
@@ -285,8 +292,24 @@ export function CalculatorPage() {
         />
       </div>
 
+      {packedResult.errors.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+          <p className="font-bold mb-1">Problemas al ubicar estampas:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            {packedResult.errors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Save Action */}
-      <Button size="lg" className="w-full rounded-2xl shadow-xl mt-4" onClick={handleSave}>
+      <Button 
+        size="lg" 
+        className="w-full rounded-2xl shadow-xl mt-4" 
+        onClick={handleSave}
+        disabled={packedResult.errors.length > 0}
+      >
         <Save className="w-5 h-5 mr-2" />
         Guardar Cotización
       </Button>
