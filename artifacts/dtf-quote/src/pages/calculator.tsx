@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { Plus, Trash2, Save, Users, MessageCircle } from "lucide-react";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
 import { StampItem, packStamps, STAMP_COLORS } from "@/lib/skyline";
@@ -39,10 +41,13 @@ function buildWhatsAppFromCalc(params: {
     .map(s => `• ${s.w}cm × ${s.h}cm × ${s.qty} unid`)
     .join("\n");
 
+  const date = format(new Date(), "d 'de' MMMM, yyyy", { locale: es });
+
   let msg = `*Cotización DTF - YAGUAR ESTUDIO*\n`;
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   if (params.clientName) msg += `👤 Cliente: ${params.clientName}\n`;
   if (params.orderName) msg += `📦 Pedido: ${params.orderName}\n`;
+  msg += `📅 Fecha: ${date}\n`;
   msg += `\n*Estampas:*\n${stampLines}\n\n`;
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   msg += `📏 Metros usados: ${params.linearMeters.toFixed(2)} m\n`;
