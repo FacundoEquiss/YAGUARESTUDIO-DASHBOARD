@@ -510,6 +510,40 @@ export function CalculatorPage() {
         )}
       </div>
 
+      {/* Action buttons — desktop compact row (above visualizer) */}
+      <div className="hidden md:flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={packedResult.errors.length > 0}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "linear-gradient(135deg, rgba(249,115,22,0.92) 0%, rgba(234,88,12,0.95) 100%)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: "0 4px 12px rgba(249,115,22,0.35), 0 1px 0 rgba(255,255,255,0.25) inset",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
+        >
+          <Save className="w-4 h-4 text-white shrink-0" />
+          <span className="text-white font-bold text-sm">Guardar Cotización</span>
+        </button>
+        <button
+          onClick={handleShareWhatsApp}
+          disabled={packedResult.errors.length > 0}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "linear-gradient(135deg, rgba(37,211,102,0.92) 0%, rgba(18,183,80,0.95) 100%)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: "0 4px 12px rgba(37,211,102,0.35), 0 1px 0 rgba(255,255,255,0.25) inset",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
+        >
+          <MessageCircle className="w-4 h-4 text-white shrink-0" />
+          <span className="text-white font-bold text-sm">Enviar por WhatsApp</span>
+        </button>
+      </div>
+
       {/* Roll Visualization */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
@@ -540,8 +574,8 @@ export function CalculatorPage() {
         </div>
       )}
 
-      {/* Action buttons */}
-      <div className="flex gap-3 mt-4">
+      {/* Action buttons — mobile only (desktop has compact row above visualizer) */}
+      <div className="flex gap-3 mt-4 md:hidden">
         {/* Save button — glass primary */}
         <button
           onClick={handleSave}
