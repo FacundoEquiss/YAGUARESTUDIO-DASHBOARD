@@ -246,15 +246,20 @@ export function CalculatorPage() {
             />
           </div>
 
-          {/* Row 3: Prendas + Wholesale toggle side by side on desktop */}
-          <div className="md:flex md:items-center md:gap-4 md:pt-1 md:border-t md:border-border">
-            <div className="flex items-center gap-3 md:flex-1">
+          {/* Row 3: Prendas + Wholesale toggle */}
+          <div className="md:flex md:items-center md:gap-4 md:pt-2 md:border-t md:border-border">
+
+            {/* Prendas — compact row mobile / prominent block desktop */}
+            <div className="flex items-center gap-3 md:flex-1 md:flex md:items-center md:gap-3">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <Users className="w-4 h-4 text-primary" />
               </div>
-              <Label htmlFor="garmentsCount" className="text-foreground font-bold text-sm whitespace-nowrap">
-                Prendas
-              </Label>
+              <div className="flex flex-col leading-tight">
+                <Label htmlFor="garmentsCount" className="text-foreground font-bold text-sm whitespace-nowrap">
+                  Cantidad de prendas
+                </Label>
+                <span className="text-[11px] text-muted-foreground">Obligatorio · mín. 1</span>
+              </div>
               <Input
                 id="garmentsCount"
                 type="text"
@@ -270,7 +275,7 @@ export function CalculatorPage() {
                     setGarmentsCountRaw("1");
                   }
                 }}
-                className="h-10 text-lg font-bold text-center md:w-24 md:flex-none"
+                className="h-11 text-2xl font-black text-center md:w-28 md:flex-none"
               />
             </div>
 
