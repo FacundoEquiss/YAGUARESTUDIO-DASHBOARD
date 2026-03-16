@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Plus, Trash2, Save, Users } from "lucide-react";
+import { Plus, Trash2, Save, Users, MessageCircle } from "lucide-react";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
 import { StampItem, packStamps, STAMP_COLORS } from "@/lib/skyline";
 import { formatCurrency } from "@/lib/utils";
@@ -20,6 +20,44 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function buildWhatsAppFromCalc(params: {
+  clientName: string;
+  orderName: string;
+  stamps: { w: number; h: number; qty: number }[];
+  linearMeters: number;
+  garments: number;
+  pricePerGarment: number;
+  totalOrder: number;
+  showWholesale: boolean;
+  pricePerGarmentWholesale: number;
+  totalOrderWholesale: number;
+}): string {
+  const stampLines = params.stamps
+    .filter(s => s.w > 0 && s.h > 0 && s.qty > 0)
+    .map(s => `• ${s.w}cm × ${s.h}cm × ${s.qty} unid`)
+    .join("\n");
+
+  let msg = `*Cotización DTF - YAGUAR ESTUDIO*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━\n`;
+  if (params.clientName) msg += `👤 Cliente: ${params.clientName}\n`;
+  if (params.orderName) msg += `📦 Pedido: ${params.orderName}\n`;
+  msg += `\n*Estampas:*\n${stampLines}\n\n`;
+  msg += `━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📏 Metros usados: ${params.linearMeters.toFixed(2)} m\n`;
+  msg += `👕 Prendas: ${params.garments} unid\n`;
+  if (params.showWholesale) {
+    msg += `💰 Precio/prenda (común): ${formatCurrency(params.pricePerGarment)}\n`;
+    msg += `💰 Precio/prenda (mayorista): ${formatCurrency(params.pricePerGarmentWholesale)}\n\n`;
+    msg += `*TOTAL COMÚN: ${formatCurrency(params.totalOrder)}*\n`;
+    msg += `*TOTAL MAYORISTA: ${formatCurrency(params.totalOrderWholesale)}*\n`;
+  } else {
+    msg += `💰 Precio por prenda: ${formatCurrency(params.pricePerGarment)}\n`;
+    msg += `\n*TOTAL PEDIDO: ${formatCurrency(params.totalOrder)}*\n`;
+  }
+  msg += `\n_Cotizado con Cotizador DTF by YAGUAR ESTUDIO_`;
+  return msg;
 }
 
 export function CalculatorPage() {
@@ -121,6 +159,27 @@ export function CalculatorPage() {
     setGarmentsCountRaw("1");
     setStamps([{ id: uuidv4(), w: 28, h: 32, qty: 1 }]);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleShareWhatsApp = () => {
+    const validStamps = stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0);
+    if (validStamps.length === 0) {
+      toast({ title: "Sin estampas", description: "Agrega al menos una estampa válida.", variant: "destructive" });
+      return;
+    }
+    const msg = buildWhatsAppFromCalc({
+      clientName,
+      orderName,
+      stamps,
+      linearMeters,
+      garments,
+      pricePerGarment,
+      totalOrder,
+      showWholesale,
+      pricePerGarmentWholesale,
+      totalOrderWholesale,
+    });
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   const validStampsCount = stamps.filter(s => s.w > 0 && s.h > 0).length;
@@ -466,16 +525,56 @@ export function CalculatorPage() {
         </div>
       )}
 
-      {/* Save Action */}
-      <Button
-        size="lg"
-        className="w-full rounded-2xl shadow-xl mt-4"
-        onClick={handleSave}
-        disabled={packedResult.errors.length > 0}
-      >
-        <Save className="w-5 h-5 mr-2" />
-        Guardar Cotización
-      </Button>
+      {/* Action buttons */}
+      <div className="flex gap-3 mt-4">
+        {/* Save button — glass primary */}
+        <button
+          onClick={handleSave}
+          disabled={packedResult.errors.length > 0}
+          className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "linear-gradient(135deg, rgba(249,115,22,0.92) 0%, rgba(234,88,12,0.95) 100%)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: "0 8px 24px rgba(249,115,22,0.35), 0 1px 0 rgba(255,255,255,0.25) inset",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
+            <Save className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-white font-bold text-sm leading-tight text-center">
+            Guardar<br />Cotización
+          </span>
+        </button>
+
+        {/* WhatsApp button — glass green */}
+        <button
+          onClick={handleShareWhatsApp}
+          disabled={packedResult.errors.length > 0}
+          className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "linear-gradient(135deg, rgba(37,211,102,0.92) 0%, rgba(18,183,80,0.95) 100%)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: "0 8px 24px rgba(37,211,102,0.35), 0 1px 0 rgba(255,255,255,0.25) inset",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
+            <MessageCircle className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-white font-bold text-sm leading-tight text-center">
+            Enviar por<br />WhatsApp
+          </span>
+        </button>
+      </div>
 
     </div>
   );
