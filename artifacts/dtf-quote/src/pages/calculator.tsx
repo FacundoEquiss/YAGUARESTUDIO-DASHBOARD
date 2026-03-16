@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Plus, Trash2, Save, Scissors } from "lucide-react";
+import { Plus, Trash2, Save } from "lucide-react";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
 import { StampItem, packStamps, PlacedStamp, STAMP_COLORS } from "@/lib/skyline";
 import { formatCurrency } from "@/lib/utils";
@@ -103,19 +103,13 @@ export function CalculatorPage() {
     <div className="px-5 py-8 flex flex-col gap-8 pb-12">
       
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-primary flex items-center gap-2">
-            <Scissors className="w-8 h-8" />
-            DTF Quote
-          </h1>
-          <p className="text-muted-foreground mt-1 font-medium">Nueva Cotización</p>
-        </div>
-        <img 
-          src={`${import.meta.env.BASE_URL}images/logo.png`} 
-          alt="DTF Quote Logo" 
-          className="w-12 h-12 object-contain"
-        />
+      <div>
+        <h1 className="text-3xl font-display font-bold text-primary">
+          Cotizador DTF
+        </h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          powered by <span className="font-black">YAGUAR</span>STUDIO
+        </p>
       </div>
 
       {/* Client Info */}
