@@ -139,6 +139,7 @@
   background: #080808;
 }
 
+/* Mobile shell */
 .glass-app-shell {
   background: rgba(255, 252, 248, 0.54);
   backdrop-filter: blur(18px) saturate(140%);
@@ -146,6 +147,34 @@
 }
 .dark .glass-app-shell {
   background: rgba(8, 8, 12, 0.6);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* Desktop sidebar */
+.desktop-sidebar {
+  background: rgba(255, 250, 244, 0.72);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-right: 1px solid rgba(255, 200, 140, 0.25);
+  box-shadow: 2px 0 24px rgba(249, 115, 22, 0.06);
+}
+.dark .desktop-sidebar {
+  background: rgba(14, 10, 20, 0.78);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-right: 1px solid rgba(255, 140, 60, 0.10);
+  box-shadow: 2px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Desktop main content area */
+.glass-app-shell-desktop {
+  background: rgba(255, 250, 244, 0.50);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.dark .glass-app-shell-desktop {
+  background: rgba(8, 8, 12, 0.55);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }

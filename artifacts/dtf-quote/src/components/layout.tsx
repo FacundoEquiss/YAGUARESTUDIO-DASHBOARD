@@ -20,9 +20,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     ...(isMaster ? [{ href: "/settings", label: "Ajustes", icon: Settings }] : []),
   ];
 
+  const userLabel = isGuest ? "Invitado" : currentUser?.email ?? "";
+  const userRole = isGuest ? "Sin cuenta" : isMaster ? "Administrador" : "Cliente";
+
   return (
     <div className="glass-app-root">
-
       {/* Animated mesh gradient blobs */}
       <div className="auth-blobs" aria-hidden="true">
         <div className="auth-blob auth-blob-1" />
@@ -40,58 +42,137 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <rect width="100%" height="100%" filter="url(#layout-noise-f)" />
       </svg>
 
-      {/* App shell */}
-      <div className="relative z-10 flex flex-col min-h-[100dvh] w-full max-w-md mx-auto shadow-2xl overflow-hidden glass-app-shell">
-        <main className="flex-1 overflow-y-auto pb-24 custom-scrollbar">
+      {/* ─── DESKTOP layout ────────────────────────────── */}
+      <div className="hidden md:flex min-h-[100dvh] relative z-10">
+
+        {/* Sidebar */}
+        <aside className="fixed top-0 left-0 h-full w-[220px] flex flex-col z-40 desktop-sidebar">
+          {/* Brand */}
+          <div className="px-6 pt-7 pb-5 border-b border-white/10">
+            <p className="text-xl font-display font-black text-primary leading-none">Cotizador</p>
+            <p className="text-xs font-medium text-muted-foreground mt-0.5">
+              by <span className="font-black">YAGUAR</span> ESTUDIO
+            </p>
+          </div>
+
+          {/* Nav links */}
+          <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
+            {navItems.map((item) => {
+              const isActive = location === item.href;
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-primary/12 text-primary font-bold"
+                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-5 h-5 shrink-0" strokeWidth={isActive ? 2.5 : 2} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Bottom: theme + user */}
+          <div className="px-3 pb-5 space-y-1 border-t border-white/10 pt-3">
+            <button
+              onClick={toggleTheme}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all duration-200"
+            >
+              {isDark
+                ? <Sun className="w-5 h-5 shrink-0" strokeWidth={2} />
+                : <Moon className="w-5 h-5 shrink-0" strokeWidth={2} />}
+              {isDark ? "Modo claro" : "Modo oscuro"}
+            </button>
+
+            {/* User button */}
+            <button
+              onClick={() => setShowUserPanel(v => !v)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                showUserPanel ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-white/8 hover:text-foreground"
+              )}
+            >
+              <UserCircle className="w-5 h-5 shrink-0" strokeWidth={showUserPanel ? 2.5 : 2} />
+              <span className="truncate">{isGuest ? "Invitado" : currentUser?.name || currentUser?.email}</span>
+            </button>
+
+            {/* User dropdown */}
+            {showUserPanel && (
+              <div className="mx-1 mt-1 glass-panel rounded-xl p-3 border border-border shadow-lg">
+                <p className="text-xs font-bold text-foreground truncate">{userLabel}</p>
+                <p className="text-xs text-muted-foreground mb-2">{userRole}</p>
+                <button
+                  onClick={() => { logout(); setShowUserPanel(false); }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors text-xs font-medium"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <main className="ml-[220px] flex-1 overflow-y-auto h-[100dvh] custom-scrollbar glass-app-shell-desktop">
           {children}
         </main>
       </div>
 
-      {/* User panel overlay */}
-      {showUserPanel && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowUserPanel(false)}>
-          <div
-            className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm glass-panel rounded-2xl p-4 shadow-2xl border border-border"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <UserCircle className="w-6 h-6 text-primary" />
+      {/* ─── MOBILE layout ─────────────────────────────── */}
+      <div className="md:hidden relative z-10">
+        <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto shadow-2xl overflow-hidden glass-app-shell">
+          <main className="flex-1 overflow-y-auto pb-24 custom-scrollbar">
+            {children}
+          </main>
+        </div>
+
+        {/* Mobile user panel overlay */}
+        {showUserPanel && (
+          <div className="fixed inset-0 z-50" onClick={() => setShowUserPanel(false)}>
+            <div
+              className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm glass-panel rounded-2xl p-4 shadow-2xl border border-border"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <UserCircle className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-foreground">{userLabel}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold text-sm text-foreground">
-                    {isGuest ? "Invitado" : currentUser?.email}
-                  </p>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {isGuest ? "Sin cuenta" : currentUser?.role === "master" ? "Administrador" : "Cliente"}
-                  </p>
-                </div>
+                <button
+                  onClick={() => setShowUserPanel(false)}
+                  className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
               <button
-                onClick={() => setShowUserPanel(false)}
-                className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
+                onClick={() => { logout(); setShowUserPanel(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors text-sm font-medium"
               >
-                <X className="w-4 h-4" />
+                <LogOut className="w-4 h-4" />
+                Cerrar sesión
               </button>
             </div>
-            <button
-              onClick={() => { logout(); setShowUserPanel(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors text-sm font-medium"
-            >
-              <LogOut className="w-4 h-4" />
-              Cerrar sesión
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Fixed Navigation Bar */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel border-t border-border rounded-t-[2rem] px-4 py-4 flex items-center justify-between z-50">
+        {/* Mobile bottom nav */}
+        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel border-t border-border rounded-t-[2rem] px-4 py-4 flex items-center justify-between z-50">
           {navItems.map((item) => {
             const isActive = location === item.href;
             const Icon = item.icon;
-
             return (
               <Link
                 key={item.href}
@@ -150,6 +231,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </button>
         </nav>
+      </div>
     </div>
   );
 }

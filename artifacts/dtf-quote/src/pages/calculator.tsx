@@ -190,7 +190,10 @@ export function CalculatorPage() {
   const validStampsCount = stamps.filter(s => s.w > 0 && s.h > 0).length;
 
   return (
-    <div className="px-5 py-8 flex flex-col gap-8 pb-12">
+    <div className="px-5 py-8 md:px-10 md:py-10 pb-12 md:flex md:gap-8 md:items-start">
+
+      {/* ── LEFT COLUMN (form inputs) ── */}
+      <div className="flex flex-col gap-8 md:flex-1 md:min-w-0">
 
       {/* Header */}
       <div>
@@ -439,6 +442,11 @@ export function CalculatorPage() {
         </Button>
       </div>
 
+      </div>{/* end LEFT COLUMN */}
+
+      {/* ── RIGHT COLUMN (summary + visualizer) ── */}
+      <div className="flex flex-col gap-6 md:w-[400px] md:shrink-0 md:sticky md:top-8 mt-8 md:mt-0">
+
       {/* Summary Card */}
       <div className="bg-gradient-to-br from-[#F97316] to-[#EA580C] rounded-[1.5rem] p-6 text-white shadow-xl shadow-orange-500/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -582,6 +590,8 @@ export function CalculatorPage() {
           </span>
         </button>
       </div>
+
+      </div>{/* end RIGHT COLUMN */}
 
     </div>
   );

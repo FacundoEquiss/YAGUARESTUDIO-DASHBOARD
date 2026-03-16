@@ -44,7 +44,7 @@ export function HistoryPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div className="px-5 py-8 flex flex-col gap-6 pb-12">
+    <div className="px-5 py-8 md:px-10 md:py-10 flex flex-col gap-6 pb-12 md:max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold">Historial</h1>
