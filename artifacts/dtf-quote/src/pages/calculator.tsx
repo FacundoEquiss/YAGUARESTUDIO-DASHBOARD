@@ -193,10 +193,10 @@ export function CalculatorPage() {
     <div className="px-5 py-8 md:px-10 md:py-10 pb-12 md:flex md:gap-8 md:items-start">
 
       {/* ── LEFT COLUMN (form inputs) ── */}
-      <div className="flex flex-col gap-8 md:flex-1 md:min-w-0">
+      <div className="flex flex-col gap-8 md:gap-4 md:flex-1 md:min-w-0">
 
-      {/* Header */}
-      <div>
+      {/* Header — hidden on desktop (sidebar already shows brand) */}
+      <div className="md:hidden">
         <h1 className="text-3xl font-display font-bold text-primary">
           Cotizador DTF
         </h1>
@@ -205,31 +205,36 @@ export function CalculatorPage() {
         </p>
       </div>
 
-      {/* Client Info */}
+      {/* Client Info + Garments — merged compact card on desktop */}
       <Card className="border-none shadow-md overflow-hidden bg-card/60 backdrop-blur">
-        <CardContent className="p-5 space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="clientName" className="text-foreground font-bold">Cliente</Label>
-            <Input
-              id="clientName"
-              placeholder="Ej: Juan Pérez"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-            />
+        <CardContent className="p-5 space-y-3">
+          {/* Row 1: Cliente + Pedido side by side on desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="clientName" className="text-foreground font-bold text-sm">Cliente</Label>
+              <Input
+                id="clientName"
+                placeholder="Ej: Juan Pérez"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="orderName" className="text-foreground font-bold text-sm">
+                Pedido <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
+              <Input
+                id="orderName"
+                placeholder="Ej: Camisetas Azules"
+                value={orderName}
+                onChange={(e) => setOrderName(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="orderName" className="text-foreground font-bold">
-              Nombre del Pedido <span className="text-muted-foreground font-normal">(opcional)</span>
-            </Label>
-            <Input
-              id="orderName"
-              placeholder="Ej: Camisetas Azules"
-              value={orderName}
-              onChange={(e) => setOrderName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="notes" className="text-foreground font-bold">
+
+          {/* Row 2: Notas — compact */}
+          <div className="space-y-1">
+            <Label htmlFor="notes" className="text-foreground font-bold text-sm">
               Notas <span className="text-muted-foreground font-normal">(opcional)</span>
             </Label>
             <Textarea
@@ -237,46 +242,40 @@ export function CalculatorPage() {
               placeholder="Detalles del pedido..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[60px]"
+              className="min-h-[48px] md:min-h-[40px] resize-none"
             />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Garments Count */}
-      <Card className="border-none shadow-md overflow-hidden bg-card/60 backdrop-blur">
-        <CardContent className="p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <Label htmlFor="garmentsCount" className="text-foreground font-bold text-base">
-                Cantidad de prendas a estampar
+          {/* Row 3: Prendas + Wholesale toggle side by side on desktop */}
+          <div className="md:flex md:items-center md:gap-4 md:pt-1 md:border-t md:border-border">
+            <div className="flex items-center gap-3 md:flex-1">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-primary" />
+              </div>
+              <Label htmlFor="garmentsCount" className="text-foreground font-bold text-sm whitespace-nowrap">
+                Prendas
               </Label>
-              <p className="text-xs text-muted-foreground">Obligatorio · mínimo 1</p>
+              <Input
+                id="garmentsCount"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={garmentsCountRaw}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, "");
+                  setGarmentsCountRaw(val);
+                }}
+                onBlur={() => {
+                  if (!garmentsCountRaw || parseInt(garmentsCountRaw) < 1) {
+                    setGarmentsCountRaw("1");
+                  }
+                }}
+                className="h-10 text-lg font-bold text-center md:w-24 md:flex-none"
+              />
             </div>
-          </div>
-          <Input
-            id="garmentsCount"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={garmentsCountRaw}
-            onChange={(e) => {
-              const val = e.target.value.replace(/[^0-9]/g, "");
-              setGarmentsCountRaw(val);
-            }}
-            onBlur={() => {
-              if (!garmentsCountRaw || parseInt(garmentsCountRaw) < 1) {
-                setGarmentsCountRaw("1");
-              }
-            }}
-            className="h-12 text-xl font-bold text-center"
-          />
 
           {/* iOS-style wholesale toggle */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border md:mt-0 md:pt-0 md:border-0 md:shrink-0">
             <div>
               <p className="text-sm font-semibold text-foreground">Ver también precio mayorista</p>
             </div>
@@ -311,6 +310,7 @@ export function CalculatorPage() {
               />
             </button>
           </div>
+          </div>{/* end Row 3 */}
         </CardContent>
       </Card>
 
