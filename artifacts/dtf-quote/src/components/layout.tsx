@@ -45,47 +45,49 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto pb-24 custom-scrollbar">
           {children}
         </main>
+      </div>
 
-        {/* User panel overlay */}
-        {showUserPanel && (
-          <div className="fixed inset-0 z-50" onClick={() => setShowUserPanel(false)}>
-            <div
-              className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm glass-panel rounded-2xl p-4 shadow-2xl border border-border"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <UserCircle className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm text-foreground">
-                      {isGuest ? "Invitado" : currentUser?.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {isGuest ? "Sin cuenta" : currentUser?.role === "master" ? "Administrador" : "Cliente"}
-                    </p>
-                  </div>
+      {/* User panel overlay */}
+      {showUserPanel && (
+        <div className="fixed inset-0 z-50" onClick={() => setShowUserPanel(false)}>
+          <div
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm glass-panel rounded-2xl p-4 shadow-2xl border border-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UserCircle className="w-6 h-6 text-primary" />
                 </div>
-                <button
-                  onClick={() => setShowUserPanel(false)}
-                  className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div>
+                  <p className="font-bold text-sm text-foreground">
+                    {isGuest ? "Invitado" : currentUser?.email}
+                  </p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {isGuest ? "Sin cuenta" : currentUser?.role === "master" ? "Administrador" : "Cliente"}
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => { logout(); setShowUserPanel(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors text-sm font-medium"
+                onClick={() => setShowUserPanel(false)}
+                className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
               >
-                <LogOut className="w-4 h-4" />
-                Cerrar sesión
+                <X className="w-4 h-4" />
               </button>
             </div>
+            <button
+              onClick={() => { logout(); setShowUserPanel(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors text-sm font-medium"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel border-t border-border rounded-t-[2rem] px-4 py-4 flex items-center justify-between z-50">
+      {/* Fixed Navigation Bar */}
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel border-t border-border rounded-t-[2rem] px-4 py-4 flex items-center justify-between z-50">
           {navItems.map((item) => {
             const isActive = location === item.href;
             const Icon = item.icon;
@@ -148,7 +150,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </button>
         </nav>
-      </div>
     </div>
   );
 }
