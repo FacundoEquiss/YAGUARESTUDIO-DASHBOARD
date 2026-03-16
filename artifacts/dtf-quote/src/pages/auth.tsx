@@ -76,8 +76,8 @@ export function AuthPage() {
             onClick={() => { setTab(t); setError(null); }}
             className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
               tab === t
-                ? "bg-white dark:bg-gray-800 text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white"
+                : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
             {t === "login" ? "Iniciar Sesión" : "Crear Cuenta"}
