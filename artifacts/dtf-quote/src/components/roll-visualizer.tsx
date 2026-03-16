@@ -70,21 +70,14 @@ export function RollVisualizer({
 
       {/* SVG Canvas — fixed-width roll, scrollable height */}
       <div
-        className="relative w-full max-h-[480px] overflow-y-auto custom-scrollbar p-5 flex justify-center"
-        style={{
-          background: "rgba(255,255,255,0.35)",
-          backdropFilter: "blur(16px) saturate(160%)",
-          WebkitBackdropFilter: "blur(16px) saturate(160%)",
-          borderTop: "1px solid rgba(255,255,255,0.55)",
-          borderBottom: "1px solid rgba(255,200,150,0.2)",
-        }}
+        className="relative w-full max-h-[480px] overflow-y-auto custom-scrollbar p-5 flex justify-center roll-canvas-bg"
       >
         {placements.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-muted-foreground text-sm font-medium">
             Agrega estampas para ver la previsualización
           </div>
         ) : (() => {
-          const DISPLAY_WIDTH = 270;
+          const DISPLAY_WIDTH = 300;
           const scale = DISPLAY_WIDTH / vWidth;
           const displayHeight = Math.max(Math.round(vHeight * scale), 80);
           return (
