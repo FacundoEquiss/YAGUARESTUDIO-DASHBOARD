@@ -68,16 +68,22 @@ export function RollVisualizer({
         </div>
       </div>
 
-      {/* SVG Canvas */}
-      <div className="relative w-full max-h-[500px] overflow-y-auto custom-scrollbar p-4 bg-secondary/20 flex justify-center">
+      {/* SVG Canvas — fixed-width roll, scrollable height */}
+      <div className="relative w-full max-h-[480px] overflow-y-auto custom-scrollbar p-4 bg-secondary/20 flex justify-center">
         {placements.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-muted-foreground text-sm font-medium">
             Agrega estampas para ver la previsualización
           </div>
-        ) : (
+        ) : (() => {
+          const DISPLAY_WIDTH = 200;
+          const scale = DISPLAY_WIDTH / vWidth;
+          const displayHeight = Math.max(Math.round(vHeight * scale), 80);
+          return (
           <svg
+            width={DISPLAY_WIDTH}
+            height={displayHeight}
             viewBox={`0 0 ${vWidth} ${vHeight}`}
-            className="w-full h-auto origin-top transition-all duration-500 ease-out rounded-2xl overflow-hidden"
+            style={{ display: "block", flexShrink: 0 }}
             preserveAspectRatio="xMidYMin meet"
           >
             <defs>
@@ -135,7 +141,8 @@ export function RollVisualizer({
               </g>
             ))}
           </svg>
-        )}
+          );
+        })()}
       </div>
 
       {legend && legend.length > 0 && (

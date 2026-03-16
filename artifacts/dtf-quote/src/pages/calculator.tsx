@@ -446,30 +446,32 @@ export function CalculatorPage() {
 
         <h3 className="font-display text-xl font-bold mb-4 opacity-90">Resumen de Costos</h3>
 
-        <div className="space-y-2 mb-4">
+        <div className="space-y-1.5 mb-5 bg-black/10 rounded-xl px-3 py-2.5">
           {stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0).map((s) => (
-            <div key={s.id} className="flex items-center gap-2 text-sm text-white/80">
-              <span className="w-2 h-2 rounded-full bg-white/60 shrink-0"></span>
-              <span>{s.qty} × {s.w}×{s.h}cm</span>
+            <div key={s.id} className="flex items-center gap-2 text-sm text-white">
+              <span className="w-2 h-2 rounded-full bg-white/70 shrink-0"></span>
+              <span className="font-medium">{s.qty} × {s.w}×{s.h}cm</span>
             </div>
           ))}
         </div>
 
-        <div className="space-y-3 mb-6">
-          <div className="flex justify-between items-center pb-3 border-b border-white/20">
-            <span className="text-white/80">Metros lineales usados</span>
-            <span className="font-bold text-lg">{linearMeters.toFixed(3)} m</span>
+        <div className="space-y-0 mb-5 rounded-xl overflow-hidden border border-white/20">
+          <div className="flex justify-between items-center px-3 py-2.5 bg-black/10 border-b border-white/15">
+            <span className="text-white/90 text-sm">Metros lineales</span>
+            <span className="font-bold text-white">{linearMeters.toFixed(3)} m</span>
           </div>
-          <div className="flex justify-between items-center pb-3 border-b border-white/20">
-            <span className="text-white/80">Prendas</span>
-            <span className="font-bold">{garments} unid.</span>
+          <div className="flex justify-between items-center px-3 py-2.5 bg-black/10 border-b border-white/15">
+            <span className="text-white/90 text-sm">Prendas</span>
+            <span className="font-bold text-white">{garments} unid.</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-white/80">Precio por prenda</span>
+          <div className="flex justify-between items-center px-3 py-2.5 bg-black/10">
+            <span className="text-white/90 text-sm">Precio por prenda</span>
             <div className="text-right">
-              <span className="font-bold">{formatCurrency(pricePerGarment)}</span>
+              <div className="font-bold text-white text-base">{formatCurrency(pricePerGarment)}</div>
               {showWholesale && (
-                <div className="text-white/60 text-xs font-medium">Mayorista: {formatCurrency(pricePerGarmentWholesale)}</div>
+                <div className="text-white text-sm font-semibold bg-white/20 rounded-md px-2 py-0.5 mt-0.5">
+                  Mayorista: {formatCurrency(pricePerGarmentWholesale)}
+                </div>
               )}
             </div>
           </div>
