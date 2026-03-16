@@ -186,14 +186,20 @@ export function CalculatorPage() {
               <p className="text-xs text-muted-foreground">Obligatorio · mínimo 1</p>
             </div>
           </div>
-          <Input 
-            id="garmentsCount"
-            type="number"
-            min="1"
-            value={garmentsCount}
-            onChange={(e) => setGarmentsCount(Math.max(1, parseInt(e.target.value) || 1))}
-            className="h-12 text-xl font-bold text-center"
-          />
+          <div className="relative">
+            <Input 
+              id="garmentsCount"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={garmentsCount}
+              onChange={(e) => {
+                const num = parseInt(e.target.value) || 1;
+                setGarmentsCount(Math.max(1, num));
+              }}
+              className="h-12 text-xl font-bold text-center"
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -287,7 +293,7 @@ export function CalculatorPage() {
                   {stamp.w > 0 && stamp.h > 0 && stamp.qty > 0 && (
                     <div className="pl-2">
                       <span 
-                        className="text-xs font-medium px-3 py-1 rounded-full border"
+                        className="text-xs font-medium px-3 py-1 rounded-full border dark:text-white dark:border-opacity-80"
                         style={{
                           color: stampColor,
                           backgroundColor: hexToRgba(stampColor, 0.1),

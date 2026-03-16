@@ -26,8 +26,8 @@ export function HistoryPage() {
       </div>
 
       {quotes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center mt-20 p-8 border-2 border-dashed border-border rounded-3xl bg-white/50">
-          <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mb-4">
+        <div className="flex flex-col items-center justify-center text-center mt-20 p-8 border-2 border-dashed border-border rounded-3xl bg-card/50 dark:bg-gray-900/50">
+          <div className="w-16 h-16 bg-accent dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
             <FileText className="w-8 h-8 text-primary opacity-50" />
           </div>
           <h3 className="text-xl font-bold text-foreground mb-2">No hay cotizaciones</h3>
@@ -42,22 +42,22 @@ export function HistoryPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-white rounded-2xl p-4 shadow-sm border border-border cursor-pointer hover:shadow-md transition-all group flex items-stretch"
+                className="bg-card rounded-2xl p-4 shadow-sm border border-border cursor-pointer hover:shadow-md transition-all group flex items-stretch dark:border-border dark:bg-gray-900"
                 onClick={() => setSelectedQuote(quote)}
               >
                 <div className="flex-1 pr-4">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-lg text-foreground line-clamp-1">{quote.clientName}</h3>
-                    <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-1 rounded-md shrink-0 ml-2">
+                    <span className="text-xs font-medium text-muted-foreground bg-secondary dark:bg-gray-800 dark:text-gray-300 px-2 py-1 rounded-md shrink-0 ml-2">
                       {format(quote.createdAt, "d MMM, yy", { locale: es })}
                     </span>
                   </div>
                   
                   <div className="flex flex-wrap gap-2 mb-3">
-                    <span className="text-xs font-medium bg-orange-50 text-orange-700 px-2 py-1 rounded-md border border-orange-100">
+                    <span className="text-xs font-medium bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-md border border-orange-100 dark:border-orange-800">
                       {quote.linearMeters.toFixed(2)} m
                     </span>
-                    <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-1 rounded-md">
+                    <span className="text-xs font-medium bg-muted dark:bg-gray-800 text-muted-foreground dark:text-gray-400 px-2 py-1 rounded-md dark:border dark:border-gray-700">
                       {quote.stamps.reduce((acc, s) => acc + s.qty, 0)} ítems
                     </span>
                   </div>
@@ -67,8 +67,8 @@ export function HistoryPage() {
                   </div>
                 </div>
 
-                <div className="w-12 border-l border-border flex flex-col justify-center items-center gap-4">
-                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                <div className="w-12 border-l border-border dark:border-gray-700 flex flex-col justify-center items-center gap-4">
+                  <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-gray-500 group-hover:text-primary transition-colors" />
                 </div>
               </motion.div>
             ))}
@@ -79,8 +79,8 @@ export function HistoryPage() {
       {/* Quote Details Modal */}
       <Dialog open={!!selectedQuote} onOpenChange={(open) => !open && setSelectedQuote(null)}>
         {selectedQuote && (
-          <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden bg-background">
-            <div className="p-6 pb-4 bg-gradient-to-b from-orange-50 to-background">
+          <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden bg-background dark:bg-gray-950">
+            <div className="p-6 pb-4 bg-gradient-to-b from-orange-50 dark:from-gray-900 to-background dark:to-gray-950">
               <DialogHeader className="mb-4">
                 <DialogTitle className="text-2xl font-display flex justify-between items-start">
                   <span>{selectedQuote.clientName}</span>
@@ -92,19 +92,19 @@ export function HistoryPage() {
               </DialogHeader>
 
               {selectedQuote.notes && (
-                <div className="bg-white p-3 rounded-xl border border-border text-sm text-foreground/80 mb-4 shadow-sm italic">
+                <div className="bg-card dark:bg-gray-800 p-3 rounded-xl border border-border dark:border-gray-700 text-sm text-foreground dark:text-gray-300 mb-4 shadow-sm italic">
                   "{selectedQuote.notes}"
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-white p-3 rounded-xl border border-border shadow-sm">
-                  <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Material</div>
-                  <div className="font-bold">{selectedQuote.linearMeters.toFixed(3)} m</div>
+                <div className="bg-card dark:bg-gray-800 p-3 rounded-xl border border-border dark:border-gray-700 shadow-sm">
+                  <div className="text-xs text-muted-foreground dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Material</div>
+                  <div className="font-bold text-foreground dark:text-white">{selectedQuote.linearMeters.toFixed(3)} m</div>
                 </div>
-                <div className="bg-white p-3 rounded-xl border border-border shadow-sm">
-                  <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Fecha</div>
-                  <div className="font-bold">{format(selectedQuote.createdAt, "dd/MM/yyyy")}</div>
+                <div className="bg-card dark:bg-gray-800 p-3 rounded-xl border border-border dark:border-gray-700 shadow-sm">
+                  <div className="text-xs text-muted-foreground dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Fecha</div>
+                  <div className="font-bold text-foreground dark:text-white">{format(selectedQuote.createdAt, "dd/MM/yyyy")}</div>
                 </div>
               </div>
 
@@ -120,7 +120,7 @@ export function HistoryPage() {
               />
             </div>
             
-            <div className="p-4 border-t border-border bg-white flex justify-between gap-3">
+            <div className="p-4 border-t border-border dark:border-gray-700 bg-card dark:bg-gray-900 flex justify-between gap-3">
               <Button 
                 variant="destructive" 
                 className="flex-1"
