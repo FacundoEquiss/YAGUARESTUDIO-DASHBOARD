@@ -31,20 +31,66 @@ const DEFAULT_SETTINGS: DTFSettings = {
   rollWidth: 58,
 };
 
+async function fetchSettingsFromAPI(): Promise<DTFSettings> {
+  const res = await fetch("/api/settings");
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const data = await res.json();
+  return {
+    pricePerMeter: data.pricePerMeter,
+    rollWidth: data.rollWidth,
+  };
+}
+
+async function pushSettingsToAPI(settings: Partial<DTFSettings>): Promise<DTFSettings> {
+  const res = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const data = await res.json();
+  return {
+    pricePerMeter: data.pricePerMeter,
+    rollWidth: data.rollWidth,
+  };
+}
+
 export function useDTFSettings() {
   const [settings, setSettingsState] = useState<DTFSettings>(() =>
     getStorage(SETTINGS_KEY, DEFAULT_SETTINGS)
   );
+  const [settingsLoading, setSettingsLoading] = useState(true);
 
-  const setSettings = useCallback((newSettings: Partial<DTFSettings>) => {
-    setSettingsState((prev) => {
-      const updated = { ...prev, ...newSettings };
-      setStorage(SETTINGS_KEY, updated);
-      return updated;
-    });
+  useEffect(() => {
+    let cancelled = false;
+    fetchSettingsFromAPI()
+      .then((remote) => {
+        if (!cancelled) {
+          setSettingsState(remote);
+          setStorage(SETTINGS_KEY, remote);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSettingsLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
-  return { settings, setSettings };
+  const setSettings = useCallback(async (newSettings: Partial<DTFSettings>) => {
+    const merged = { ...settings, ...newSettings };
+    setSettingsState(merged);
+    setStorage(SETTINGS_KEY, merged);
+    try {
+      const confirmed = await pushSettingsToAPI(newSettings);
+      setSettingsState(confirmed);
+      setStorage(SETTINGS_KEY, confirmed);
+    } catch (err) {
+      console.error("Failed to sync settings to API:", err);
+    }
+  }, [settings]);
+
+  return { settings, setSettings, settingsLoading };
 }
 
 export function useDTFQuotes(userId: string = "guest") {
