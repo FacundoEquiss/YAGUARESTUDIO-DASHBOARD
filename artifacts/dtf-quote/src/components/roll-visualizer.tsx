@@ -69,13 +69,22 @@ export function RollVisualizer({
       </div>
 
       {/* SVG Canvas — fixed-width roll, scrollable height */}
-      <div className="relative w-full max-h-[480px] overflow-y-auto custom-scrollbar p-4 bg-secondary/20 flex justify-center">
+      <div
+        className="relative w-full max-h-[480px] overflow-y-auto custom-scrollbar p-5 flex justify-center"
+        style={{
+          background: "rgba(255,255,255,0.35)",
+          backdropFilter: "blur(16px) saturate(160%)",
+          WebkitBackdropFilter: "blur(16px) saturate(160%)",
+          borderTop: "1px solid rgba(255,255,255,0.55)",
+          borderBottom: "1px solid rgba(255,200,150,0.2)",
+        }}
+      >
         {placements.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-muted-foreground text-sm font-medium">
             Agrega estampas para ver la previsualización
           </div>
         ) : (() => {
-          const DISPLAY_WIDTH = 200;
+          const DISPLAY_WIDTH = 270;
           const scale = DISPLAY_WIDTH / vWidth;
           const displayHeight = Math.max(Math.round(vHeight * scale), 80);
           return (
@@ -93,21 +102,27 @@ export function RollVisualizer({
                   <stop offset="100%" style={{ stopColor: hexToRgba(p.color, 0.72) }} />
                 </linearGradient>
               ))}
+              <filter id="roll-shadow" x="-8%" y="-1%" width="116%" height="102%">
+                <feDropShadow dx="0" dy="0.6" stdDeviation="1.2" floodColor="#C97B3A" floodOpacity="0.22" />
+              </filter>
+              <linearGradient id="paper-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#FFF8F0" />
+                <stop offset="45%" stopColor="#FFFDF9" />
+                <stop offset="100%" stopColor="#FFF0E0" />
+              </linearGradient>
             </defs>
 
-            {/* Dark outer background — always matches SVG height */}
-            <rect x="0" y="0" width={vWidth} height={vHeight} fill="#111827" />
-
-            {/* Roll background (white paper) */}
+            {/* Roll background — warm paper with glass-friendly soft shadow */}
             <rect
               x={padding}
               y={padding}
               width={rollWidth}
               height={totalHeight}
-              fill="#FFFAF5"
-              stroke="#E8D4C0"
-              strokeWidth="0.8"
-              rx="0"
+              fill="url(#paper-grad)"
+              stroke="#DFC4A8"
+              strokeWidth="0.5"
+              rx="0.5"
+              filter="url(#roll-shadow)"
             />
 
             {/* Stamps — centered, gradient fill, thin contrasted border */}
