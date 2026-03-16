@@ -36,6 +36,7 @@ export function CalculatorPage() {
   const [stamps, setStamps] = useState<StampItem[]>([
     { id: uuidv4(), w: 28, h: 32, qty: 1 }
   ]);
+  const [showWholesale, setShowWholesale] = useState(false);
 
   const garmentsCount = Math.max(1, parseInt(garmentsCountRaw) || 0);
 
@@ -66,6 +67,8 @@ export function CalculatorPage() {
   const rawCostPerGarment = rawCost / garments;
   const pricePerGarment = Math.ceil((rawCostPerGarment + 2000) / 100) * 100;
   const totalOrder = pricePerGarment * garments;
+  const pricePerGarmentWholesale = Math.ceil((rawCostPerGarment + 1200) / 100) * 100;
+  const totalOrderWholesale = pricePerGarmentWholesale * garments;
 
   const handleSave = () => {
     if (!clientName.trim()) {
@@ -204,6 +207,44 @@ export function CalculatorPage() {
             }}
             className="h-12 text-xl font-bold text-center"
           />
+
+          {/* iOS-style wholesale toggle */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Ver también precio mayorista</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Muestra precio con margen reducido ($1.200)</p>
+            </div>
+            <button
+              onClick={() => setShowWholesale(v => !v)}
+              aria-label="Toggle precio mayorista"
+              style={{
+                width: 51,
+                height: 31,
+                borderRadius: 999,
+                backgroundColor: showWholesale ? "#f97316" : isDark ? "#374151" : "#d1d5db",
+                position: "relative",
+                border: "none",
+                cursor: "pointer",
+                transition: "background-color 0.25s ease",
+                flexShrink: 0,
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: showWholesale ? 22 : 2,
+                  width: 27,
+                  height: 27,
+                  borderRadius: "50%",
+                  backgroundColor: "#ffffff",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                  transition: "left 0.25s ease",
+                  display: "block",
+                }}
+              />
+            </button>
+          </div>
         </CardContent>
       </Card>
 
@@ -280,15 +321,28 @@ export function CalculatorPage() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Cantidad</Label>
-                      <Input
+                      <input
                         type="number"
                         min="1"
                         value={stamp.qty || ""}
                         onChange={(e) => updateStamp(stamp.id, "qty", parseInt(e.target.value) || 0)}
-                        className="h-10 px-3 font-bold !text-black dark:!text-white"
                         style={{
+                          display: "flex",
+                          height: 40,
+                          width: "100%",
+                          borderRadius: 12,
+                          paddingLeft: 12,
+                          paddingRight: 12,
+                          fontWeight: 700,
+                          fontSize: "0.9rem",
+                          outline: "none",
+                          border: "none",
+                          appearance: "none",
+                          WebkitAppearance: "none",
                           backgroundColor: hexToRgba(stampColor, isDark ? 0.4 : 0.12),
-                          borderColor: hexToRgba(stampColor, isDark ? 0.7 : 0.4),
+                          boxShadow: `0 0 0 1.5px ${hexToRgba(stampColor, isDark ? 0.7 : 0.4)}`,
+                          color: isDark ? "#ffffff" : "#111827",
+                          transition: "box-shadow 0.2s",
                         }}
                       />
                     </div>
@@ -348,17 +402,39 @@ export function CalculatorPage() {
             <span className="font-bold">{garments} unid.</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-white/80">Costo por prenda</span>
-            <span className="font-bold">{formatCurrency(pricePerGarment)}</span>
+            <span className="text-white/80">Precio por prenda</span>
+            <div className="text-right">
+              <span className="font-bold">{formatCurrency(pricePerGarment)}</span>
+              {showWholesale && (
+                <div className="text-white/60 text-xs font-medium">Mayorista: {formatCurrency(pricePerGarmentWholesale)}</div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="bg-white text-foreground rounded-xl p-4 flex justify-between items-end shadow-inner">
-          <span className="text-sm font-bold text-muted-foreground tracking-widest uppercase">TOTAL PEDIDO</span>
-          <span className="text-3xl font-display font-black text-primary">
-            {formatCurrency(totalOrder)}
-          </span>
-        </div>
+        {showWholesale ? (
+          <div className="space-y-2">
+            <div className="bg-white/15 rounded-xl p-4 flex justify-between items-end">
+              <span className="text-xs font-bold text-white/70 tracking-widest uppercase">TOTAL COMÚN</span>
+              <span className="text-2xl font-display font-black text-white">
+                {formatCurrency(totalOrder)}
+              </span>
+            </div>
+            <div className="bg-white text-foreground rounded-xl p-4 flex justify-between items-end shadow-inner">
+              <span className="text-xs font-bold text-muted-foreground tracking-widest uppercase">TOTAL MAYORISTA</span>
+              <span className="text-2xl font-display font-black text-primary">
+                {formatCurrency(totalOrderWholesale)}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white text-foreground rounded-xl p-4 flex justify-between items-end shadow-inner">
+            <span className="text-sm font-bold text-muted-foreground tracking-widest uppercase">TOTAL PEDIDO</span>
+            <span className="text-3xl font-display font-black text-primary">
+              {formatCurrency(totalOrder)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Roll Visualization */}
