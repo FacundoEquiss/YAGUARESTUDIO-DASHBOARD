@@ -42,7 +42,7 @@ export interface PackResult {
 export function packStamps(
   rollWidth: number,
   items: StampItem[],
-  gap: number = 0.1
+  gap: number = 0.25
 ): PackResult {
   const usableWidth = rollWidth - gap * 2;
   const skyline: SkylineSegment[] = [{ x: 0, w: usableWidth, h: 0 }];
