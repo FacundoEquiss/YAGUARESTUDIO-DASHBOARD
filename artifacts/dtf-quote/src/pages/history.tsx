@@ -54,10 +54,10 @@ export function HistoryPage() {
                   </div>
                   
                   <div className="flex flex-wrap gap-2 mb-3">
-                    <span className="text-xs font-medium bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-md border border-orange-100 dark:border-orange-800">
+                    <span className="text-xs font-medium bg-orange-50 dark:bg-gray-950 text-orange-700 dark:text-orange-400 px-2 py-1 rounded-md border border-orange-100 dark:border-gray-800">
                       {quote.linearMeters.toFixed(2)} m
                     </span>
-                    <span className="text-xs font-medium bg-muted dark:bg-gray-800 text-muted-foreground dark:text-gray-400 px-2 py-1 rounded-md dark:border dark:border-gray-700">
+                    <span className="text-xs font-medium bg-muted dark:bg-gray-950 text-muted-foreground dark:text-gray-400 px-2 py-1 rounded-md dark:border dark:border-gray-800">
                       {quote.stamps.reduce((acc, s) => acc + s.qty, 0)} ítems
                     </span>
                   </div>
