@@ -212,7 +212,6 @@ export function CalculatorPage() {
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
             <div>
               <p className="text-sm font-semibold text-foreground">Ver también precio mayorista</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Muestra precio con margen reducido ($1.200)</p>
             </div>
             <button
               onClick={() => setShowWholesale(v => !v)}

@@ -69,71 +69,72 @@ export function RollVisualizer({
       </div>
 
       {/* SVG Canvas */}
-      <div className="relative w-full max-h-[500px] overflow-y-auto custom-scrollbar p-6 bg-secondary/20 flex justify-center">
+      <div className="relative w-full max-h-[500px] overflow-y-auto custom-scrollbar p-4 bg-secondary/20 flex justify-center">
         {placements.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-muted-foreground text-sm font-medium">
             Agrega estampas para ver la previsualización
           </div>
         ) : (
-          <div className="rounded-2xl p-5 bg-gray-900 shadow-2xl w-full">
-            <svg
-              viewBox={`0 0 ${vWidth} ${vHeight}`}
-              className="w-full h-auto origin-top transition-all duration-500 ease-out"
-              preserveAspectRatio="xMidYMin meet"
-            >
-              <defs>
-                {placements.map((p, idx) => (
-                  <linearGradient key={`grad-${idx}`} id={`stampGradient-${idx}`} x1="0%" y1="0%" x2="30%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: hexToRgba(p.color, 0.95) }} />
-                    <stop offset="100%" style={{ stopColor: hexToRgba(p.color, 0.72) }} />
-                  </linearGradient>
-                ))}
-              </defs>
-
-              {/* Roll background */}
-              <rect
-                x={padding}
-                y={padding}
-                width={rollWidth}
-                height={totalHeight}
-                fill="#FFFAF5"
-                stroke="#E8D4C0"
-                strokeWidth="0.8"
-                rx="0"
-              />
-
-              {/* Stamps — centered, gradient fill, thin contrasted border */}
+          <svg
+            viewBox={`0 0 ${vWidth} ${vHeight}`}
+            className="w-full h-auto origin-top transition-all duration-500 ease-out rounded-2xl overflow-hidden"
+            preserveAspectRatio="xMidYMin meet"
+          >
+            <defs>
               {placements.map((p, idx) => (
-                <g key={p.id}>
-                  <rect
-                    x={padding + p.x + centerOffsetX}
-                    y={padding + p.y}
-                    width={p.w}
-                    height={p.h}
-                    fill={`url(#stampGradient-${idx})`}
-                    stroke={getDarkerColor(p.color)}
-                    strokeWidth="0.15"
-                    rx="0.4"
-                  />
-                  {p.w > 3 && p.h > 2.5 && (
-                    <text
-                      x={padding + p.x + centerOffsetX + p.w / 2}
-                      y={padding + p.y + p.h / 2}
-                      fill="#2C1810"
-                      fontSize={Math.min(p.w * 0.12, p.h * 0.18, 2.2)}
-                      fontFamily="Outfit, sans-serif"
-                      fontWeight="600"
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      opacity="0.75"
-                    >
-                      {Math.round(p.w)}×{Math.round(p.h)}
-                    </text>
-                  )}
-                </g>
+                <linearGradient key={`grad-${idx}`} id={`stampGradient-${idx}`} x1="0%" y1="0%" x2="30%" y2="100%">
+                  <stop offset="0%" style={{ stopColor: hexToRgba(p.color, 0.95) }} />
+                  <stop offset="100%" style={{ stopColor: hexToRgba(p.color, 0.72) }} />
+                </linearGradient>
               ))}
-            </svg>
-          </div>
+            </defs>
+
+            {/* Dark outer background — always matches SVG height */}
+            <rect x="0" y="0" width={vWidth} height={vHeight} fill="#111827" />
+
+            {/* Roll background (white paper) */}
+            <rect
+              x={padding}
+              y={padding}
+              width={rollWidth}
+              height={totalHeight}
+              fill="#FFFAF5"
+              stroke="#E8D4C0"
+              strokeWidth="0.8"
+              rx="0"
+            />
+
+            {/* Stamps — centered, gradient fill, thin contrasted border */}
+            {placements.map((p, idx) => (
+              <g key={p.id}>
+                <rect
+                  x={padding + p.x + centerOffsetX}
+                  y={padding + p.y}
+                  width={p.w}
+                  height={p.h}
+                  fill={`url(#stampGradient-${idx})`}
+                  stroke={getDarkerColor(p.color)}
+                  strokeWidth="0.15"
+                  rx="0.4"
+                />
+                {p.w > 3 && p.h > 2.5 && (
+                  <text
+                    x={padding + p.x + centerOffsetX + p.w / 2}
+                    y={padding + p.y + p.h / 2}
+                    fill="#2C1810"
+                    fontSize={Math.min(p.w * 0.12, p.h * 0.18, 2.2)}
+                    fontFamily="Outfit, sans-serif"
+                    fontWeight="600"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    opacity="0.75"
+                  >
+                    {Math.round(p.w)}×{Math.round(p.h)}
+                  </text>
+                )}
+              </g>
+            ))}
+          </svg>
         )}
       </div>
 
