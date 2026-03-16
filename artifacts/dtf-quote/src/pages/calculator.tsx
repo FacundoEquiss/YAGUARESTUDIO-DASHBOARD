@@ -285,11 +285,10 @@ export function CalculatorPage() {
                         min="1"
                         value={stamp.qty || ""}
                         onChange={(e) => updateStamp(stamp.id, "qty", parseInt(e.target.value) || 0)}
-                        className="h-10 px-3 font-bold"
+                        className="h-10 px-3 font-bold !text-black dark:!text-white"
                         style={{
                           backgroundColor: hexToRgba(stampColor, isDark ? 0.4 : 0.12),
                           borderColor: hexToRgba(stampColor, isDark ? 0.7 : 0.4),
-                          color: isDark ? "#ffffff" : "#111827",
                         }}
                       />
                     </div>
