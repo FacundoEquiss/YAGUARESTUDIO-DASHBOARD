@@ -11,14 +11,17 @@ export interface DTFSettings {
 export interface Quote {
   id: string;
   clientName: string;
+  orderName?: string;
   notes: string;
   stamps: StampItem[];
   placements: PlacedStamp[];
-  totalHeight: number; // cm
-  linearMeters: number; // m
+  totalHeight: number;
+  linearMeters: number;
   totalPrice: number;
-  rollWidth: number; // cm
+  rollWidth: number;
   createdAt: number;
+  garmentsCount?: number;
+  pricePerGarment?: number;
 }
 
 const SETTINGS_KEY = "dtf-settings";

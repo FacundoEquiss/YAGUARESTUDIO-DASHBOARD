@@ -57,7 +57,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <Card className="border-none shadow-md bg-white">
+      <Card className="border-none shadow-md bg-card">
         <CardContent className="p-6 space-y-6">
           
           <div className="space-y-2">
