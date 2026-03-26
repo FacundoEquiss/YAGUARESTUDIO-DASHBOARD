@@ -226,7 +226,7 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
 
     const monthStart = getMonthStart();
 
-    const [result] = await db.execute(sql`
+    const queryResult = await db.execute(sql`
       INSERT INTO usage_counters (user_id, counter_type, count, period_start)
       VALUES (${userId}, ${type}, 1, ${monthStart})
       ON CONFLICT (user_id, counter_type)
@@ -244,7 +244,8 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
       RETURNING count
     `);
 
-    const newCount = Number((result as { count: number }).count);
+    const rows = queryResult.rows as { count: number }[];
+    const newCount = Number(rows[0].count);
 
     if (limit !== -1 && newCount > limit) {
       await db.execute(sql`
