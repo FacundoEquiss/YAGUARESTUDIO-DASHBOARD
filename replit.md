@@ -74,8 +74,9 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/components/plan-guard.tsx` — Route-level plan guard (subscription/limit check)
 - `src/pages/landing.tsx` — Public landing page (hero, tools, pricing, footer)
 - `src/pages/calculator.tsx` — Main quote calculator page (with usage tracking)
-- `src/pages/mockups.tsx` — Mockup generator (Konva canvas, garment templates, design upload, PNG export)
-- `src/lib/garment-templates.ts` — SVG garment templates (t-shirt front/back, hoodie, tank top) + color palette
+- `src/pages/mockups.tsx` — Mockup generator (dual Konva canvas front+back, real garment PNGs, layer system, drag/resize/rotate, combined PNG export with branding)
+- `src/lib/garment-templates.ts` — Garment template definitions (tshirt white/black, hoodie black) with front/back image pairs and print area coordinates
+- `public/garments/` — Real garment photo PNGs (tshirt-white-front/back, tshirt-black-front/back, hoodie-black-front/back)
 - `src/pages/history.tsx` — Saved quotes history
 - `src/pages/settings.tsx` — App settings (price, roll width)
 - `src/pages/auth.tsx` — Login/register page (async API calls)
