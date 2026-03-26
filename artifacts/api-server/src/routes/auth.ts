@@ -24,6 +24,21 @@ export async function seedMasterAccount() {
   }
 }
 
+function userProfile(user: typeof users.$inferSelect) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    lastName: user.lastName,
+    role: user.role,
+    phone: user.phone,
+    businessName: user.businessName,
+    birthDate: user.birthDate,
+    profilePhotoUrl: user.profilePhotoUrl,
+    createdAt: user.createdAt,
+  };
+}
+
 authRouter.post("/auth/register", async (req, res) => {
   try {
     const { email, password, name } = req.body as {
@@ -93,14 +108,7 @@ authRouter.post("/auth/register", async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
-    res.json({
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role,
-      },
-    });
+    res.json({ user: userProfile(newUser) });
   } catch (err) {
     console.error("POST /auth/register error:", err);
     res.status(500).json({ error: "Error al crear cuenta" });
@@ -143,14 +151,7 @@ authRouter.post("/auth/login", async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
-    res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
-    });
+    res.json({ user: userProfile(user) });
   } catch (err) {
     console.error("POST /auth/login error:", err);
     res.status(500).json({ error: "Error al iniciar sesión" });
@@ -182,17 +183,93 @@ authRouter.get("/auth/me", requireAuth, async (req, res) => {
       .where(eq(userSubscriptions.userId, user.id));
 
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
+      user: userProfile(user),
       subscription: subscription || null,
     });
   } catch (err) {
     console.error("GET /auth/me error:", err);
     res.status(500).json({ error: "Error al obtener sesión" });
+  }
+});
+
+authRouter.put("/auth/profile", requireAuth, async (req, res) => {
+  try {
+    const { name, lastName, phone, businessName, birthDate, profilePhotoUrl } = req.body as {
+      name?: string;
+      lastName?: string;
+      phone?: string;
+      businessName?: string;
+      birthDate?: string;
+      profilePhotoUrl?: string;
+    };
+
+    const updates: Record<string, unknown> = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (lastName !== undefined) updates.lastName = lastName.trim() || null;
+    if (phone !== undefined) updates.phone = phone.trim() || null;
+    if (businessName !== undefined) updates.businessName = businessName.trim() || null;
+    if (birthDate !== undefined) updates.birthDate = birthDate || null;
+    if (profilePhotoUrl !== undefined) updates.profilePhotoUrl = profilePhotoUrl || null;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: "No hay campos para actualizar" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, req.user!.userId))
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+
+    res.json({ user: userProfile(updated) });
+  } catch (err) {
+    console.error("PUT /auth/profile error:", err);
+    res.status(500).json({ error: "Error al actualizar perfil" });
+  }
+});
+
+authRouter.put("/auth/password", requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: "Ambas contraseñas son requeridas" });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ error: "La nueva contraseña debe tener al menos 6 caracteres" });
+      return;
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId));
+    if (!user) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "La contraseña actual es incorrecta" });
+      return;
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await db.update(users).set({ passwordHash: hash }).where(eq(users.id, user.id));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("PUT /auth/password error:", err);
+    res.status(500).json({ error: "Error al cambiar contraseña" });
   }
 });
 

@@ -58,6 +58,7 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 **Key Features:**
 - Quote calculator with multiple stamp types (width, height, quantity)
 - Skyline 2D strip packing algorithm for optimal stamp placement on a fixed-width roll
+- User profile page (`/profile`) with personal info editing, password change, subscription status, and logout
 - Roll visualizer (SVG) showing stamps packed with absolute positions
 - Cost calculation: linear meters × price per meter (default $10,000 CLP)
 - Quote history with detail view and roll visualization

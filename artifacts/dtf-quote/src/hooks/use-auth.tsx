@@ -6,7 +6,13 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  lastName?: string | null;
   role: "master" | "user" | "guest";
+  phone?: string | null;
+  businessName?: string | null;
+  birthDate?: string | null;
+  profilePhotoUrl?: string | null;
+  createdAt?: string | null;
 }
 
 export interface SubscriptionInfo {
@@ -26,6 +32,34 @@ const GUEST_USER: AuthUser = {
 
 const SESSION_KEY = "dtf:session";
 
+interface ApiUser {
+  id: number;
+  email: string;
+  name: string;
+  lastName?: string | null;
+  role: string;
+  phone?: string | null;
+  businessName?: string | null;
+  birthDate?: string | null;
+  profilePhotoUrl?: string | null;
+  createdAt?: string | null;
+}
+
+function mapUser(u: ApiUser): AuthUser {
+  return {
+    id: String(u.id),
+    email: u.email,
+    name: u.name,
+    lastName: u.lastName,
+    role: u.role as "master" | "user",
+    phone: u.phone,
+    businessName: u.businessName,
+    birthDate: u.birthDate,
+    profilePhotoUrl: u.profilePhotoUrl,
+    createdAt: u.createdAt,
+  };
+}
+
 interface AuthContextValue {
   currentUser: AuthUser | null;
   subscription: SubscriptionInfo | null;
@@ -35,6 +69,7 @@ interface AuthContextValue {
   loginAsGuest: () => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  updateProfile: (data: Partial<AuthUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -52,15 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    apiFetch<{ user: { id: number; email: string; name: string; role: string }; subscription: SubscriptionInfo | null }>("/auth/me")
+    apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/me")
       .then(({ data }) => {
         if (data?.user) {
-          setCurrentUser({
-            id: String(data.user.id),
-            email: data.user.email,
-            name: data.user.name,
-            role: data.user.role as "master" | "user",
-          });
+          setCurrentUser(mapUser(data.user));
           setSubscription(data.subscription || null);
           setStorage(SESSION_KEY, "api");
         } else {
@@ -80,18 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
-    const { data, error } = await apiFetch<{ user: { id: number; email: string; name: string; role: string } }>("/auth/login", {
+    const { data, error } = await apiFetch<{ user: ApiUser }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
     if (error) return error;
     if (data?.user) {
-      setCurrentUser({
-        id: String(data.user.id),
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role as "master" | "user",
-      });
+      setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
 
       const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me");
@@ -101,18 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string): Promise<string | null> => {
-    const { data, error } = await apiFetch<{ user: { id: number; email: string; name: string; role: string } }>("/auth/register", {
+    const { data, error } = await apiFetch<{ user: ApiUser }>("/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     });
     if (error) return error;
     if (data?.user) {
-      setCurrentUser({
-        id: String(data.user.id),
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role as "master" | "user",
-      });
+      setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
 
       const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me");
@@ -122,16 +142,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshSession = useCallback(async () => {
-    const { data } = await apiFetch<{ user: { id: number; email: string; name: string; role: string }; subscription: SubscriptionInfo | null }>("/auth/me");
+    const { data } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/me");
     if (data?.user) {
-      setCurrentUser({
-        id: String(data.user.id),
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role as "master" | "user",
-      });
+      setCurrentUser(mapUser(data.user));
       setSubscription(data.subscription || null);
     }
+  }, []);
+
+  const updateProfile = useCallback((data: Partial<AuthUser>) => {
+    setCurrentUser(prev => prev ? { ...prev, ...data } : prev);
   }, []);
 
   const logout = useCallback(async () => {
@@ -144,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, loginAsGuest, logout, refreshSession }}>
+    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, loginAsGuest, logout, refreshSession, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

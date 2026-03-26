@@ -14,6 +14,11 @@ import {
   Instagram,
   MessageCircle,
   Sparkles,
+  Wrench,
+  CreditCard,
+  Users,
+  UserCircle,
+  ExternalLink,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -128,36 +133,60 @@ export function LandingPage() {
       </svg>
 
       <div className="relative z-10 overflow-y-auto h-[100dvh] custom-scrollbar scroll-smooth">
-        <nav className="sticky top-0 z-50 backdrop-blur-xl bg-white/60 dark:bg-gray-950/60 border-b border-white/20 dark:border-white/5">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <span className="text-xl font-display font-black text-primary">YAGUAR</span>
-              <span className="text-xl font-display font-light text-foreground">ESTUDIO</span>
+        <nav className="sticky top-0 z-50 backdrop-blur-xl bg-gray-950/60 border-b border-white/5">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+            <div className="flex items-center gap-1 cursor-pointer" onClick={() => scrollTo("top")}>
+              <span className="text-lg font-display font-black text-primary">YAGUAR</span>
+              <span className="text-lg font-display font-light text-foreground">ESTUDIO</span>
             </div>
-            <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-              <button onClick={() => scrollTo("herramientas")} className="hover:text-foreground transition-colors">Herramientas</button>
-              <button onClick={() => scrollTo("planes")} className="hover:text-foreground transition-colors">Planes</button>
-              <button onClick={() => scrollTo("nosotros")} className="hover:text-foreground transition-colors">Nosotros</button>
+
+            <div className="hidden sm:flex items-center gap-1">
+              <button
+                onClick={() => scrollTo("herramientas")}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
+              >
+                <Wrench className="w-4 h-4" />
+                Herramientas
+              </button>
+              <button
+                onClick={() => scrollTo("planes")}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
+              >
+                <CreditCard className="w-4 h-4" />
+                Planes
+              </button>
+              <button
+                onClick={() => scrollTo("nosotros")}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
+              >
+                <Users className="w-4 h-4" />
+                Nosotros
+              </button>
             </div>
-            <div className="flex items-center gap-3">
+
+            <div className="flex items-center gap-2">
               {currentUser ? (
                 <button
-                  onClick={() => setLocation("/app")}
-                  className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
+                  onClick={() => setLocation("/profile")}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
                 >
-                  Ir a la App
+                  <UserCircle className="w-5 h-5" />
+                  <span className="hidden sm:block truncate max-w-[120px]">
+                    {currentUser.name || currentUser.email?.split("@")[0]}
+                  </span>
                 </button>
               ) : (
                 <>
                   <button
                     onClick={() => setLocation("/auth")}
-                    className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
                   >
+                    <UserCircle className="w-4 h-4" />
                     Iniciar Sesión
                   </button>
                   <button
                     onClick={() => setLocation("/auth?tab=register")}
-                    className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/12 text-primary text-sm font-bold hover:bg-primary/20 transition-all"
                   >
                     Crear Cuenta
                   </button>
@@ -167,7 +196,7 @@ export function LandingPage() {
           </div>
         </nav>
 
-        <section className="relative min-h-[calc(100dvh-4rem)] flex items-center justify-center px-4 sm:px-6">
+        <section id="top" className="relative min-h-[calc(100dvh-3.5rem)] flex items-center justify-center px-4 sm:px-6">
           <div className="max-w-4xl mx-auto text-center py-20">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -205,18 +234,11 @@ export function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex flex-col sm:flex-row items-center justify-center gap-4"
+              className="flex items-center justify-center"
             >
               <button
-                onClick={() => setLocation(currentUser ? "/app" : "/auth?tab=register")}
-                className="px-8 py-3.5 rounded-2xl bg-primary text-primary-foreground text-base font-bold hover:opacity-90 transition-opacity shadow-xl shadow-primary/25 flex items-center gap-2"
-              >
-                {currentUser ? "Ir a la App" : "Comenzar gratis"}
-                <ArrowRight className="w-5 h-5" />
-              </button>
-              <button
                 onClick={() => scrollTo("herramientas")}
-                className="px-8 py-3.5 rounded-2xl bg-white/60 dark:bg-white/5 border border-border text-foreground text-base font-bold hover:bg-white/80 dark:hover:bg-white/10 transition-all flex items-center gap-2"
+                className="px-8 py-3.5 rounded-2xl bg-white/5 border border-border text-foreground text-base font-bold hover:bg-white/10 transition-all flex items-center gap-2"
               >
                 Ver herramientas
                 <ChevronDown className="w-5 h-5" />
@@ -415,7 +437,16 @@ export function LandingPage() {
                 </p>
               </motion.div>
 
-              <motion.div variants={fadeUp} custom={2} className="flex items-center justify-center gap-4">
+              <motion.div variants={fadeUp} custom={2} className="flex flex-wrap items-center justify-center gap-3">
+                <a
+                  href="https://www.yaguarestudio.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity shadow-md"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Tienda Online
+                </a>
                 <a
                   href="https://www.instagram.com/yaguar.estudio"
                   target="_blank"

@@ -9,6 +9,7 @@ import { CalculatorPage } from "@/pages/calculator";
 import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
 import { MockupsPage } from "@/pages/mockups";
+import { ProfilePage } from "@/pages/profile";
 import { AuthPage } from "@/pages/auth";
 import { LandingPage } from "@/pages/landing";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -32,7 +33,7 @@ function AuthRedirect() {
 
 function ProtectedRedirect() {
   const [location] = useLocation();
-  const validPaths = ["/app", "/mockups", "/history", "/settings"];
+  const validPaths = ["/app", "/mockups", "/history", "/settings", "/profile"];
   const next = validPaths.includes(location) ? location : "/app";
   return <Redirect to={`/auth?next=${next}`} />;
 }
@@ -85,6 +86,11 @@ function Router() {
       <Route path="/settings">
         <Layout>
           <SettingsPage />
+        </Layout>
+      </Route>
+      <Route path="/profile">
+        <Layout>
+          <ProfilePage />
         </Layout>
       </Route>
       <Route component={NotFound} />
