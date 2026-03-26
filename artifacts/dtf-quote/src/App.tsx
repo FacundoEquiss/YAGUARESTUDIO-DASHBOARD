@@ -63,7 +63,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
-      <Route path="/auth"><AuthRedirect /></Route>
+      <Route path="/auth">
+        {currentUser.role === "guest" ? <AuthPage /> : <AuthRedirect />}
+      </Route>
       <Route path="/app">
         <Layout>
           <PlanGuard feature="dtf_quotes" featureLabel="cotizaciones DTF">
