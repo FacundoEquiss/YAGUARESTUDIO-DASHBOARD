@@ -26,6 +26,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/app": "Cotizador DTF",
   "/mockups": "Generador de Mockups",
   "/history": "Historial",
+  "/profile": "Mi Perfil",
 };
 
 export function AuthPage() {
