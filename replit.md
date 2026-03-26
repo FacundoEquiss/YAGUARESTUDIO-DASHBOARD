@@ -86,16 +86,17 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/lib/storage.ts` — localStorage utility functions
 
 **Routing (wouter):**
-- `/` — Landing page (unauthenticated) or redirects to `/app` (authenticated)
-- `/auth` — Login/register page (unauthenticated) or redirects to `/app` (authenticated)
+- `/` — Landing page (accessible to both auth and unauth users)
+- `/auth` — Login/register page; supports `?next=/path` param for deep linking after auth
 - `/app` — Calculator page (authenticated, wrapped in PlanGuard for dtf_quotes)
 - `/mockups` — Mockup generator (authenticated, wrapped in PlanGuard for mockup_pngs)
 - `/history` — Quote history (authenticated)
 - `/settings` — App settings (authenticated, master only)
+- Unauthenticated access to protected routes redirects to `/auth?next=<path>` preserving intent
 
-**Navigation:** Sidebar (desktop) / bottom tab bar (mobile) with Cotizador, Mockups, Historial, Ajustes tabs using wouter routing.
+**Navigation:** Horizontal top navbar (desktop) / bottom tab bar (mobile) with Inicio, Cotizador, Mockups, Historial, Ajustes tabs using wouter routing. Dynamic title in navbar changes per route (Cotizador, Mockups, Historial, Ajustes). Landing page accessible via "Inicio" link from app pages.
 
-**Design:** Warm cream/beige background (#FAF8F5), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design.
+**Design:** Dark mode only (forced via `<html class="dark">`), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design. No theme toggle.
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 

@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 
 interface PlanLimits {
   dtfQuotes: number;
@@ -44,6 +45,7 @@ const TOOLS = [
       "Calculá el costo exacto de tus transfers DTF con precios por metro, márgenes y descuentos por cantidad. Resultado al instante.",
     cta: "Probar ahora",
     ready: true,
+    href: "/app",
     color: "from-orange-500 to-amber-500",
   },
   {
@@ -53,6 +55,7 @@ const TOOLS = [
       "Visualizá tus diseños en prendas reales. Subí tu arte, elegí la prenda y descargá un mockup listo para presentar al cliente.",
     cta: "Probar ahora",
     ready: true,
+    href: "/mockups",
     color: "from-blue-500 to-indigo-500",
   },
   {
@@ -60,8 +63,9 @@ const TOOLS = [
     title: "Extractor de Fondos",
     description:
       "Remové fondos de imágenes en segundos con inteligencia artificial. Ideal para preparar artes para DTF o catálogos.",
-    cta: "Probar ahora",
+    cta: "Próximamente",
     ready: false,
+    href: "/app",
     color: "from-emerald-500 to-teal-500",
   },
   {
@@ -71,6 +75,7 @@ const TOOLS = [
       "Aprendé todo sobre DTF, sublimación, vinilo y más. Guías, tutoriales y consejos para hacer crecer tu negocio textil.",
     cta: "Próximamente",
     ready: false,
+    href: "/app",
     color: "from-purple-500 to-violet-500",
   },
 ];
@@ -92,6 +97,7 @@ const FALLBACK_PLANS: ApiPlan[] = [
 
 export function LandingPage() {
   const [, setLocation] = useLocation();
+  const { currentUser } = useAuth();
   const [plans, setPlans] = useState<ApiPlan[]>(FALLBACK_PLANS);
 
   useEffect(() => {
@@ -134,18 +140,29 @@ export function LandingPage() {
               <button onClick={() => scrollTo("nosotros")} className="hover:text-foreground transition-colors">Nosotros</button>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setLocation("/auth")}
-                className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Iniciar Sesión
-              </button>
-              <button
-                onClick={() => setLocation("/auth?tab=register")}
-                className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
-              >
-                Crear Cuenta
-              </button>
+              {currentUser ? (
+                <button
+                  onClick={() => setLocation("/app")}
+                  className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
+                >
+                  Ir a la App
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setLocation("/auth")}
+                    className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Iniciar Sesión
+                  </button>
+                  <button
+                    onClick={() => setLocation("/auth?tab=register")}
+                    className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
+                  >
+                    Crear Cuenta
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </nav>
@@ -191,10 +208,10 @@ export function LandingPage() {
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
               <button
-                onClick={() => setLocation("/auth?tab=register")}
+                onClick={() => setLocation(currentUser ? "/app" : "/auth?tab=register")}
                 className="px-8 py-3.5 rounded-2xl bg-primary text-primary-foreground text-base font-bold hover:opacity-90 transition-opacity shadow-xl shadow-primary/25 flex items-center gap-2"
               >
-                Comenzar gratis
+                {currentUser ? "Ir a la App" : "Comenzar gratis"}
                 <ArrowRight className="w-5 h-5" />
               </button>
               <button
@@ -246,7 +263,7 @@ export function LandingPage() {
                     <h3 className="text-xl font-display font-bold text-foreground mb-2">{tool.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed mb-5">{tool.description}</p>
                     <button
-                      onClick={() => tool.ready ? setLocation("/auth") : undefined}
+                      onClick={() => tool.ready ? setLocation(currentUser ? tool.href : `/auth?next=${tool.href}`) : undefined}
                       disabled={!tool.ready}
                       className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                         tool.ready

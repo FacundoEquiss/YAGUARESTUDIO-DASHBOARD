@@ -1,26 +1,49 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, LogIn, UserPlus, Users, Loader2 } from "lucide-react";
+import { Mail, Lock, User, LogIn, UserPlus, Users, Loader2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type Tab = "login" | "register";
 
-function getInitialTab(): Tab {
+function getSearchParams() {
   const params = new URLSearchParams(window.location.search);
-  return params.get("tab") === "register" ? "register" : "login";
+  return params;
 }
+
+function getInitialTab(): Tab {
+  return getSearchParams().get("tab") === "register" ? "register" : "login";
+}
+
+function getNextRoute(): string {
+  return getSearchParams().get("next") || "/app";
+}
+
+const PAGE_LABELS: Record<string, string> = {
+  "/app": "Cotizador DTF",
+  "/mockups": "Generador de Mockups",
+  "/history": "Historial",
+};
 
 export function AuthPage() {
   const { login, register, loginAsGuest } = useAuth();
+  const [, setLocation] = useLocation();
   const [tab, setTab] = useState<Tab>(getInitialTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const nextRoute = getNextRoute();
+  const pageLabel = PAGE_LABELS[nextRoute] || "YAGUAR ESTUDIO";
+
+  const handleSuccess = () => {
+    setLocation(nextRoute);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,15 +63,22 @@ export function AuthPage() {
         }
         const err = await register(email, password, name);
         if (err) setError(err);
+        else handleSuccess();
       } else {
         const err = await login(email, password);
         if (err) setError(err);
+        else handleSuccess();
       }
     } catch {
       setError("Error de conexión");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGuest = () => {
+    loginAsGuest();
+    handleSuccess();
   };
 
   return (
@@ -81,15 +111,23 @@ export function AuthPage() {
       <div className="auth-card-wrapper">
         <div className="auth-card">
 
+          <button
+            onClick={() => setLocation("/")}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver al inicio
+          </button>
+
           <div className="mb-8">
-            <h1 className="text-4xl font-display font-bold text-primary">Cotizador DTF</h1>
+            <h1 className="text-4xl font-display font-bold text-primary">{pageLabel}</h1>
             <p className="text-muted-foreground mt-1 text-sm">
               powered by <span className="font-black text-foreground">YAGUAR</span> ESTUDIO
             </p>
           </div>
 
           <button
-            onClick={loginAsGuest}
+            onClick={handleGuest}
             className="w-full flex items-center gap-4 p-4 rounded-2xl border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all mb-7 group text-left"
           >
             <div className="w-11 h-11 rounded-2xl bg-secondary flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
@@ -114,8 +152,8 @@ export function AuthPage() {
                 onClick={() => { setTab(t); setError(null); }}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
                   tab === t
-                    ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white"
-                    : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                    ? "bg-gray-800 text-white shadow-sm"
+                    : "text-gray-400 hover:text-gray-200"
                 }`}
               >
                 {t === "login" ? "Iniciar Sesión" : "Crear Cuenta"}
