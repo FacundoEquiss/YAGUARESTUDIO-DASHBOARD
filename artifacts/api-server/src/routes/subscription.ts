@@ -20,9 +20,14 @@ async function rolloverAndGetPeriodStart(userId: number): Promise<Date> {
 
   const now = new Date();
   if (sub.periodEnd && sub.periodEnd < now) {
-    const newStart = new Date(sub.periodEnd);
-    const newEnd = new Date(newStart);
+    let newStart = new Date(sub.periodEnd);
+    let newEnd = new Date(newStart);
     newEnd.setMonth(newEnd.getMonth() + 1);
+    while (newEnd < now) {
+      newStart = new Date(newEnd);
+      newEnd = new Date(newStart);
+      newEnd.setMonth(newEnd.getMonth() + 1);
+    }
     await db
       .update(userSubscriptions)
       .set({ currentPeriodStart: newStart, currentPeriodEnd: newEnd })
@@ -238,11 +243,12 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
 
     const featureKey = type === "dtf_quotes" ? "dtfQuotes" : type === "mockup_pngs" ? "mockupPngs" : "pdfExports";
 
+    const periodStart = await rolloverAndGetPeriodStart(userId);
+
     const [sub] = await db
       .select({
         limits: subscriptionPlans.limits,
         status: userSubscriptions.status,
-        periodEnd: userSubscriptions.currentPeriodEnd,
       })
       .from(userSubscriptions)
       .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
@@ -251,10 +257,6 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
     if (!isMaster) {
       if (!sub || sub.status !== "active") {
         res.status(403).json({ error: "Suscripción inactiva", requiresPlan: true });
-        return;
-      }
-      if (sub.periodEnd && new Date(sub.periodEnd) < new Date()) {
-        res.status(403).json({ error: "Suscripción expirada", requiresPlan: true });
         return;
       }
       const featureLimits = sub.limits as PlanLimits;
@@ -266,8 +268,6 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
 
     const limits = (sub?.limits as PlanLimits) || { dtfQuotes: 10, mockupPngs: 5, pdfExports: 3 };
     const limit = limits[featureKey];
-
-    const periodStart = await rolloverAndGetPeriodStart(userId);
 
     const queryResult = await db.execute(sql`
       INSERT INTO usage_counters (user_id, counter_type, count, period_start)
