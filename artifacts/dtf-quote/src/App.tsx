@@ -10,6 +10,7 @@ import { SettingsPage } from "@/pages/settings";
 import { AuthPage } from "@/pages/auth";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UsageProvider } from "@/hooks/use-usage";
+import { PlanGuard } from "@/components/plan-guard";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +32,11 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={CalculatorPage} />
+        <Route path="/">
+          <PlanGuard feature="dtf_quotes" featureLabel="cotizaciones DTF">
+            <CalculatorPage />
+          </PlanGuard>
+        </Route>
         <Route path="/history" component={HistoryPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
