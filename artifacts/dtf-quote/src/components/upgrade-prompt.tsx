@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crown, X, Check, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,35 +11,74 @@ interface UpgradePromptProps {
   feature: string;
 }
 
-const PLANS = [
-  {
-    slug: "free",
-    name: "Gratis",
-    price: 0,
-    features: ["10 cotizaciones/mes", "5 mockups PNG", "3 fichas PDF"],
-    color: "from-gray-400 to-gray-500",
-  },
-  {
-    slug: "standard",
-    name: "Estándar",
-    price: 4990,
-    features: ["40 cotizaciones/mes", "30 mockups PNG", "25 fichas PDF"],
-    color: "from-blue-500 to-indigo-600",
-    popular: true,
-  },
-  {
-    slug: "premium",
-    name: "Premium",
-    price: 9990,
-    features: ["Cotizaciones ilimitadas", "Mockups ilimitados", "Fichas ilimitadas"],
-    color: "from-orange-500 to-red-500",
-  },
+interface PlanLimits {
+  dtfQuotes: number;
+  mockupPngs: number;
+  pdfExports: number;
+}
+
+interface ApiPlan {
+  id: number;
+  name: string;
+  slug: string;
+  limits: PlanLimits;
+  price: number;
+  isActive: boolean;
+}
+
+interface DisplayPlan {
+  slug: string;
+  name: string;
+  price: number;
+  features: string[];
+  color: string;
+  popular?: boolean;
+}
+
+function formatLimit(n: number, label: string): string {
+  return n === -1 ? `${label} ilimitadas` : `${n} ${label}/mes`;
+}
+
+function apiPlanToDisplay(p: ApiPlan): DisplayPlan {
+  const colors: Record<string, string> = {
+    free: "from-gray-400 to-gray-500",
+    standard: "from-blue-500 to-indigo-600",
+    premium: "from-orange-500 to-red-500",
+  };
+  return {
+    slug: p.slug,
+    name: p.name,
+    price: p.price,
+    features: [
+      formatLimit(p.limits.dtfQuotes, "cotizaciones"),
+      formatLimit(p.limits.mockupPngs, "mockups PNG"),
+      formatLimit(p.limits.pdfExports, "fichas PDF"),
+    ],
+    color: colors[p.slug] || "from-gray-400 to-gray-500",
+    popular: p.slug === "standard",
+  };
+}
+
+const FALLBACK_PLANS: DisplayPlan[] = [
+  { slug: "free", name: "Gratis", price: 0, features: ["10 cotizaciones/mes", "5 mockups PNG", "3 fichas PDF"], color: "from-gray-400 to-gray-500" },
+  { slug: "standard", name: "Estándar", price: 4990, features: ["40 cotizaciones/mes", "30 mockups PNG", "25 fichas PDF"], color: "from-blue-500 to-indigo-600", popular: true },
+  { slug: "premium", name: "Premium", price: 9990, features: ["Cotizaciones ilimitadas", "Mockups ilimitados", "Fichas ilimitadas"], color: "from-orange-500 to-red-500" },
 ];
 
 export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
-  const { subscription } = useAuth();
+  const { subscription, refreshSession } = useAuth();
   const { refresh } = useUsage();
   const [upgrading, setUpgrading] = useState<string | null>(null);
+  const [plans, setPlans] = useState<DisplayPlan[]>(FALLBACK_PLANS);
+
+  useEffect(() => {
+    if (!open) return;
+    apiFetch<{ plans: ApiPlan[] }>("/subscription/plans").then(({ data }) => {
+      if (data?.plans) {
+        setPlans(data.plans.map(apiPlanToDisplay));
+      }
+    });
+  }, [open]);
 
   const handleUpgrade = async (planSlug: string) => {
     setUpgrading(planSlug);
@@ -49,9 +88,8 @@ export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
     });
     setUpgrading(null);
     if (!error) {
-      await refresh();
+      await Promise.all([refresh(), refreshSession()]);
       onClose();
-      window.location.reload();
     }
   };
 
@@ -93,7 +131,7 @@ export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-6 pt-2">
-              {PLANS.map((plan) => {
+              {plans.map((plan) => {
                 const isCurrent = subscription?.planSlug === plan.slug;
                 return (
                   <div

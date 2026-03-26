@@ -34,6 +34,7 @@ interface AuthContextValue {
   register: (email: string, password: string, name: string) => Promise<string | null>;
   loginAsGuest: () => void;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -120,6 +121,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    const { data } = await apiFetch<{ user: { id: number; email: string; name: string; role: string }; subscription: SubscriptionInfo | null }>("/auth/me");
+    if (data?.user) {
+      setCurrentUser({
+        id: String(data.user.id),
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role as "master" | "user",
+      });
+      setSubscription(data.subscription || null);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     if (currentUser?.role !== "guest") {
       await apiFetch("/auth/logout", { method: "POST" });
@@ -130,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, loginAsGuest, logout }}>
+    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, loginAsGuest, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
