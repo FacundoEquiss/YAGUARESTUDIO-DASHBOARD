@@ -74,6 +74,8 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/components/plan-guard.tsx` — Route-level plan guard (subscription/limit check)
 - `src/pages/landing.tsx` — Public landing page (hero, tools, pricing, footer)
 - `src/pages/calculator.tsx` — Main quote calculator page (with usage tracking)
+- `src/pages/mockups.tsx` — Mockup generator (Konva canvas, garment templates, design upload, PNG export)
+- `src/lib/garment-templates.ts` — SVG garment templates (t-shirt front/back, hoodie, tank top) + color palette
 - `src/pages/history.tsx` — Saved quotes history
 - `src/pages/settings.tsx` — App settings (price, roll width)
 - `src/pages/auth.tsx` — Login/register page (async API calls)
@@ -85,11 +87,12 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 **Routing (wouter):**
 - `/` — Landing page (unauthenticated) or redirects to `/app` (authenticated)
 - `/auth` — Login/register page (unauthenticated) or redirects to `/app` (authenticated)
-- `/app` — Calculator page (authenticated, wrapped in PlanGuard)
+- `/app` — Calculator page (authenticated, wrapped in PlanGuard for dtf_quotes)
+- `/mockups` — Mockup generator (authenticated, wrapped in PlanGuard for mockup_pngs)
 - `/history` — Quote history (authenticated)
 - `/settings` — App settings (authenticated, master only)
 
-**Navigation:** Bottom tab bar with 3 tabs (Cotizador, Historial, Ajustes) using wouter routing.
+**Navigation:** Sidebar (desktop) / bottom tab bar (mobile) with Cotizador, Mockups, Historial, Ajustes tabs using wouter routing.
 
 **Design:** Warm cream/beige background (#FAF8F5), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design.
 

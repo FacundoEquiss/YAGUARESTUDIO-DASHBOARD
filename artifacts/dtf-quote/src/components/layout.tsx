@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, Clock, Settings, Moon, Sun, UserCircle, LogOut, X, Crown } from "lucide-react";
+import { Calculator, Clock, Settings, Moon, Sun, UserCircle, LogOut, X, Crown, Shirt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,6 +18,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/app", label: "Cotizador", icon: Calculator },
+    { href: "/mockups", label: "Mockups", icon: Shirt },
     { href: "/history", label: "Historial", icon: Clock },
     ...(isMaster ? [{ href: "/settings", label: "Ajustes", icon: Settings }] : []),
   ];

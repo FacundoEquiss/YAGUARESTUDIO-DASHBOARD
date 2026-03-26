@@ -52,7 +52,7 @@ const TOOLS = [
     description:
       "Visualizá tus diseños en prendas reales. Subí tu arte, elegí la prenda y descargá un mockup listo para presentar al cliente.",
     cta: "Probar ahora",
-    ready: false,
+    ready: true,
     color: "from-blue-500 to-indigo-500",
   },
   {
@@ -124,9 +124,9 @@ export function LandingPage() {
       <div className="relative z-10 overflow-y-auto h-[100dvh] custom-scrollbar scroll-smooth">
         <nav className="sticky top-0 z-50 backdrop-blur-xl bg-white/60 dark:bg-gray-950/60 border-b border-white/20 dark:border-white/5">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-display font-black text-primary">Cotizado</span>
-              <span className="text-xl font-display font-light text-foreground">.xyz</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xl font-display font-black text-primary">YAGUAR</span>
+              <span className="text-xl font-display font-light text-foreground">ESTUDIO</span>
             </div>
             <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-muted-foreground">
               <button onClick={() => scrollTo("herramientas")} className="hover:text-foreground transition-colors">Herramientas</button>
@@ -159,7 +159,7 @@ export function LandingPage() {
             >
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold mb-6">
                 <Sparkles className="w-3.5 h-3.5" />
-                Plataforma SaaS para impresión textil
+                Herramienta de DTF Textil para potenciar tu negocio
               </div>
             </motion.div>
 
@@ -380,15 +380,27 @@ export function LandingPage() {
                 </p>
               </motion.div>
 
-              <motion.p variants={fadeUp} custom={1} className="text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-8">
-                Somos un estudio digital especializado en herramientas para negocios de personalización textil.
-                Desde cotizadores inteligentes hasta generadores de mockups, creamos tecnología que ayuda
-                a emprendedores y empresas a escalar sus operaciones de DTF, sublimación y más.
-              </motion.p>
+              <motion.div variants={fadeUp} custom={1} className="text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-8 space-y-4 text-left sm:text-center">
+                <p>
+                  En Yaguar Estudio entendemos que una prenda no es solo tela y tinta; es en lo primero que pensás en ponerte antes de salir de tu casa, para ir al trabajo, a una salida, un concierto, o para tu marca. Somos un estudio dedicado al diseño, la personalización textil y la producción de merchandising textil de alta calidad.
+                </p>
+                <p>
+                  <span className="font-bold text-foreground">¿Qué nos diferencia?</span> A diferencia de una imprenta tradicional, nosotros somos diseñadores. No solo ejecutamos un pedido, sino que entendemos tu visión estética y potenciamos esa idea, con diseños de alta calidad.
+                </p>
+                <p>
+                  <span className="font-bold text-foreground">Experiencia que respalda tu confianza.</span> Sabemos trabajar bajo presión y con los estándares más altos. Hemos sido elegidos para gestionar el merchandising oficial de eventos de talla mundial, como la Red Bull Batalla de Gallos Internacional, y producciones exclusivas para eventos en el Hipódromo de Palermo. Esa misma calidad y logística que aplicamos para las grandes marcas, la volcamos en tu proyecto, sea una línea de ropa, uniformes corporativos o merch para tu comunidad o evento.
+                </p>
+                <p>
+                  <span className="font-bold text-foreground">Nuestra Misión.</span> Potenciar la imagen de empresas, negocios y eventos a través de productos textiles que la gente realmente quiera usar en su día a día.
+                </p>
+                <p className="text-foreground font-bold text-base sm:text-center">
+                  ¿Tenés una idea? Hagámosla realidad.
+                </p>
+              </motion.div>
 
               <motion.div variants={fadeUp} custom={2} className="flex items-center justify-center gap-4">
                 <a
-                  href="https://instagram.com/yaguarestudio"
+                  href="https://www.instagram.com/yaguar.estudio"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-md"
@@ -397,7 +409,7 @@ export function LandingPage() {
                   Instagram
                 </a>
                 <a
-                  href="https://wa.me/56912345678"
+                  href="https://wa.me/1122811911"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-md"
@@ -412,9 +424,9 @@ export function LandingPage() {
 
         <footer className="border-t border-white/10 dark:border-white/5 py-8 px-4 sm:px-6">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-display font-black text-primary">Cotizado</span>
-              <span className="text-sm font-display font-light text-foreground">.xyz</span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-display font-black text-primary">YAGUAR</span>
+              <span className="text-sm font-display font-light text-foreground">ESTUDIO</span>
             </div>
             <p className="text-xs text-muted-foreground">
               &copy; {new Date().getFullYear()} YAGUAR ESTUDIO. Todos los derechos reservados.

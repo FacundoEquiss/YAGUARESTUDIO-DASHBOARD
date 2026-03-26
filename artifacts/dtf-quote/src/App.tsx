@@ -8,6 +8,7 @@ import { Layout } from "@/components/layout";
 import { CalculatorPage } from "@/pages/calculator";
 import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
+import { MockupsPage } from "@/pages/mockups";
 import { AuthPage } from "@/pages/auth";
 import { LandingPage } from "@/pages/landing";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -51,6 +52,11 @@ function Router() {
         <Route path="/app">
           <PlanGuard feature="dtf_quotes" featureLabel="cotizaciones DTF">
             <CalculatorPage />
+          </PlanGuard>
+        </Route>
+        <Route path="/mockups">
+          <PlanGuard feature="mockup_pngs" featureLabel="mockups">
+            <MockupsPage />
           </PlanGuard>
         </Route>
         <Route path="/history" component={HistoryPage} />
