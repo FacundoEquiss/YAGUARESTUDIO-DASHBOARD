@@ -14,14 +14,11 @@ import {
   Instagram,
   MessageCircle,
   Sparkles,
-  Wrench,
-  CreditCard,
-  Users,
-  UserCircle,
   ExternalLink,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { Navbar } from "@/components/navbar";
 
 interface PlanLimits {
   dtfQuotes: number;
@@ -102,7 +99,7 @@ const FALLBACK_PLANS: ApiPlan[] = [
 
 export function LandingPage() {
   const [, setLocation] = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, subscription } = useAuth();
   const [plans, setPlans] = useState<ApiPlan[]>(FALLBACK_PLANS);
 
   useEffect(() => {
@@ -133,68 +130,7 @@ export function LandingPage() {
       </svg>
 
       <div className="relative z-10 overflow-y-auto h-[100dvh] custom-scrollbar scroll-smooth">
-        <nav className="sticky top-0 z-50 backdrop-blur-xl bg-gray-950/60 border-b border-white/5">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            <div className="flex items-center gap-1 cursor-pointer" onClick={() => scrollTo("top")}>
-              <span className="text-lg font-display font-black text-primary">YAGUAR</span>
-              <span className="text-lg font-display font-light text-foreground">ESTUDIO</span>
-            </div>
-
-            <div className="hidden sm:flex items-center gap-1">
-              <button
-                onClick={() => scrollTo("herramientas")}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
-              >
-                <Wrench className="w-4 h-4" />
-                Herramientas
-              </button>
-              <button
-                onClick={() => scrollTo("planes")}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
-              >
-                <CreditCard className="w-4 h-4" />
-                Planes
-              </button>
-              <button
-                onClick={() => scrollTo("nosotros")}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
-              >
-                <Users className="w-4 h-4" />
-                Nosotros
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {currentUser ? (
-                <button
-                  onClick={() => setLocation("/profile")}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
-                >
-                  <UserCircle className="w-5 h-5" />
-                  <span className="hidden sm:block truncate max-w-[120px]">
-                    {currentUser.name || currentUser.email?.split("@")[0]}
-                  </span>
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setLocation("/auth")}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
-                  >
-                    <UserCircle className="w-4 h-4" />
-                    Iniciar Sesión
-                  </button>
-                  <button
-                    onClick={() => setLocation("/auth?tab=register")}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/12 text-primary text-sm font-bold hover:bg-primary/20 transition-all"
-                  >
-                    Crear Cuenta
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </nav>
+        <Navbar isLanding onScrollTo={scrollTo} />
 
         <section id="top" className="relative min-h-[calc(100dvh-3.5rem)] flex items-center justify-center px-4 sm:px-6">
           <div className="max-w-4xl mx-auto text-center py-20">
@@ -383,18 +319,39 @@ export function LandingPage() {
                       </li>
                     </ul>
 
-                    <button
-                      onClick={() => setLocation("/auth?tab=register")}
-                      className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
-                        isPremium
-                          ? "bg-primary text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/20"
-                          : isStandard
-                            ? "bg-primary text-primary-foreground hover:opacity-90 shadow-md"
-                            : "bg-secondary hover:bg-secondary/80 text-foreground"
-                      }`}
-                    >
-                      {plan.price === 0 ? "Comenzar gratis" : "Elegir plan"}
-                    </button>
+                    {(() => {
+                      const isCurrentPlan = subscription?.planSlug === plan.slug;
+                      const isLoggedIn = !!currentUser && currentUser.role !== "guest";
+                      if (isCurrentPlan) {
+                        return (
+                          <div className="w-full py-3 rounded-xl text-sm font-bold text-center bg-primary/10 text-primary border border-primary/20">
+                            Tu plan actual
+                          </div>
+                        );
+                      }
+                      return (
+                        <button
+                          onClick={() => {
+                            if (isLoggedIn) {
+                              setLocation("/profile");
+                            } else {
+                              setLocation("/auth?tab=register");
+                            }
+                          }}
+                          className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
+                            isPremium
+                              ? "bg-primary text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/20"
+                              : isStandard
+                                ? "bg-primary text-primary-foreground hover:opacity-90 shadow-md"
+                                : "bg-secondary hover:bg-secondary/80 text-foreground"
+                          }`}
+                        >
+                          {isLoggedIn
+                            ? plan.price === 0 ? "Gratis" : "Mejorar plan"
+                            : plan.price === 0 ? "Comenzar gratis" : "Elegir plan"}
+                        </button>
+                      );
+                    })()}
                   </motion.div>
                 );
               })}

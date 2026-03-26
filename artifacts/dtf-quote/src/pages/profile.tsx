@@ -184,16 +184,29 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {subscription && !isMaster && (
+      {!isMaster && (
         <div className="glass-panel rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Crown className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold text-foreground">Suscripción</h3>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-bold text-foreground">Suscripción</h3>
+            </div>
+            {subscription?.planSlug !== "premium" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLocation("/")}
+                className="rounded-xl text-xs"
+              >
+                <Crown className="w-3.5 h-3.5 mr-1" />
+                Mejorar plan
+              </Button>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white/5 rounded-xl p-3">
               <p className="text-xs text-muted-foreground mb-1">Plan actual</p>
-              <p className="text-sm font-bold text-primary">{subscription.planName}</p>
+              <p className="text-sm font-bold text-primary">{subscription?.planName || "Gratis"}</p>
             </div>
             <div className="bg-white/5 rounded-xl p-3">
               <p className="text-xs text-muted-foreground mb-1">Estado</p>
@@ -206,7 +219,7 @@ export function ProfilePage() {
               </div>
             )}
           </div>
-          {limits.dtfQuotes !== -1 && (
+          {subscription && limits.dtfQuotes !== -1 && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Cotizaciones</span>
