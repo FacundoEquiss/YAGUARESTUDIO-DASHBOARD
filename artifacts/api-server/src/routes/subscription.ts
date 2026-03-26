@@ -2,17 +2,21 @@ import { Router } from "express";
 import { db, subscriptionPlans, userSubscriptions, usageCounters } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { requirePlan } from "../middleware/plan-guard";
 import type { PlanLimits } from "@workspace/db/schema";
 
 const subscriptionRouter = Router();
 
-function getMonthStart(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+async function getUserPeriodStart(userId: number): Promise<Date> {
+  const [sub] = await db
+    .select({ periodStart: userSubscriptions.currentPeriodStart })
+    .from(userSubscriptions)
+    .where(eq(userSubscriptions.userId, userId));
+  return sub?.periodStart ?? new Date();
 }
 
 async function getOrResetCounter(userId: number, counterType: string): Promise<number> {
-  const monthStart = getMonthStart();
+  const periodStart = await getUserPeriodStart(userId);
   const [counter] = await db
     .select()
     .from(usageCounters)
@@ -28,15 +32,15 @@ async function getOrResetCounter(userId: number, counterType: string): Promise<n
       userId,
       counterType,
       count: 0,
-      periodStart: monthStart,
+      periodStart,
     });
     return 0;
   }
 
-  if (counter.periodStart < monthStart) {
+  if (counter.periodStart < periodStart) {
     await db
       .update(usageCounters)
-      .set({ count: 0, periodStart: monthStart })
+      .set({ count: 0, periodStart })
       .where(eq(usageCounters.id, counter.id));
     return 0;
   }
@@ -202,7 +206,7 @@ subscriptionRouter.get("/usage", requireAuth, async (req, res) => {
   }
 });
 
-subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
+subscriptionRouter.post("/usage/increment", requireAuth, requirePlan("dtfQuotes"), async (req, res) => {
   try {
     const userId = req.user!.userId;
     const { type } = req.body as { type?: string };
@@ -224,21 +228,21 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
     const limitKey = type === "dtf_quotes" ? "dtfQuotes" : type === "mockup_pngs" ? "mockupPngs" : "pdfExports";
     const limit = limits[limitKey];
 
-    const monthStart = getMonthStart();
+    const periodStart = await getUserPeriodStart(userId);
 
     const queryResult = await db.execute(sql`
       INSERT INTO usage_counters (user_id, counter_type, count, period_start)
-      VALUES (${userId}, ${type}, 1, ${monthStart})
+      VALUES (${userId}, ${type}, 1, ${periodStart})
       ON CONFLICT (user_id, counter_type)
       DO UPDATE SET
         count = CASE
-          WHEN usage_counters.period_start < ${monthStart}
+          WHEN usage_counters.period_start < ${periodStart}
           THEN 1
           ELSE usage_counters.count + 1
         END,
         period_start = CASE
-          WHEN usage_counters.period_start < ${monthStart}
-          THEN ${monthStart}
+          WHEN usage_counters.period_start < ${periodStart}
+          THEN ${periodStart}
           ELSE usage_counters.period_start
         END
       RETURNING count
