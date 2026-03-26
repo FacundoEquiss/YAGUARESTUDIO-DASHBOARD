@@ -8,9 +8,14 @@ import { Label } from "@/components/ui/label";
 
 type Tab = "login" | "register";
 
+function getInitialTab(): Tab {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("tab") === "register" ? "register" : "login";
+}
+
 export function AuthPage() {
   const { login, register, loginAsGuest } = useAuth();
-  const [tab, setTab] = useState<Tab>("login");
+  const [tab, setTab] = useState<Tab>(getInitialTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");

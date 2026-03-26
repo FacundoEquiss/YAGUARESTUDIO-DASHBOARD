@@ -84,13 +84,19 @@ const fadeUp = {
   }),
 };
 
+const FALLBACK_PLANS: ApiPlan[] = [
+  { id: 1, name: "Gratis", slug: "free", limits: { dtfQuotes: 10, mockupPngs: 5, pdfExports: 3 }, price: 0, isActive: true },
+  { id: 2, name: "Estándar", slug: "standard", limits: { dtfQuotes: 40, mockupPngs: 30, pdfExports: 25 }, price: 4990, isActive: true },
+  { id: 3, name: "Premium", slug: "premium", limits: { dtfQuotes: -1, mockupPngs: -1, pdfExports: -1 }, price: 9990, isActive: true },
+];
+
 export function LandingPage() {
   const [, setLocation] = useLocation();
-  const [plans, setPlans] = useState<ApiPlan[]>([]);
+  const [plans, setPlans] = useState<ApiPlan[]>(FALLBACK_PLANS);
 
   useEffect(() => {
     apiFetch<{ plans: ApiPlan[] }>("/subscription/plans").then(({ data }) => {
-      if (data?.plans) setPlans(data.plans);
+      if (data?.plans?.length) setPlans(data.plans);
     });
   }, []);
 
