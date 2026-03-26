@@ -9,11 +9,20 @@ import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
 import { AuthPage } from "@/pages/auth";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { UsageProvider } from "@/hooks/use-usage";
 
 const queryClient = new QueryClient();
 
 function Router() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[100dvh]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <AuthPage />;
@@ -36,9 +45,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
+          <UsageProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+          </UsageProvider>
         </AuthProvider>
         <Toaster />
       </TooltipProvider>

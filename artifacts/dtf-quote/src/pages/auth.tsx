@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, LogIn, UserPlus, Users } from "lucide-react";
+import { Mail, Lock, User, LogIn, UserPlus, Users, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,34 +17,38 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    if (tab === "register") {
-      if (!name.trim()) {
-        setError("El nombre es requerido");
-        setLoading(false);
-        return;
+    try {
+      if (tab === "register") {
+        if (!name.trim()) {
+          setError("El nombre es requerido");
+          setLoading(false);
+          return;
+        }
+        if (password.length < 6) {
+          setError("La contraseña debe tener al menos 6 caracteres");
+          setLoading(false);
+          return;
+        }
+        const err = await register(email, password, name);
+        if (err) setError(err);
+      } else {
+        const err = await login(email, password);
+        if (err) setError(err);
       }
-      if (password.length < 6) {
-        setError("La contraseña debe tener al menos 6 caracteres");
-        setLoading(false);
-        return;
-      }
-      const err = register(email, password, name);
-      if (err) setError(err);
-    } else {
-      const err = login(email, password);
-      if (err) setError(err);
+    } catch {
+      setError("Error de conexión");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <div className="auth-root">
 
-      {/* Animated mesh gradient blobs */}
       <div className="auth-blobs" aria-hidden="true">
         <div className="auth-blob auth-blob-1" />
         <div className="auth-blob auth-blob-2" />
@@ -52,7 +56,6 @@ export function AuthPage() {
         <div className="auth-blob auth-blob-4" />
       </div>
 
-      {/* Noise texture overlay */}
       <svg
         className="auth-noise"
         aria-hidden="true"
@@ -70,11 +73,9 @@ export function AuthPage() {
         <rect width="100%" height="100%" filter="url(#auth-noise-f)" />
       </svg>
 
-      {/* Form card */}
       <div className="auth-card-wrapper">
         <div className="auth-card">
 
-          {/* Logo */}
           <div className="mb-8">
             <h1 className="text-4xl font-display font-bold text-primary">Cotizador DTF</h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -82,7 +83,6 @@ export function AuthPage() {
             </p>
           </div>
 
-          {/* Guest button */}
           <button
             onClick={loginAsGuest}
             className="w-full flex items-center gap-4 p-4 rounded-2xl border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all mb-7 group text-left"
@@ -96,14 +96,12 @@ export function AuthPage() {
             </div>
           </button>
 
-          {/* Divider */}
           <div className="relative flex items-center gap-3 mb-5">
             <div className="flex-1 h-px bg-border" />
             <span className="text-xs text-muted-foreground font-medium px-1">o con cuenta</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          {/* Tabs */}
           <div className="flex bg-secondary rounded-2xl p-1 mb-5">
             {(["login", "register"] as Tab[]).map((t) => (
               <button
@@ -120,7 +118,6 @@ export function AuthPage() {
             ))}
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <AnimatePresence mode="wait">
               {tab === "register" && (
@@ -188,7 +185,9 @@ export function AuthPage() {
             </AnimatePresence>
 
             <Button type="submit" size="lg" className="w-full rounded-2xl" disabled={loading}>
-              {tab === "login" ? (
+              {loading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : tab === "login" ? (
                 <><LogIn className="w-5 h-5 mr-2" /> Iniciar Sesión</>
               ) : (
                 <><UserPlus className="w-5 h-5 mr-2" /> Crear Cuenta</>

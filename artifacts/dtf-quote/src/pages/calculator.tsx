@@ -9,6 +9,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
+import { useUsage } from "@/hooks/use-usage";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,6 +73,8 @@ export function CalculatorPage() {
   const { isDark } = useTheme();
   const { saveQuote } = useDTFQuotes(currentUser?.id || "guest");
   const { toast } = useToast();
+  const { canUse, increment } = useUsage();
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const [clientName, setClientName] = useState("");
   const [orderName, setOrderName] = useState("");
@@ -113,7 +117,7 @@ export function CalculatorPage() {
   const pricePerGarmentWholesale = Math.ceil((rawCostPerGarment + 1200) / 100) * 100;
   const totalOrderWholesale = pricePerGarmentWholesale * garments;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!clientName.trim()) {
       toast({
         title: "Falta información",
@@ -136,6 +140,17 @@ export function CalculatorPage() {
         description: packedResult.errors[0],
         variant: "destructive"
       });
+      return;
+    }
+
+    if (!canUse("dtf_quotes")) {
+      setShowUpgrade(true);
+      return;
+    }
+
+    const ok = await increment("dtf_quotes");
+    if (!ok) {
+      setShowUpgrade(true);
       return;
     }
 
@@ -631,6 +646,12 @@ export function CalculatorPage() {
       </div>
 
       </div>{/* end RIGHT COLUMN */}
+
+      <UpgradePrompt
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature="cotizaciones"
+      />
 
     </div>
   );

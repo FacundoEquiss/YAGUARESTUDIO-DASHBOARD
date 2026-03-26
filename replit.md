@@ -53,7 +53,7 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 ### `artifacts/dtf-quote` (`@workspace/dtf-quote`)
 
-DTF (Direct to Film) printing quote calculator — frontend-only React + Vite app. All data stored in localStorage, no backend needed.
+DTF (Direct to Film) printing quote calculator — React + Vite app with backend auth and subscription system.
 
 **Key Features:**
 - Quote calculator with multiple stamp types (width, height, quantity)
@@ -62,13 +62,21 @@ DTF (Direct to Film) printing quote calculator — frontend-only React + Vite ap
 - Cost calculation: linear meters × price per meter (default $10,000 CLP)
 - Quote history with detail view and roll visualization
 - Settings: configurable price per meter and roll width
+- Server-side auth (JWT via httpOnly cookies) with register/login/guest modes
+- Subscription system with usage tracking (quotes, mockups, PDFs per month)
+- Upgrade prompt when usage limits are reached
 
 **Key Files:**
 - `src/lib/skyline.ts` — Skyline 2D strip packing algorithm
+- `src/lib/api.ts` — API fetch helper with credentials support
 - `src/components/roll-visualizer.tsx` — SVG roll preview component
-- `src/pages/calculator.tsx` — Main quote calculator page
+- `src/components/upgrade-prompt.tsx` — Upgrade plan modal (glassmorphism)
+- `src/pages/calculator.tsx` — Main quote calculator page (with usage tracking)
 - `src/pages/history.tsx` — Saved quotes history
 - `src/pages/settings.tsx` — App settings (price, roll width)
+- `src/pages/auth.tsx` — Login/register page (async API calls)
+- `src/hooks/use-auth.tsx` — Auth context (API-backed, JWT sessions)
+- `src/hooks/use-usage.tsx` — Usage tracking context (limits, remaining, increment)
 - `src/hooks/use-dtf-store.ts` — localStorage hooks for settings and quotes
 - `src/lib/storage.ts` — localStorage utility functions
 
@@ -80,13 +88,15 @@ DTF (Direct to Film) printing quote calculator — frontend-only React + Vite ap
 
 Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+- Entry: `src/index.ts` — reads `PORT`, starts Express, seeds plans & master account on startup
+- App setup: `src/app.ts` — mounts CORS (credentials), cookie-parser, JSON/urlencoded parsing, routes at `/api`
+- Routes: `src/routes/index.ts` mounts sub-routers (health, settings, auth, subscription)
+- Auth middleware: `src/middleware/auth.ts` — JWT sign/verify, `requireAuth` middleware
+- Auth routes: `src/routes/auth.ts` — POST `/api/auth/register`, POST `/api/auth/login`, GET `/api/auth/me`, POST `/api/auth/logout`
+- Subscription routes: `src/routes/subscription.ts` — GET `/api/subscription`, GET `/api/subscription/plans`, POST `/api/subscription/upgrade`, GET `/api/usage`, POST `/api/usage/increment`
+- Depends on: `@workspace/db`, `@workspace/api-zod`, bcryptjs, jsonwebtoken
+- JWT stored in httpOnly cookie named `token` (30-day expiry)
+- Master account: `yaguarestudio@gmail.com` / role `master` — auto-seeded on startup
 
 ### `lib/db` (`@workspace/db`)
 
@@ -94,9 +104,16 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
 - `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
+- Schema tables:
+  - `settings.ts` — `dtf_global_settings` (price per meter, roll width)
+  - `users.ts` — `users` (email, name, passwordHash, role)
+  - `plans.ts` — `subscription_plans` (name, slug, limits as JSONB, price)
+  - `subscriptions.ts` — `user_subscriptions` (userId, planId, status, period dates)
+  - `usage.ts` — `usage_counters` (userId, counterType, count, periodStart — auto-resets monthly)
+- `src/seed-plans.ts` — Seeds 3 plans: Gratis (10/5/3), Estándar (40/30/25), Premium (unlimited)
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
+- Exports: `.` (pool, db, schema), `./schema` (schema only), `./seed-plans` (seed function)
+- Subscription plans use `-1` in limits to indicate unlimited
 
 Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
 

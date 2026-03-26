@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, Clock, Settings, Moon, Sun, UserCircle, LogOut, X } from "lucide-react";
+import { Calculator, Clock, Settings, Moon, Sun, UserCircle, LogOut, X, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
+import { useUsage } from "@/hooks/use-usage";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { isDark, toggleTheme } = useTheme();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, subscription, logout } = useAuth();
+  const { usage, limits } = useUsage();
   const [showUserPanel, setShowUserPanel] = useState(false);
 
   const isMaster = currentUser?.role === "master";
@@ -106,7 +108,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {showUserPanel && (
               <div className="mx-1 mt-1 glass-panel rounded-xl p-3 border border-border shadow-lg">
                 <p className="text-xs font-bold text-foreground truncate">{userLabel}</p>
-                <p className="text-xs text-muted-foreground mb-2">{userRole}</p>
+                <p className="text-xs text-muted-foreground mb-1">{userRole}</p>
+                {subscription && !isMaster && !isGuest && (
+                  <div className="mb-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/10">
+                    <div className="flex items-center gap-1 mb-1">
+                      <Crown className="w-3 h-3 text-primary" />
+                      <span className="text-[10px] font-bold text-primary">{subscription.planName}</span>
+                    </div>
+                    {limits.dtfQuotes !== -1 && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Cotizaciones: {usage.dtfQuotes}/{limits.dtfQuotes}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={() => { logout(); setShowUserPanel(false); }}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors text-xs font-medium"
@@ -157,6 +172,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+              {subscription && !isMaster && !isGuest && (
+                <div className="mb-3 px-3 py-2 rounded-xl bg-primary/5 border border-primary/10">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Crown className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-xs font-bold text-primary">Plan {subscription.planName}</span>
+                  </div>
+                  {limits.dtfQuotes !== -1 && (
+                    <p className="text-xs text-muted-foreground">
+                      Cotizaciones: {usage.dtfQuotes} de {limits.dtfQuotes} usadas
+                    </p>
+                  )}
+                </div>
+              )}
               <button
                 onClick={() => { logout(); setShowUserPanel(false); }}
                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors text-sm font-medium"

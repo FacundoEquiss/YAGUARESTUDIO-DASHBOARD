@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { getStorage, setStorage } from "@/lib/storage";
-import { v4 as uuidv4 } from "uuid";
+import { apiFetch } from "@/lib/api";
 
 export interface AuthUser {
   id: string;
@@ -9,21 +9,13 @@ export interface AuthUser {
   role: "master" | "user" | "guest";
 }
 
-interface StoredUser {
-  id: string;
-  email: string;
-  name: string;
-  password: string;
+export interface SubscriptionInfo {
+  planName: string;
+  planSlug: string;
+  limits: { dtfQuotes: number; mockupPngs: number; pdfExports: number };
+  status: string;
+  periodEnd: string;
 }
-
-const MASTER_USER: AuthUser = {
-  id: "master",
-  email: "yaguarestudio@gmail.com",
-  name: "YAGUAR ESTUDIO",
-  role: "master",
-};
-
-const MASTER_PASSWORD = "Sanignacio43391475";
 
 const GUEST_USER: AuthUser = {
   id: "guest",
@@ -32,81 +24,113 @@ const GUEST_USER: AuthUser = {
   role: "guest",
 };
 
-const USERS_KEY = "dtf:users";
 const SESSION_KEY = "dtf:session";
 
 interface AuthContextValue {
   currentUser: AuthUser | null;
-  login: (email: string, password: string) => string | null;
-  register: (email: string, password: string, name: string) => string | null;
+  subscription: SubscriptionInfo | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<string | null>;
+  register: (email: string, password: string, name: string) => Promise<string | null>;
   loginAsGuest: () => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    const sessionId = getStorage<string | null>(SESSION_KEY, null);
-    if (!sessionId) return null;
-    if (sessionId === "master") return MASTER_USER;
-    if (sessionId === "guest") return GUEST_USER;
-    const users = getStorage<StoredUser[]>(USERS_KEY, []);
-    const found = users.find((u) => u.id === sessionId);
-    if (found) return { id: found.id, email: found.email, name: found.name, role: "user" };
-    return null;
-  });
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const sessionType = getStorage<string | null>(SESSION_KEY, null);
+    if (sessionType === "guest") {
+      setCurrentUser(GUEST_USER);
+      setLoading(false);
+      return;
+    }
+
+    apiFetch<{ user: { id: number; email: string; name: string; role: string }; subscription: SubscriptionInfo | null }>("/auth/me")
+      .then(({ data }) => {
+        if (data?.user) {
+          setCurrentUser({
+            id: String(data.user.id),
+            email: data.user.email,
+            name: data.user.name,
+            role: data.user.role as "master" | "user",
+          });
+          setSubscription(data.subscription || null);
+          setStorage(SESSION_KEY, "api");
+        } else {
+          setStorage<string | null>(SESSION_KEY, null);
+        }
+      })
+      .catch(() => {
+        setStorage<string | null>(SESSION_KEY, null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const loginAsGuest = useCallback(() => {
     setStorage(SESSION_KEY, "guest");
     setCurrentUser(GUEST_USER);
+    setSubscription(null);
   }, []);
 
-  const login = useCallback((email: string, password: string): string | null => {
-    if (email.trim().toLowerCase() === MASTER_USER.email.toLowerCase()) {
-      if (password === MASTER_PASSWORD) {
-        setStorage(SESSION_KEY, "master");
-        setCurrentUser(MASTER_USER);
-        return null;
-      }
-      return "Contraseña incorrecta";
+  const login = useCallback(async (email: string, password: string): Promise<string | null> => {
+    const { data, error } = await apiFetch<{ user: { id: number; email: string; name: string; role: string } }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    if (error) return error;
+    if (data?.user) {
+      setCurrentUser({
+        id: String(data.user.id),
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role as "master" | "user",
+      });
+      setStorage(SESSION_KEY, "api");
+
+      const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me");
+      setSubscription(meRes.data?.subscription || null);
     }
-    const users = getStorage<StoredUser[]>(USERS_KEY, []);
-    const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user) return "No existe una cuenta con ese correo";
-    if (user.password !== password) return "Contraseña incorrecta";
-    setStorage(SESSION_KEY, user.id);
-    setCurrentUser({ id: user.id, email: user.email, name: user.name, role: "user" });
     return null;
   }, []);
 
-  const register = useCallback((email: string, password: string, name: string): string | null => {
-    if (email.trim().toLowerCase() === MASTER_USER.email.toLowerCase()) {
-      return "Ese correo no está disponible";
+  const register = useCallback(async (email: string, password: string, name: string): Promise<string | null> => {
+    const { data, error } = await apiFetch<{ user: { id: number; email: string; name: string; role: string } }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    });
+    if (error) return error;
+    if (data?.user) {
+      setCurrentUser({
+        id: String(data.user.id),
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role as "master" | "user",
+      });
+      setStorage(SESSION_KEY, "api");
+
+      const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me");
+      setSubscription(meRes.data?.subscription || null);
     }
-    const users = getStorage<StoredUser[]>(USERS_KEY, []);
-    if (users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())) {
-      return "Ya existe una cuenta con ese correo";
-    }
-    const newUser: StoredUser = {
-      id: uuidv4(),
-      email: email.trim().toLowerCase(),
-      name: name.trim(),
-      password,
-    };
-    setStorage(USERS_KEY, [...users, newUser]);
-    setStorage(SESSION_KEY, newUser.id);
-    setCurrentUser({ id: newUser.id, email: newUser.email, name: newUser.name, role: "user" });
     return null;
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    if (currentUser?.role !== "guest") {
+      await apiFetch("/auth/logout", { method: "POST" });
+    }
     setStorage<string | null>(SESSION_KEY, null);
     setCurrentUser(null);
-  }, []);
+    setSubscription(null);
+  }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, register, loginAsGuest, logout }}>
+    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, loginAsGuest, logout }}>
       {children}
     </AuthContext.Provider>
   );
