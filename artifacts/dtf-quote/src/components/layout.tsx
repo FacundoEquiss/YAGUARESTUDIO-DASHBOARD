@@ -17,7 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const isGuest = currentUser?.role === "guest";
 
   const navItems = [
-    { href: "/", label: "Cotizador", icon: Calculator },
+    { href: "/app", label: "Cotizador", icon: Calculator },
     { href: "/history", label: "Historial", icon: Clock },
     ...(isMaster ? [{ href: "/settings", label: "Ajustes", icon: Settings }] : []),
   ];

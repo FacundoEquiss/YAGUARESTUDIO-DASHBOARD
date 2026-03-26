@@ -70,15 +70,24 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/lib/skyline.ts` — Skyline 2D strip packing algorithm
 - `src/lib/api.ts` — API fetch helper with credentials support
 - `src/components/roll-visualizer.tsx` — SVG roll preview component
-- `src/components/upgrade-prompt.tsx` — Upgrade plan modal (glassmorphism)
+- `src/components/upgrade-prompt.tsx` — Upgrade plan modal (fetches plans from API)
+- `src/components/plan-guard.tsx` — Route-level plan guard (subscription/limit check)
+- `src/pages/landing.tsx` — Public landing page (hero, tools, pricing, footer)
 - `src/pages/calculator.tsx` — Main quote calculator page (with usage tracking)
 - `src/pages/history.tsx` — Saved quotes history
 - `src/pages/settings.tsx` — App settings (price, roll width)
 - `src/pages/auth.tsx` — Login/register page (async API calls)
-- `src/hooks/use-auth.tsx` — Auth context (API-backed, JWT sessions)
+- `src/hooks/use-auth.tsx` — Auth context (API-backed, JWT sessions, refreshSession)
 - `src/hooks/use-usage.tsx` — Usage tracking context (limits, remaining, increment)
 - `src/hooks/use-dtf-store.ts` — localStorage hooks for settings and quotes
 - `src/lib/storage.ts` — localStorage utility functions
+
+**Routing (wouter):**
+- `/` — Landing page (unauthenticated) or redirects to `/app` (authenticated)
+- `/auth` — Login/register page (unauthenticated) or redirects to `/app` (authenticated)
+- `/app` — Calculator page (authenticated, wrapped in PlanGuard)
+- `/history` — Quote history (authenticated)
+- `/settings` — App settings (authenticated, master only)
 
 **Navigation:** Bottom tab bar with 3 tabs (Cotizador, Historial, Ajustes) using wouter routing.
 

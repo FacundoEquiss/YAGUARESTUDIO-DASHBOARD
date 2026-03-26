@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,11 +9,18 @@ import { CalculatorPage } from "@/pages/calculator";
 import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
 import { AuthPage } from "@/pages/auth";
+import { LandingPage } from "@/pages/landing";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UsageProvider } from "@/hooks/use-usage";
 import { PlanGuard } from "@/components/plan-guard";
 
 const queryClient = new QueryClient();
+
+function Redirect({ to }: { to: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => { setLocation(to); }, [to, setLocation]);
+  return null;
+}
 
 function Router() {
   const { currentUser, loading } = useAuth();
@@ -26,13 +34,21 @@ function Router() {
   }
 
   if (!currentUser) {
-    return <AuthPage />;
+    return (
+      <Switch>
+        <Route path="/auth" component={AuthPage} />
+        <Route path="/" component={LandingPage} />
+        <Route><Redirect to="/" /></Route>
+      </Switch>
+    );
   }
 
   return (
     <Layout>
       <Switch>
-        <Route path="/">
+        <Route path="/auth"><Redirect to="/app" /></Route>
+        <Route path="/"><Redirect to="/app" /></Route>
+        <Route path="/app">
           <PlanGuard feature="dtf_quotes" featureLabel="cotizaciones DTF">
             <CalculatorPage />
           </PlanGuard>
