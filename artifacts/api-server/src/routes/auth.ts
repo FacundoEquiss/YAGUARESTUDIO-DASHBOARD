@@ -6,9 +6,9 @@ import { signToken, requireAuth } from "../middleware/auth";
 
 const authRouter = Router();
 
-const MASTER_EMAIL = "yaguarestudio@gmail.com";
-const MASTER_PASSWORD = "Sanignacio43391475";
-const MASTER_NAME = "YAGUAR ESTUDIO";
+const MASTER_EMAIL = process.env.MASTER_EMAIL || "yaguarestudio@gmail.com";
+const MASTER_PASSWORD = process.env.MASTER_PASSWORD || "Sanignacio43391475";
+const MASTER_NAME = process.env.MASTER_NAME || "YAGUAR ESTUDIO";
 
 export async function seedMasterAccount() {
   const existing = await db.select().from(users).where(eq(users.email, MASTER_EMAIL));

@@ -2,21 +2,39 @@ import { Router } from "express";
 import { db, subscriptionPlans, userSubscriptions, usageCounters } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requirePlan } from "../middleware/plan-guard";
 import type { PlanLimits } from "@workspace/db/schema";
 
 const subscriptionRouter = Router();
 
-async function getUserPeriodStart(userId: number): Promise<Date> {
+async function rolloverAndGetPeriodStart(userId: number): Promise<Date> {
   const [sub] = await db
-    .select({ periodStart: userSubscriptions.currentPeriodStart })
+    .select({
+      id: userSubscriptions.id,
+      periodStart: userSubscriptions.currentPeriodStart,
+      periodEnd: userSubscriptions.currentPeriodEnd,
+    })
     .from(userSubscriptions)
     .where(eq(userSubscriptions.userId, userId));
-  return sub?.periodStart ?? new Date();
+
+  if (!sub) return new Date();
+
+  const now = new Date();
+  if (sub.periodEnd && sub.periodEnd < now) {
+    const newStart = new Date(sub.periodEnd);
+    const newEnd = new Date(newStart);
+    newEnd.setMonth(newEnd.getMonth() + 1);
+    await db
+      .update(userSubscriptions)
+      .set({ currentPeriodStart: newStart, currentPeriodEnd: newEnd })
+      .where(eq(userSubscriptions.id, sub.id));
+    return newStart;
+  }
+
+  return sub.periodStart;
 }
 
 async function getOrResetCounter(userId: number, counterType: string): Promise<number> {
-  const periodStart = await getUserPeriodStart(userId);
+  const periodStart = await rolloverAndGetPeriodStart(userId);
   const [counter] = await db
     .select()
     .from(usageCounters)
@@ -206,9 +224,10 @@ subscriptionRouter.get("/usage", requireAuth, async (req, res) => {
   }
 });
 
-subscriptionRouter.post("/usage/increment", requireAuth, requirePlan("dtfQuotes"), async (req, res) => {
+subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
+    const isMaster = req.user!.role === "master";
     const { type } = req.body as { type?: string };
 
     const validTypes = ["dtf_quotes", "mockup_pngs", "pdf_exports"];
@@ -217,18 +236,38 @@ subscriptionRouter.post("/usage/increment", requireAuth, requirePlan("dtfQuotes"
       return;
     }
 
+    const featureKey = type === "dtf_quotes" ? "dtfQuotes" : type === "mockup_pngs" ? "mockupPngs" : "pdfExports";
+
     const [sub] = await db
-      .select({ limits: subscriptionPlans.limits })
+      .select({
+        limits: subscriptionPlans.limits,
+        status: userSubscriptions.status,
+        periodEnd: userSubscriptions.currentPeriodEnd,
+      })
       .from(userSubscriptions)
       .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
       .where(eq(userSubscriptions.userId, userId));
 
+    if (!isMaster) {
+      if (!sub || sub.status !== "active") {
+        res.status(403).json({ error: "Suscripción inactiva", requiresPlan: true });
+        return;
+      }
+      if (sub.periodEnd && new Date(sub.periodEnd) < new Date()) {
+        res.status(403).json({ error: "Suscripción expirada", requiresPlan: true });
+        return;
+      }
+      const featureLimits = sub.limits as PlanLimits;
+      if (featureLimits[featureKey] === 0) {
+        res.status(403).json({ error: "Tu plan no incluye esta función", requiresPlan: true, feature: featureKey });
+        return;
+      }
+    }
+
     const limits = (sub?.limits as PlanLimits) || { dtfQuotes: 10, mockupPngs: 5, pdfExports: 3 };
+    const limit = limits[featureKey];
 
-    const limitKey = type === "dtf_quotes" ? "dtfQuotes" : type === "mockup_pngs" ? "mockupPngs" : "pdfExports";
-    const limit = limits[limitKey];
-
-    const periodStart = await getUserPeriodStart(userId);
+    const periodStart = await rolloverAndGetPeriodStart(userId);
 
     const queryResult = await db.execute(sql`
       INSERT INTO usage_counters (user_id, counter_type, count, period_start)
