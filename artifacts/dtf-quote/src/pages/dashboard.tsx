@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
-import { useUsageEvents, type UsageEventItem } from "@/hooks/use-usage-events";
+import { useUsageEvents } from "@/hooks/use-usage-events";
+import { useOrderStats } from "@/hooks/use-orders";
 import {
   BarChart,
   Bar,
@@ -71,6 +72,7 @@ export function DashboardPage() {
   const { currentUser, subscription } = useAuth();
   const { usage, limits } = useUsage();
   const { events } = useUsageEvents(7);
+  const orderStats = useOrderStats();
 
   const isMaster = currentUser?.role === "master";
   const isGuest = currentUser?.role === "guest";
@@ -128,10 +130,10 @@ export function DashboardPage() {
     {
       label: "Pedidos",
       sublabel: "activos",
-      value: 0,
+      value: orderStats.activeOrders,
       icon: ClipboardList,
       color: "from-emerald-500 to-teal-500",
-      soon: true,
+      href: "/orders",
     },
     {
       label: "Ingresos del mes",
