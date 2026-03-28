@@ -311,7 +311,7 @@ export function SuppliersPage() {
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Contacto</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Categoría</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground"><span className="inline-flex items-center gap-1">Categoría <HelpTooltip text="Tipo de insumo o servicio que provee: telas, tintas, film DTF, maquinaria, etc." iconSize={11} /></span></th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Registrado</th>
                     <th className="w-10"></th>
                   </tr>

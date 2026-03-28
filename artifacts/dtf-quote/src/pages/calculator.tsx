@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Plus, Trash2, Save, Users, MessageCircle } from "lucide-react";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
 import { StampItem, packStamps, STAMP_COLORS } from "@/lib/skyline";
 import { formatCurrency } from "@/lib/utils";
@@ -340,6 +341,7 @@ export function CalculatorPage() {
           <h2 className="text-xl font-bold flex items-center gap-2">
             <div className="w-2 h-6 bg-primary rounded-full"></div>
             Estampas a cotizar
+            <HelpTooltip text="Ingresá ancho, largo y cantidad de cada diseño. Se distribuyen automáticamente en el rollo para calcular metros lineales." />
           </h2>
           <span className="text-xs font-medium bg-secondary text-muted-foreground px-2.5 py-1 rounded-full">
             {validStampsCount} ítem{validStampsCount !== 1 ? "s" : ""}
@@ -472,7 +474,7 @@ export function CalculatorPage() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -ml-5 -mb-5 pointer-events-none"></div>
 
-        <h3 className="font-display text-xl font-bold mb-4 opacity-90">Resumen de Costos</h3>
+        <h3 className="font-display text-xl font-bold mb-4 opacity-90 flex items-center gap-2">Resumen de Costos <HelpTooltip text="El precio por prenda se calcula sumando el costo del material más el margen, redondeado a $100. El total es precio/prenda × cantidad de prendas." iconSize={13} /></h3>
 
         <div className="space-y-1.5 mb-5 bg-black/10 rounded-xl px-3 py-2.5">
           {stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0).map((s) => (
@@ -569,6 +571,7 @@ export function CalculatorPage() {
         <h2 className="text-xl font-bold flex items-center gap-2">
           <div className="w-2 h-6 bg-primary rounded-full"></div>
           Vista Previa del Rollo
+          <HelpTooltip text="Representación visual de cómo se distribuyen las estampas en el rollo. Cada color corresponde a un diseño diferente." />
         </h2>
         <RollVisualizer
           rollWidth={settings.rollWidth}

@@ -52,6 +52,7 @@ export function AccountsPage() {
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <Users className="w-4 h-4 text-primary" />
           <h3 className="font-semibold text-sm">Saldos de Clientes</h3>
+          <HelpTooltip text="Cuánto te deben tus clientes, calculado como ingresos menos gastos asociados a cada cliente." iconSize={12} />
           <span className="text-xs text-muted-foreground ml-auto">{clientBalances.length} cliente{clientBalances.length !== 1 ? "s" : ""}</span>
         </div>
         {clientBalances.length === 0 ? (
@@ -97,6 +98,7 @@ export function AccountsPage() {
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <Truck className="w-4 h-4 text-primary" />
           <h3 className="font-semibold text-sm">Saldos de Proveedores</h3>
+          <HelpTooltip text="Cuánto les debés a tus proveedores, calculado como gastos menos ingresos asociados a cada proveedor." iconSize={12} />
           <span className="text-xs text-muted-foreground ml-auto">{supplierBalances.length} proveedor{supplierBalances.length !== 1 ? "es" : ""}</span>
         </div>
         {supplierBalances.length === 0 ? (

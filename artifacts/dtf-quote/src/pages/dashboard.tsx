@@ -126,6 +126,7 @@ export function DashboardPage() {
       value: usage.dtfQuotes,
       icon: Calculator,
       color: "from-orange-500 to-amber-500",
+      help: "Cantidad de cotizaciones DTF creadas en el mes actual.",
     },
     {
       id: "mockups",
@@ -134,6 +135,7 @@ export function DashboardPage() {
       value: usage.mockupPngs,
       icon: Shirt,
       color: "from-blue-500 to-indigo-500",
+      help: "Cantidad de mockups PNG generados en el mes actual.",
     },
     {
       id: "income-month",
@@ -142,6 +144,7 @@ export function DashboardPage() {
       value: formatCurrency(Number(financeSummary?.monthIncome || 0)),
       icon: TrendingUp,
       color: "from-emerald-500 to-teal-500",
+      help: "Total de ingresos registrados en Finanzas durante el mes actual.",
     },
     {
       id: "expenses-month",
@@ -150,6 +153,7 @@ export function DashboardPage() {
       value: formatCurrency(Number(financeSummary?.monthExpenses || 0)),
       icon: TrendingDown,
       color: "from-red-500 to-rose-500",
+      help: "Total de gastos registrados en Finanzas durante el mes actual.",
     },
     {
       id: "balance-month",
@@ -158,6 +162,7 @@ export function DashboardPage() {
       value: formatCurrency(Number(financeSummary?.monthIncome || 0) - Number(financeSummary?.monthExpenses || 0)),
       icon: DollarSign,
       color: "from-purple-500 to-violet-500",
+      help: "Diferencia entre ingresos y gastos del mes. Positivo = ganancia.",
     },
   ];
 
@@ -212,8 +217,9 @@ export function DashboardPage() {
               <p className="text-2xl font-display font-black text-foreground leading-none">
                 {m.value}
               </p>
-              <p className="text-[11px] text-muted-foreground font-medium mt-1">
+              <p className="text-[11px] text-muted-foreground font-medium mt-1 flex items-center gap-1">
                 {m.label} · {m.sublabel}
+                <HelpTooltip text={m.help} iconSize={11} side="bottom" />
               </p>
             </div>
           );

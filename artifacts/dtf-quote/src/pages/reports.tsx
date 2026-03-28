@@ -132,6 +132,7 @@ export function ReportsPage() {
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="w-4 h-4 text-primary" />
           <h3 className="font-semibold text-sm">Ingresos vs Gastos por mes</h3>
+          <HelpTooltip text="Comparación mensual de ingresos (verde) vs gastos (rojo). Basado en las transacciones registradas." iconSize={12} />
         </div>
         {monthlyData.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-10">Sin datos para mostrar. Agregá transacciones para ver el gráfico.</p>
@@ -154,6 +155,7 @@ export function ReportsPage() {
           <div className="flex items-center gap-2 mb-4">
             <PieChartIcon className="w-4 h-4 text-emerald-400" />
             <h3 className="font-semibold text-sm">Ingresos por categoría</h3>
+            <HelpTooltip text="Distribución de tus ingresos según la categoría asignada a cada transacción." iconSize={12} />
           </div>
           {incomePieData.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10">Sin ingresos este mes</p>
@@ -185,6 +187,7 @@ export function ReportsPage() {
           <div className="flex items-center gap-2 mb-4">
             <PieChartIcon className="w-4 h-4 text-red-400" />
             <h3 className="font-semibold text-sm">Gastos por categoría</h3>
+            <HelpTooltip text="Distribución de tus gastos según la categoría asignada a cada transacción." iconSize={12} />
           </div>
           {expensePieData.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10">Sin gastos este mes</p>
@@ -218,6 +221,7 @@ export function ReportsPage() {
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-4 h-4 text-primary" />
             <h3 className="font-semibold text-sm">Tendencia de ganancia y proyección</h3>
+            <HelpTooltip text="Línea de tendencia con proyección a 3 meses basada en promedios históricos. Los meses marcados con * son proyecciones." iconSize={12} />
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={projectionData}>

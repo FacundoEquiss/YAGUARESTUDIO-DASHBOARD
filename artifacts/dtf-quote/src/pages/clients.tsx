@@ -353,7 +353,7 @@ export function ClientsPage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Contacto</th>
                     <th className="text-center px-4 py-3 font-medium text-muted-foreground">Pedidos</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Facturado</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground"><span className="inline-flex items-center gap-1">Facturado <HelpTooltip text="Monto total de los pedidos asociados a este cliente." iconSize={11} side="left" /></span></th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Registrado</th>
                     <th className="w-10"></th>
                   </tr>

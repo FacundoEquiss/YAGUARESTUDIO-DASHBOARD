@@ -264,6 +264,7 @@ export function FinancePage() {
               <TrendingUp className="w-4 h-4 text-emerald-400" />
             </div>
             <span className="text-xs text-muted-foreground">Ingresos del mes</span>
+            <HelpTooltip text="Total de transacciones tipo ingreso registradas en el mes actual." iconSize={12} />
           </div>
           <p className="text-xl font-bold text-emerald-400">{formatCurrency(monthIncome)}</p>
         </div>
@@ -273,6 +274,7 @@ export function FinancePage() {
               <TrendingDown className="w-4 h-4 text-red-400" />
             </div>
             <span className="text-xs text-muted-foreground">Gastos del mes</span>
+            <HelpTooltip text="Total de transacciones tipo gasto registradas en el mes actual." iconSize={12} />
           </div>
           <p className="text-xl font-bold text-red-400">{formatCurrency(monthExpenses)}</p>
         </div>
@@ -282,6 +284,7 @@ export function FinancePage() {
               <DollarSign className="w-4 h-4 text-blue-400" />
             </div>
             <span className="text-xs text-muted-foreground">Balance</span>
+            <HelpTooltip text="Diferencia entre ingresos y gastos del mes. Positivo = ganancia, negativo = pérdida." iconSize={12} />
           </div>
           <p className={cn("text-xl font-bold", balance >= 0 ? "text-emerald-400" : "text-red-400")}>{formatCurrency(balance)}</p>
         </div>

@@ -480,13 +480,14 @@ export function OrdersPage() {
       </div>
 
       <div className="bg-card/60 backdrop-blur rounded-2xl border border-border overflow-hidden">
-        <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-border text-xs font-bold text-muted-foreground uppercase tracking-wider">
+        <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-border text-xs font-bold text-muted-foreground uppercase tracking-wider items-center">
           <button onClick={() => handleSort("clientName")} className="text-left flex items-center gap-1 hover:text-foreground transition-colors">
             Cliente {sortBy === "clientName" && (sortDir === "asc" ? "↑" : "↓")}
           </button>
           <span className="w-24 text-center">Estado</span>
           <button onClick={() => handleSort("totalPrice")} className="w-24 text-right flex items-center justify-end gap-1 hover:text-foreground transition-colors">
             Total {sortBy === "totalPrice" && (sortDir === "asc" ? "↑" : "↓")}
+            <HelpTooltip text="Precio total del pedido. Hacé clic en el encabezado para ordenar." iconSize={11} side="bottom" />
           </button>
           <button onClick={() => handleSort("dueDate")} className="w-24 text-right flex items-center justify-end gap-1 hover:text-foreground transition-colors">
             Entrega {sortBy === "dueDate" && (sortDir === "asc" ? "↑" : "↓")}
