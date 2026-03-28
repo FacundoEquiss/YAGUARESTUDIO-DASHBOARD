@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { cn } from "@/lib/utils";
+
 import {
   useSuppliers,
   createSupplier,
@@ -19,8 +19,6 @@ import {
   X,
   Mail,
   Phone,
-  Building2,
-  StickyNote,
   Tag,
 } from "lucide-react";
 
