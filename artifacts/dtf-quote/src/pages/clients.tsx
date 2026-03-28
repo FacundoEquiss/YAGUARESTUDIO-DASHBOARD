@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   useClients,
@@ -290,11 +290,12 @@ export function ClientsPage() {
     sortDir: "desc",
   });
 
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setPage(1);
-    const timeout = setTimeout(() => setDebouncedSearch(val), 300);
-    return () => clearTimeout(timeout);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 300);
   };
 
   const handleSaved = () => {

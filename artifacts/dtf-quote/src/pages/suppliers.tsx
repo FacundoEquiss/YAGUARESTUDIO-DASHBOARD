@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   useSuppliers,
@@ -240,11 +240,12 @@ export function SuppliersPage() {
     sortDir: "desc",
   });
 
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setPage(1);
-    const timeout = setTimeout(() => setDebouncedSearch(val), 300);
-    return () => clearTimeout(timeout);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 300);
   };
 
   const handleSaved = () => {
