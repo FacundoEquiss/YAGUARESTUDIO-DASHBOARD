@@ -89,10 +89,14 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/hooks/use-usage-events.ts` — Fetches usage events from API for dashboard activity chart/feed
 - `src/hooks/use-orders.ts` — Orders CRUD hooks (useOrders, useOrderStats, createOrder, updateOrder, deleteOrder)
 - `src/hooks/use-clients.ts` — Clients CRUD hooks (useClients, useAllClients, createClient, updateClient, deleteClient)
-- `src/hooks/use-suppliers.ts` — Suppliers CRUD hooks (useSuppliers, createSupplier, updateSupplier, deleteSupplier)
+- `src/hooks/use-suppliers.ts` — Suppliers CRUD hooks (useSuppliers, useAllSuppliers, createSupplier, updateSupplier, deleteSupplier)
+- `src/hooks/use-transactions.ts` — Transactions CRUD hooks (useTransactions, useTransactionSummary, useBalances, createTransaction, updateTransaction, deleteTransaction)
 - `src/pages/orders.tsx` — Orders list page with status filters, search, sortable table, create/edit/detail modals, client selection
 - `src/pages/clients.tsx` — Clients list page with search, create/edit/detail modals
 - `src/pages/suppliers.tsx` — Suppliers list page with search, category filter, create/edit/detail modals
+- `src/pages/finance.tsx` — Finance transactions page (income/expense CRUD, search, type/category filters, pagination, summary cards)
+- `src/pages/reports.tsx` — Financial reports page (monthly bar chart, income/expense pie charts by category, profit trend line with projection)
+- `src/pages/accounts.tsx` — Cuentas corrientes page (client/supplier balance summaries from linked transactions)
 - `src/hooks/use-dtf-store.ts` — localStorage hooks for settings and quotes
 - `src/lib/storage.ts` — localStorage utility functions
 
@@ -105,6 +109,9 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `/orders` — Orders management (authenticated, uses DashboardLayout)
 - `/clients` — Clients management (authenticated, uses DashboardLayout)
 - `/suppliers` — Suppliers management (authenticated, uses DashboardLayout)
+- `/finance` — Finance transactions (authenticated, uses DashboardLayout)
+- `/reports` — Financial reports (authenticated, uses DashboardLayout)
+- `/accounts` — Cuentas corrientes (authenticated, uses DashboardLayout)
 - `/history` — Quote history (authenticated, uses DashboardLayout)
 - `/settings` — App settings (authenticated, master only, uses DashboardLayout)
 - `/profile` — User profile (authenticated, uses DashboardLayout)
@@ -121,7 +128,7 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/components/navbar.tsx` — Public navbar (desktop top bar, used on landing page)
 - `src/components/sidebar.tsx` — Dashboard sidebar with nav sections, active states, mobile drawer
 - `src/components/dashboard-layout.tsx` — Dashboard layout wrapper (sidebar + header + content)
-- `src/pages/dashboard.tsx` — Dashboard home page (greeting, plan badge, 4 metric cards, weekly activity chart via Recharts with quotes+mockups from API events, activity feed, plan usage bars, quick actions, coming soon section)
+- `src/pages/dashboard.tsx` — Dashboard home page (greeting, plan badge, 4 metric cards [quotes, mockups, monthly income, monthly expenses], weekly activity chart via Recharts with quotes+mockups from API events, activity feed, plan usage bars, quick actions, coming soon section)
 
 **Design:** Dark mode only (forced via `<html class="dark">`), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design. No theme toggle.
 
@@ -138,6 +145,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 - Orders routes: `src/routes/orders.ts` — GET `/api/orders` (list with filters/search/sort/pagination), GET `/api/orders/stats` (active + monthly counts), GET `/api/orders/:id`, POST `/api/orders` (with optional clientId), PUT `/api/orders/:id`, DELETE `/api/orders/:id` (soft delete)
 - Clients routes: `src/routes/clients.ts` — GET `/api/clients` (list with search/sort/pagination), GET `/api/clients/:id` (with related orders + stats), POST `/api/clients`, PUT `/api/clients/:id`, DELETE `/api/clients/:id` (soft delete)
 - Suppliers routes: `src/routes/suppliers.ts` — GET `/api/suppliers` (list with search/category/sort/pagination), GET `/api/suppliers/:id`, POST `/api/suppliers`, PUT `/api/suppliers/:id`, DELETE `/api/suppliers/:id` (soft delete)
+- Transactions routes: `src/routes/transactions.ts` — GET `/api/transactions` (list with type/category/date/search filters, sort, pagination), GET `/api/transactions/summary` (monthly income/expenses/balance, category breakdowns, 6-month chart), GET `/api/transactions/balances` (client/supplier account balances), POST `/api/transactions`, PUT `/api/transactions/:id` (with ownership validation), DELETE `/api/transactions/:id` (soft delete)
 - Depends on: `@workspace/db`, `@workspace/api-zod`, bcryptjs, jsonwebtoken
 - JWT stored in httpOnly cookie named `token` (30-day expiry)
 - Master account: `yaguarestudio@gmail.com` / role `master` — auto-seeded on startup
@@ -157,6 +165,7 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
   - `orders.ts` — `orders` (userId, clientId FK→clients nullable, clientName, description, quantity, unitPrice, totalPrice, status, dueDate, notes, deletedAt soft-delete, createdAt, updatedAt)
   - `clients.ts` — `clients` (userId, name, email, phone, businessName, notes, deletedAt soft-delete, createdAt, updatedAt)
   - `suppliers.ts` — `suppliers` (userId, name, email, phone, businessName, category, notes, deletedAt soft-delete, createdAt, updatedAt)
+  - `transactions.ts` — `transactions` (userId, type [income/expense], amount numeric, description, category [venta/anticipo/otro/materiales/envio/servicios/impuestos/otros], clientId FK→clients nullable, supplierId FK→suppliers nullable, orderId FK→orders nullable, date, deletedAt soft-delete, createdAt, updatedAt)
 - `src/seed-plans.ts` — Seeds 3 plans: Gratis (10/5/3), Estándar (40/30/25), Premium (unlimited)
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only), `./seed-plans` (seed function)

@@ -6,6 +6,7 @@ import subscriptionRouter from "./subscription";
 import ordersRouter from "./orders";
 import clientsRouter from "./clients";
 import suppliersRouter from "./suppliers";
+import transactionsRouter from "./transactions";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(subscriptionRouter);
 router.use(ordersRouter);
 router.use(clientsRouter);
 router.use(suppliersRouter);
+router.use(transactionsRouter);
 
 export default router;

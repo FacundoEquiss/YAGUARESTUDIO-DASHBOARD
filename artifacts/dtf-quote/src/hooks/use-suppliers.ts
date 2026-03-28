@@ -94,3 +94,21 @@ export async function deleteSupplier(id: number): Promise<{ error?: string }> {
   const { error } = await apiFetch(`/suppliers/${id}`, { method: "DELETE" });
   return { error };
 }
+
+export function useAllSuppliers() {
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const { data } = await apiFetch<SuppliersListResult>("/suppliers?limit=50");
+    if (data) setSuppliers(data.suppliers);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { suppliers, loading, refresh };
+}

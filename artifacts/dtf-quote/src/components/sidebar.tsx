@@ -51,9 +51,9 @@ const TOOLS_NAV: NavItem[] = [
 ];
 
 const FINANCE_NAV: NavItem[] = [
-  { href: "/finance", label: "Ingresos / Gastos", icon: DollarSign, ready: false },
-  { href: "/reports", label: "Reportes", icon: BarChart3, ready: false },
-  { href: "/accounts", label: "Cuentas Corrientes", icon: Landmark, ready: false },
+  { href: "/finance", label: "Ingresos / Gastos", icon: DollarSign, ready: true },
+  { href: "/reports", label: "Reportes", icon: BarChart3, ready: true },
+  { href: "/accounts", label: "Cuentas Corrientes", icon: Landmark, ready: true },
 ];
 
 const TELEGRAM_LINK = "https://t.me/+IhEEsOPYZ-MzZDYx";

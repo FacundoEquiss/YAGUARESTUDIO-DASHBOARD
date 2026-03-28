@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { Link } from "wouter";
+import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
 import { useUsageEvents } from "@/hooks/use-usage-events";
 import { useOrderStats } from "@/hooks/use-orders";
+import { useTransactionSummary } from "@/hooks/use-transactions";
 import {
   BarChart,
   Bar,
@@ -22,6 +24,8 @@ import {
   ArrowRight,
   Sparkles,
   TrendingUp,
+  TrendingDown,
+  DollarSign,
   FileText,
   Clock,
   Crown,
@@ -72,6 +76,7 @@ export function DashboardPage() {
   const { usage, limits } = useUsage();
   const { events } = useUsageEvents(7);
   const orderStats = useOrderStats();
+  const { summary: financeSummary } = useTransactionSummary();
 
   const isMaster = currentUser?.role === "master";
   const isGuest = currentUser?.role === "guest";
@@ -129,20 +134,20 @@ export function DashboardPage() {
       color: "from-blue-500 to-indigo-500",
     },
     {
-      id: "orders-active",
-      label: "Pedidos activos",
-      sublabel: "en curso",
-      value: orderStats.activeOrders,
-      icon: ClipboardList,
+      id: "income-month",
+      label: "Ingresos",
+      sublabel: "este mes",
+      value: formatCurrency(Number(financeSummary?.monthIncome || 0)),
+      icon: TrendingUp,
       color: "from-emerald-500 to-teal-500",
     },
     {
-      id: "orders-month",
-      label: "Pedidos del mes",
-      sublabel: "creados",
-      value: orderStats.monthOrders,
-      icon: ClipboardList,
-      color: "from-purple-500 to-violet-500",
+      id: "expenses-month",
+      label: "Gastos",
+      sublabel: "este mes",
+      value: formatCurrency(Number(financeSummary?.monthExpenses || 0)),
+      icon: TrendingDown,
+      color: "from-red-500 to-rose-500",
     },
   ];
 

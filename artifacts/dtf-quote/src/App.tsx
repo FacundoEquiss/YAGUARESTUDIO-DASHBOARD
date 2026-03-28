@@ -15,6 +15,9 @@ import { DashboardPage } from "@/pages/dashboard";
 import { OrdersPage } from "@/pages/orders";
 import { ClientsPage } from "@/pages/clients";
 import { SuppliersPage } from "@/pages/suppliers";
+import { FinancePage } from "@/pages/finance";
+import { ReportsPage } from "@/pages/reports";
+import { AccountsPage } from "@/pages/accounts";
 import { AuthPage } from "@/pages/auth";
 import { LandingPage } from "@/pages/landing";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -38,7 +41,7 @@ function AuthRedirect() {
 
 function ProtectedRedirect() {
   const [location] = useLocation();
-  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/profile", "/orders", "/clients", "/suppliers"];
+  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/profile", "/orders", "/clients", "/suppliers", "/finance", "/reports", "/accounts"];
   const next = validPaths.includes(location) ? location : "/dashboard";
   return <Redirect to={`/auth?next=${next}`} />;
 }
@@ -112,6 +115,21 @@ function Router() {
       <Route path="/suppliers">
         <DashboardLayout>
           <SuppliersPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/finance">
+        <DashboardLayout>
+          <FinancePage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/reports">
+        <DashboardLayout>
+          <ReportsPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/accounts">
+        <DashboardLayout>
+          <AccountsPage />
         </DashboardLayout>
       </Route>
       <Route path="/history">
