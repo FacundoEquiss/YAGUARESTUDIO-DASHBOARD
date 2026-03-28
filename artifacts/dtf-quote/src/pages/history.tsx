@@ -15,7 +15,10 @@ import { STAMP_COLORS } from "@/lib/skyline";
 function buildWhatsAppMessage(q: Quote): string {
   const date = format(q.createdAt, "d 'de' MMMM, yyyy", { locale: es });
   const stampLines = q.stamps
-    .map((s) => `• ${s.w}cm × ${s.h}cm × ${s.qty} unid`)
+    .map((s, i) => {
+      const title = s.title || `Estampa ${i + 1}`;
+      return `• ${title}: ${s.w}cm × ${s.h}cm × ${s.qty} unid`;
+    })
     .join("\n");
 
   let msg = `*Cotización DTF - YAGUAR ESTUDIO*\n`;
@@ -27,6 +30,8 @@ function buildWhatsAppMessage(q: Quote): string {
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   msg += `📏 Metros usados: ${q.linearMeters.toFixed(2)} m\n`;
   if (q.garmentsCount) msg += `👕 Prendas: ${q.garmentsCount} unid\n`;
+  if (q.pressPasses && q.pressPasses > 0) msg += `🔥 Bajadas de plancha: ${q.pressPasses}\n`;
+  if (q.talleEnabled) msg += `📐 Incluye talle: Sí\n`;
   if (q.pricePerGarment) msg += `💰 Precio por prenda: ${formatCurrency(q.pricePerGarment)}\n`;
   msg += `\n*TOTAL PEDIDO: ${formatCurrency(q.totalPrice)}*\n`;
   msg += `\n_Cotizado con Cotizador DTF by YAGUAR ESTUDIO_`;
@@ -202,7 +207,7 @@ export function HistoryPage() {
                         <div className="flex items-center gap-2.5">
                           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
                           <span className="font-semibold text-sm text-foreground">
-                            {stamp.w}cm × {stamp.h}cm
+                            {stamp.title || `Estampa ${i + 1}`}: {stamp.w}cm × {stamp.h}cm
                           </span>
                         </div>
                         <span

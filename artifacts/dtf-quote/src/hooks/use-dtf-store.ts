@@ -2,10 +2,17 @@ import { useState, useEffect, useCallback } from "react";
 import { getStorage, setStorage } from "@/lib/storage";
 import { StampItem, PlacedStamp } from "@/lib/skyline";
 import { v4 as uuidv4 } from "uuid";
+import { apiFetch } from "@/lib/api";
 
 export interface DTFSettings {
   pricePerMeter: number;
   rollWidth: number;
+  baseMargin: number;
+  wholesaleMargin: number;
+  pressPassThreshold: number;
+  pressPassExtraCost: number;
+  talleEnabled: boolean;
+  talleSurcharge: number;
 }
 
 export interface Quote {
@@ -22,6 +29,8 @@ export interface Quote {
   createdAt: number;
   garmentsCount?: number;
   pricePerGarment?: number;
+  pressPasses?: number;
+  talleEnabled?: boolean;
 }
 
 const SETTINGS_KEY = "dtf-settings";
@@ -29,30 +38,40 @@ const SETTINGS_KEY = "dtf-settings";
 const DEFAULT_SETTINGS: DTFSettings = {
   pricePerMeter: 10000,
   rollWidth: 58,
+  baseMargin: 2000,
+  wholesaleMargin: 1200,
+  pressPassThreshold: 2,
+  pressPassExtraCost: 800,
+  talleEnabled: false,
+  talleSurcharge: 0,
 };
 
-async function fetchSettingsFromAPI(): Promise<DTFSettings> {
-  const res = await fetch("/api/settings");
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  const data = await res.json();
+function mapApiData(raw: any): DTFSettings {
   return {
-    pricePerMeter: data.pricePerMeter,
-    rollWidth: data.rollWidth,
+    pricePerMeter: raw.pricePerMeter ?? DEFAULT_SETTINGS.pricePerMeter,
+    rollWidth: raw.rollWidth ?? DEFAULT_SETTINGS.rollWidth,
+    baseMargin: raw.baseMargin ?? DEFAULT_SETTINGS.baseMargin,
+    wholesaleMargin: raw.wholesaleMargin ?? DEFAULT_SETTINGS.wholesaleMargin,
+    pressPassThreshold: raw.pressPassThreshold ?? DEFAULT_SETTINGS.pressPassThreshold,
+    pressPassExtraCost: raw.pressPassExtraCost ?? DEFAULT_SETTINGS.pressPassExtraCost,
+    talleEnabled: raw.talleEnabled ?? DEFAULT_SETTINGS.talleEnabled,
+    talleSurcharge: raw.talleSurcharge ?? DEFAULT_SETTINGS.talleSurcharge,
   };
 }
 
-async function pushSettingsToAPI(settings: Partial<DTFSettings>): Promise<DTFSettings> {
-  const res = await fetch("/api/settings", {
+async function fetchUserSettings(): Promise<DTFSettings> {
+  const { data, error } = await apiFetch<any>("/user-settings");
+  if (error || !data) throw new Error(error || "No data");
+  return mapApiData(data);
+}
+
+async function pushUserSettings(settings: Partial<DTFSettings>): Promise<DTFSettings> {
+  const { data, error } = await apiFetch<any>("/user-settings", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(settings),
   });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  const data = await res.json();
-  return {
-    pricePerMeter: data.pricePerMeter,
-    rollWidth: data.rollWidth,
-  };
+  if (error || !data) throw new Error(error || "No data");
+  return mapApiData(data);
 }
 
 export function useDTFSettings() {
@@ -63,7 +82,7 @@ export function useDTFSettings() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchSettingsFromAPI()
+    fetchUserSettings()
       .then((remote) => {
         if (!cancelled) {
           setSettingsState(remote);
@@ -82,7 +101,7 @@ export function useDTFSettings() {
     setSettingsState(merged);
     setStorage(SETTINGS_KEY, merged);
     try {
-      const confirmed = await pushSettingsToAPI(newSettings);
+      const confirmed = await pushUserSettings(newSettings);
       setSettingsState(confirmed);
       setStorage(SETTINGS_KEY, confirmed);
     } catch (err) {

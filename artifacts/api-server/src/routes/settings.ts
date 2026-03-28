@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { db, dtfGlobalSettings } from "@workspace/db";
+import { db, dtfGlobalSettings, userDtfSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { requireAuth } from "../middleware/auth";
 
 const settingsRouter = Router();
 
@@ -22,7 +23,7 @@ settingsRouter.get("/settings", async (_req, res) => {
   }
 });
 
-settingsRouter.put("/settings", async (req, res) => {
+settingsRouter.put("/settings", requireAuth, async (req, res) => {
   try {
     const { pricePerMeter, rollWidth } = req.body as { pricePerMeter?: number; rollWidth?: number };
 
@@ -50,6 +51,116 @@ settingsRouter.put("/settings", async (req, res) => {
   } catch (err) {
     console.error("PUT /settings error:", err);
     res.status(500).json({ error: "Failed to update settings" });
+  }
+});
+
+settingsRouter.get("/user-settings", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const rows = await db.select().from(userDtfSettings).where(eq(userDtfSettings.userId, userId));
+
+    if (rows.length > 0) {
+      res.json(rows[0]);
+      return;
+    }
+
+    await ensureSettingsRow();
+    const global = await db.select().from(dtfGlobalSettings).where(eq(dtfGlobalSettings.id, 1));
+    res.json({
+      id: null,
+      userId,
+      pricePerMeter: global[0].pricePerMeter,
+      rollWidth: global[0].rollWidth,
+      baseMargin: 2000,
+      wholesaleMargin: 1200,
+      pressPassThreshold: 2,
+      pressPassExtraCost: 800,
+      talleEnabled: false,
+      talleSurcharge: 0,
+    });
+  } catch (err) {
+    console.error("GET /user-settings error:", err);
+    res.status(500).json({ error: "Failed to fetch user settings" });
+  }
+});
+
+settingsRouter.put("/user-settings", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const {
+      pricePerMeter,
+      rollWidth,
+      baseMargin,
+      wholesaleMargin,
+      pressPassThreshold,
+      pressPassExtraCost,
+      talleEnabled,
+      talleSurcharge,
+    } = req.body;
+
+    if (pricePerMeter !== undefined && (typeof pricePerMeter !== "number" || pricePerMeter <= 0)) {
+      res.status(400).json({ error: "Invalid pricePerMeter" }); return;
+    }
+    if (rollWidth !== undefined && (typeof rollWidth !== "number" || rollWidth <= 0)) {
+      res.status(400).json({ error: "Invalid rollWidth" }); return;
+    }
+    if (baseMargin !== undefined && (typeof baseMargin !== "number" || baseMargin < 0)) {
+      res.status(400).json({ error: "Invalid baseMargin" }); return;
+    }
+    if (wholesaleMargin !== undefined && (typeof wholesaleMargin !== "number" || wholesaleMargin < 0)) {
+      res.status(400).json({ error: "Invalid wholesaleMargin" }); return;
+    }
+    if (pressPassThreshold !== undefined && (typeof pressPassThreshold !== "number" || pressPassThreshold < 1)) {
+      res.status(400).json({ error: "Invalid pressPassThreshold" }); return;
+    }
+    if (pressPassExtraCost !== undefined && (typeof pressPassExtraCost !== "number" || pressPassExtraCost < 0)) {
+      res.status(400).json({ error: "Invalid pressPassExtraCost" }); return;
+    }
+    if (talleSurcharge !== undefined && (typeof talleSurcharge !== "number" || talleSurcharge < 0)) {
+      res.status(400).json({ error: "Invalid talleSurcharge" }); return;
+    }
+
+    const existing = await db.select().from(userDtfSettings).where(eq(userDtfSettings.userId, userId));
+
+    const updateData: Record<string, any> = {};
+    if (pricePerMeter !== undefined) updateData.pricePerMeter = pricePerMeter;
+    if (rollWidth !== undefined) updateData.rollWidth = rollWidth;
+    if (baseMargin !== undefined) updateData.baseMargin = baseMargin;
+    if (wholesaleMargin !== undefined) updateData.wholesaleMargin = wholesaleMargin;
+    if (pressPassThreshold !== undefined) updateData.pressPassThreshold = pressPassThreshold;
+    if (pressPassExtraCost !== undefined) updateData.pressPassExtraCost = pressPassExtraCost;
+    if (talleEnabled !== undefined) updateData.talleEnabled = !!talleEnabled;
+    if (talleSurcharge !== undefined) updateData.talleSurcharge = talleSurcharge;
+    updateData.updatedAt = new Date();
+
+    if (existing.length > 0) {
+      const updated = await db
+        .update(userDtfSettings)
+        .set(updateData)
+        .where(eq(userDtfSettings.userId, userId))
+        .returning();
+      res.json(updated[0]);
+    } else {
+      const inserted = await db
+        .insert(userDtfSettings)
+        .values({
+          userId,
+          pricePerMeter: pricePerMeter ?? 10000,
+          rollWidth: rollWidth ?? 58,
+          baseMargin: baseMargin ?? 2000,
+          wholesaleMargin: wholesaleMargin ?? 1200,
+          pressPassThreshold: pressPassThreshold ?? 2,
+          pressPassExtraCost: pressPassExtraCost ?? 800,
+          talleEnabled: talleEnabled ?? false,
+          talleSurcharge: talleSurcharge ?? 0,
+          ...updateData,
+        })
+        .returning();
+      res.json(inserted[0]);
+    }
+  } catch (err) {
+    console.error("PUT /user-settings error:", err);
+    res.status(500).json({ error: "Failed to update user settings" });
   }
 });
 

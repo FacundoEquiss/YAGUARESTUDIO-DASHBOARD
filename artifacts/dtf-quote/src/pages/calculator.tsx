@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Trash2, Save, Users, MessageCircle } from "lucide-react";
+import { Plus, Trash2, Save, Users, MessageCircle, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
 import { StampItem, packStamps, STAMP_COLORS } from "@/lib/skyline";
@@ -30,7 +30,7 @@ function hexToRgba(hex: string, alpha: number): string {
 function buildWhatsAppFromCalc(params: {
   clientName: string;
   orderName: string;
-  stamps: { w: number; h: number; qty: number }[];
+  stamps: StampItem[];
   linearMeters: number;
   garments: number;
   pricePerGarment: number;
@@ -38,10 +38,15 @@ function buildWhatsAppFromCalc(params: {
   showWholesale: boolean;
   pricePerGarmentWholesale: number;
   totalOrderWholesale: number;
+  pressPasses: number;
+  talleActive: boolean;
 }): string {
   const stampLines = params.stamps
     .filter(s => s.w > 0 && s.h > 0 && s.qty > 0)
-    .map(s => `• ${s.w}cm × ${s.h}cm × ${s.qty} unid`)
+    .map((s, i) => {
+      const title = s.title || `Estampa ${i + 1}`;
+      return `• ${title}: ${s.w}cm × ${s.h}cm × ${s.qty} unid`;
+    })
     .join("\n");
 
   const date = format(new Date(), "d 'de' MMMM, yyyy", { locale: es });
@@ -55,6 +60,8 @@ function buildWhatsAppFromCalc(params: {
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   msg += `📏 Metros usados: ${params.linearMeters.toFixed(2)} m\n`;
   msg += `👕 Prendas: ${params.garments} unid\n`;
+  if (params.pressPasses > 0) msg += `🔥 Bajadas de plancha: ${params.pressPasses}\n`;
+  if (params.talleActive) msg += `📐 Incluye talle: Sí\n`;
   if (params.showWholesale) {
     msg += `💰 Precio/prenda (común): ${formatCurrency(params.pricePerGarment)}\n`;
     msg += `💰 Precio/prenda (mayorista): ${formatCurrency(params.pricePerGarmentWholesale)}\n\n`;
@@ -82,17 +89,22 @@ export function CalculatorPage() {
   const [notes, setNotes] = useState("");
   const [garmentsCountRaw, setGarmentsCountRaw] = useState("1");
   const [stamps, setStamps] = useState<StampItem[]>([
-    { id: uuidv4(), w: 28, h: 32, qty: 1 }
+    { id: uuidv4(), w: 28, h: 32, qty: 1, title: "" }
   ]);
   const [showWholesale, setShowWholesale] = useState(false);
+  const [pressPassesRaw, setPressPassesRaw] = useState("2");
+  const [talleActive, setTalleActive] = useState(settings.talleEnabled);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showMathExplanation, setShowMathExplanation] = useState(false);
 
   const garmentsCount = Math.max(1, parseInt(garmentsCountRaw) || 0);
+  const pressPasses = Math.max(0, parseInt(pressPassesRaw) || 0);
 
   const addStamp = () => {
-    setStamps([...stamps, { id: uuidv4(), w: 0, h: 0, qty: 1 }]);
+    setStamps([...stamps, { id: uuidv4(), w: 0, h: 0, qty: 1, title: "" }]);
   };
 
-  const updateStamp = (id: string, field: keyof StampItem, value: number) => {
+  const updateStamp = (id: string, field: keyof StampItem, value: number | string) => {
     setStamps(stamps.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
 
@@ -112,10 +124,17 @@ export function CalculatorPage() {
 
   const rawCost = linearMeters * settings.pricePerMeter;
   const garments = garmentsCount;
-  const rawCostPerGarment = rawCost / garments;
-  const pricePerGarment = Math.ceil((rawCostPerGarment + 2000) / 100) * 100;
+  const dtfCostPerGarment = rawCost / garments;
+
+  const pressPassExtra = pressPasses > settings.pressPassThreshold
+    ? (pressPasses - settings.pressPassThreshold) * settings.pressPassExtraCost
+    : 0;
+
+  const talleSurchargeAmount = talleActive ? settings.talleSurcharge : 0;
+
+  const pricePerGarment = Math.ceil((dtfCostPerGarment + settings.baseMargin + pressPassExtra + talleSurchargeAmount) / 100) * 100;
   const totalOrder = pricePerGarment * garments;
-  const pricePerGarmentWholesale = Math.ceil((rawCostPerGarment + 1200) / 100) * 100;
+  const pricePerGarmentWholesale = Math.ceil((dtfCostPerGarment + settings.wholesaleMargin + pressPassExtra + talleSurchargeAmount) / 100) * 100;
   const totalOrderWholesale = pricePerGarmentWholesale * garments;
 
   const handleSave = async () => {
@@ -167,6 +186,8 @@ export function CalculatorPage() {
       rollWidth: settings.rollWidth,
       garmentsCount: garments,
       pricePerGarment,
+      pressPasses,
+      talleEnabled: talleActive,
     });
 
     toast({
@@ -178,7 +199,9 @@ export function CalculatorPage() {
     setOrderName("");
     setNotes("");
     setGarmentsCountRaw("1");
-    setStamps([{ id: uuidv4(), w: 28, h: 32, qty: 1 }]);
+    setPressPassesRaw("2");
+    setTalleActive(settings.talleEnabled);
+    setStamps([{ id: uuidv4(), w: 28, h: 32, qty: 1, title: "" }]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -199,6 +222,8 @@ export function CalculatorPage() {
       showWholesale,
       pricePerGarmentWholesale,
       totalOrderWholesale,
+      pressPasses,
+      talleActive,
     });
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
@@ -208,10 +233,8 @@ export function CalculatorPage() {
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-6 pb-12 md:flex md:gap-8 md:items-start">
 
-      {/* ── LEFT COLUMN (form inputs) ── */}
       <div className="flex flex-col gap-8 md:gap-4 md:flex-1 md:min-w-0">
 
-      {/* Header — hidden on desktop (sidebar already shows brand) */}
       <div className="md:hidden">
         <h1 className="text-3xl font-display font-bold text-primary">
           Cotizador DTF
@@ -221,10 +244,8 @@ export function CalculatorPage() {
         </p>
       </div>
 
-      {/* Client Info + Garments — merged compact card on desktop */}
       <Card className="border-none shadow-md overflow-hidden bg-card/60 backdrop-blur">
         <CardContent className="p-5 space-y-3">
-          {/* Row 1: Cliente + Pedido side by side on desktop */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="clientName" className="text-foreground font-bold text-sm">Cliente</Label>
@@ -248,7 +269,6 @@ export function CalculatorPage() {
             </div>
           </div>
 
-          {/* Row 2: Notas — compact */}
           <div className="space-y-1">
             <Label htmlFor="notes" className="text-foreground font-bold text-sm">
               Notas <span className="text-muted-foreground font-normal">(opcional)</span>
@@ -262,10 +282,7 @@ export function CalculatorPage() {
             />
           </div>
 
-          {/* Row 3: Prendas + Wholesale toggle */}
           <div className="md:flex md:items-center md:gap-4 md:pt-2 md:border-t md:border-border">
-
-            {/* Prendas — compact row mobile / prominent block desktop */}
             <div className="flex items-center gap-3 md:flex-1 md:flex md:items-center md:gap-3">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <Users className="w-4 h-4 text-primary" />
@@ -295,7 +312,6 @@ export function CalculatorPage() {
               />
             </div>
 
-          {/* iOS-style wholesale toggle */}
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border md:mt-0 md:pt-0 md:border-0 md:shrink-0">
             <div>
               <p className="text-sm font-semibold text-foreground">Ver también precio mayorista</p>
@@ -331,11 +347,82 @@ export function CalculatorPage() {
               />
             </button>
           </div>
-          </div>{/* end Row 3 */}
+          </div>
+
+          <div className="md:flex md:items-center md:gap-4 md:pt-2 md:border-t md:border-border space-y-3 md:space-y-0">
+            <div className="flex items-center gap-3 md:flex-1">
+              <div className="flex flex-col leading-tight">
+                <Label htmlFor="pressPasses" className="text-foreground font-bold text-sm whitespace-nowrap flex items-center gap-1">
+                  Bajadas de plancha
+                  <HelpTooltip text={`Cantidad de pasadas por la plancha térmica. Las primeras ${settings.pressPassThreshold} están incluidas; cada bajada extra suma ${formatCurrency(settings.pressPassExtraCost)} por prenda.`} iconSize={12} />
+                </Label>
+                <span className="text-[11px] text-muted-foreground">Umbral incluido: {settings.pressPassThreshold}</span>
+              </div>
+              <Input
+                id="pressPasses"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={pressPassesRaw}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, "");
+                  setPressPassesRaw(val);
+                }}
+                onBlur={() => {
+                  if (!pressPassesRaw || parseInt(pressPassesRaw) < 0) {
+                    setPressPassesRaw("0");
+                  }
+                }}
+                className="h-11 text-2xl font-black text-center md:w-28 md:flex-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col leading-tight">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1">
+                  ¿Lleva talle?
+                  <HelpTooltip text={`Agrega un recargo de ${formatCurrency(settings.talleSurcharge)} por prenda cuando el diseño incluye número o letra de talle.`} iconSize={12} />
+                </p>
+                {talleActive && settings.talleSurcharge > 0 && (
+                  <span className="text-[11px] text-primary font-medium">+{formatCurrency(settings.talleSurcharge)}/prenda</span>
+                )}
+              </div>
+              <button
+                onClick={() => setTalleActive(v => !v)}
+                aria-label="Toggle talle"
+                style={{
+                  width: 51,
+                  height: 31,
+                  borderRadius: 999,
+                  backgroundColor: talleActive ? "#f97316" : isDark ? "#374151" : "#d1d5db",
+                  position: "relative",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background-color 0.25s ease",
+                  flexShrink: 0,
+                  marginLeft: 12,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: talleActive ? 22 : 2,
+                    width: 27,
+                    height: 27,
+                    borderRadius: "50%",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                    transition: "left 0.25s ease",
+                    display: "block",
+                  }}
+                />
+              </button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Stamps Form */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold flex items-center gap-2">
@@ -367,12 +454,18 @@ export function CalculatorPage() {
                   />
 
                   <div className="flex justify-between items-center pl-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="w-3 h-3 rounded-full shrink-0"
                         style={{ backgroundColor: stampColor }}
                       />
-                      <span className="text-sm font-bold">Estampa {index + 1}</span>
+                      <input
+                        type="text"
+                        value={stamp.title || ""}
+                        onChange={(e) => updateStamp(stamp.id, "title", e.target.value)}
+                        placeholder={`Estampa ${index + 1}`}
+                        className="text-sm font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/60 w-full min-w-0"
+                      />
                     </div>
                     {stamps.length > 1 && (
                       <button
@@ -444,7 +537,7 @@ export function CalculatorPage() {
                           backgroundColor: stampColor,
                         }}
                       >
-                        {stamp.w}cm × {stamp.h}cm · {stamp.qty} unidad{stamp.qty !== 1 ? "es" : ""}
+                        {stamp.title || `Estampa ${index + 1}`}: {stamp.w}cm × {stamp.h}cm · {stamp.qty} unidad{stamp.qty !== 1 ? "es" : ""}
                       </span>
                     </div>
                   )}
@@ -464,23 +557,21 @@ export function CalculatorPage() {
         </Button>
       </div>
 
-      </div>{/* end LEFT COLUMN */}
+      </div>
 
-      {/* ── RIGHT COLUMN (summary + visualizer) ── */}
       <div className="flex flex-col gap-6 md:w-[400px] md:shrink-0 md:sticky md:top-8 mt-8 md:mt-0">
 
-      {/* Summary Card */}
       <div className="bg-gradient-to-br from-[#F97316] to-[#EA580C] rounded-[1.5rem] p-6 text-white shadow-xl shadow-orange-500/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -ml-5 -mb-5 pointer-events-none"></div>
 
-        <h3 className="font-display text-xl font-bold mb-4 opacity-90 flex items-center gap-2">Resumen de Costos <HelpTooltip text="El precio por prenda se calcula sumando el costo del material más el margen, redondeado a $100. El total es precio/prenda × cantidad de prendas." iconSize={13} /></h3>
+        <h3 className="font-display text-xl font-bold mb-4 opacity-90 flex items-center gap-2">Resumen de Costos <HelpTooltip text="El precio por prenda se calcula sumando material DTF + margen + bajadas extra + talle, redondeado a $100." iconSize={13} /></h3>
 
         <div className="space-y-1.5 mb-5 bg-black/10 rounded-xl px-3 py-2.5">
-          {stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0).map((s) => (
+          {stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0).map((s, i) => (
             <div key={s.id} className="flex items-center gap-2 text-sm text-white">
               <span className="w-2 h-2 rounded-full bg-white/70 shrink-0"></span>
-              <span className="font-medium">{s.qty} × {s.w}×{s.h}cm</span>
+              <span className="font-medium">{s.title || `Estampa ${i + 1}`}: {s.qty} × {s.w}×{s.h}cm</span>
             </div>
           ))}
         </div>
@@ -494,16 +585,87 @@ export function CalculatorPage() {
             <span className="text-white/90 text-sm">Prendas</span>
             <span className="font-bold text-white">{garments} unid.</span>
           </div>
-          <div className="flex justify-between items-center px-3 py-2.5 bg-black/10">
-            <span className="text-white/90 text-sm">Precio por prenda</span>
-            <div className="text-right">
-              <div className="font-bold text-white text-base">{formatCurrency(pricePerGarment)}</div>
-              {showWholesale && (
-                <div className="text-white text-sm font-semibold bg-white/20 rounded-md px-2 py-0.5 mt-0.5">
-                  Mayorista: {formatCurrency(pricePerGarmentWholesale)}
-                </div>
-              )}
+          {pressPasses > settings.pressPassThreshold && (
+            <div className="flex justify-between items-center px-3 py-2.5 bg-black/10 border-b border-white/15">
+              <span className="text-white/90 text-sm">Bajadas extra</span>
+              <span className="font-bold text-white">+{formatCurrency(pressPassExtra)}/prenda</span>
             </div>
+          )}
+          {talleActive && settings.talleSurcharge > 0 && (
+            <div className="flex justify-between items-center px-3 py-2.5 bg-black/10 border-b border-white/15">
+              <span className="text-white/90 text-sm">Recargo talle</span>
+              <span className="font-bold text-white">+{formatCurrency(settings.talleSurcharge)}/prenda</span>
+            </div>
+          )}
+          <div className="bg-black/10">
+            <button
+              onClick={() => setShowBreakdown(v => !v)}
+              className="w-full flex justify-between items-center px-3 py-2.5 hover:bg-white/5 transition-colors"
+            >
+              <span className="text-white/90 text-sm flex items-center gap-1">
+                Precio por prenda
+                {showBreakdown ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </span>
+              <div className="text-right">
+                <div className="font-bold text-white text-base">{formatCurrency(pricePerGarment)}</div>
+                {showWholesale && (
+                  <div className="text-white text-sm font-semibold bg-white/20 rounded-md px-2 py-0.5 mt-0.5">
+                    Mayorista: {formatCurrency(pricePerGarmentWholesale)}
+                  </div>
+                )}
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {showBreakdown && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-3 pb-3 space-y-1.5 text-xs">
+                    <div className="h-px bg-white/15 mb-2" />
+                    <div className="flex justify-between text-white/80">
+                      <span>Costo DTF material</span>
+                      <span>{formatCurrency(Math.round(dtfCostPerGarment))}</span>
+                    </div>
+                    <div className="flex justify-between text-white/80">
+                      <span>Margen base{showWholesale ? " (común)" : ""}</span>
+                      <span>+{formatCurrency(settings.baseMargin)}</span>
+                    </div>
+                    {showWholesale && (
+                      <div className="flex justify-between text-white/80">
+                        <span>Margen mayorista</span>
+                        <span>+{formatCurrency(settings.wholesaleMargin)}</span>
+                      </div>
+                    )}
+                    {pressPassExtra > 0 && (
+                      <div className="flex justify-between text-white/80">
+                        <span>Bajadas extra ({pressPasses - settings.pressPassThreshold} × {formatCurrency(settings.pressPassExtraCost)})</span>
+                        <span>+{formatCurrency(pressPassExtra)}</span>
+                      </div>
+                    )}
+                    {talleActive && settings.talleSurcharge > 0 && (
+                      <div className="flex justify-between text-white/80">
+                        <span>Recargo talle</span>
+                        <span>+{formatCurrency(settings.talleSurcharge)}</span>
+                      </div>
+                    )}
+                    <div className="h-px bg-white/15 mt-1 mb-1" />
+                    <div className="flex justify-between text-white font-bold text-sm">
+                      <span>Subtotal antes de redondeo</span>
+                      <span>{formatCurrency(Math.round(dtfCostPerGarment + settings.baseMargin + pressPassExtra + talleSurchargeAmount))}</span>
+                    </div>
+                    <div className="flex justify-between text-white font-bold text-sm">
+                      <span>Redondeado a $100 →</span>
+                      <span>{formatCurrency(pricePerGarment)}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -532,7 +694,80 @@ export function CalculatorPage() {
         )}
       </div>
 
-      {/* Action buttons — desktop compact row (above visualizer) */}
+      <div className="bg-card/60 backdrop-blur rounded-2xl border border-border overflow-hidden">
+        <button
+          onClick={() => setShowMathExplanation(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/5 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <Info className="w-4 h-4 text-primary" />
+            ¿Cómo se calcula el precio?
+          </span>
+          {showMathExplanation ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+        <AnimatePresence>
+          {showMathExplanation && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <div className="px-5 pb-5 text-sm text-muted-foreground space-y-3 border-t border-border pt-4">
+                <div>
+                  <p className="font-bold text-foreground text-xs uppercase tracking-wider mb-1">1. Costo del material</p>
+                  <p>Se calcula cuántos metros lineales de rollo DTF se usan según las estampas ingresadas. Este valor se multiplica por el precio por metro ({formatCurrency(settings.pricePerMeter)}).</p>
+                  <p className="mt-1 text-xs bg-secondary/50 rounded-lg px-3 py-1.5 font-mono">
+                    Costo DTF = {linearMeters.toFixed(3)} m × {formatCurrency(settings.pricePerMeter)} = {formatCurrency(Math.round(rawCost))}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-bold text-foreground text-xs uppercase tracking-wider mb-1">2. Costo por prenda</p>
+                  <p>El costo total del material se divide entre la cantidad de prendas ({garments}).</p>
+                  <p className="mt-1 text-xs bg-secondary/50 rounded-lg px-3 py-1.5 font-mono">
+                    Costo/prenda = {formatCurrency(Math.round(rawCost))} ÷ {garments} = {formatCurrency(Math.round(dtfCostPerGarment))}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-bold text-foreground text-xs uppercase tracking-wider mb-1">3. Margen de ganancia</p>
+                  <p>Se suma el margen configurado: {formatCurrency(settings.baseMargin)} (común){showWholesale ? ` o ${formatCurrency(settings.wholesaleMargin)} (mayorista)` : ""}.</p>
+                </div>
+
+                {(settings.pressPassThreshold > 0) && (
+                  <div>
+                    <p className="font-bold text-foreground text-xs uppercase tracking-wider mb-1">4. Bajadas de plancha</p>
+                    <p>Las primeras {settings.pressPassThreshold} bajadas están incluidas. Cada bajada adicional suma {formatCurrency(settings.pressPassExtraCost)} al precio por prenda.</p>
+                    {pressPassExtra > 0 && (
+                      <p className="mt-1 text-xs bg-secondary/50 rounded-lg px-3 py-1.5 font-mono">
+                        Extra = ({pressPasses} - {settings.pressPassThreshold}) × {formatCurrency(settings.pressPassExtraCost)} = {formatCurrency(pressPassExtra)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <p className="font-bold text-foreground text-xs uppercase tracking-wider mb-1">{settings.pressPassThreshold > 0 ? "5" : "4"}. Recargo por talle</p>
+                  <p>Si el diseño lleva talle (número o letra), se suma {formatCurrency(settings.talleSurcharge)} por prenda.{!talleActive ? " (No activado)" : ""}</p>
+                </div>
+
+                <div>
+                  <p className="font-bold text-foreground text-xs uppercase tracking-wider mb-1">Fórmula final</p>
+                  <div className="text-xs bg-primary/10 rounded-lg px-3 py-2 font-mono text-primary border border-primary/20">
+                    <p>Precio/prenda = redondear_arriba(</p>
+                    <p className="pl-4">costo_DTF + margen + bajadas_extra + talle</p>
+                    <p>, a $100)</p>
+                    <p className="mt-1 text-foreground/70">Total pedido = precio/prenda × prendas</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       <div className="hidden md:flex gap-2">
         <button
           onClick={handleSave}
@@ -566,7 +801,6 @@ export function CalculatorPage() {
         </button>
       </div>
 
-      {/* Roll Visualization */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <div className="w-2 h-6 bg-primary rounded-full"></div>
@@ -597,9 +831,7 @@ export function CalculatorPage() {
         </div>
       )}
 
-      {/* Action buttons — mobile only (desktop has compact row above visualizer) */}
       <div className="flex gap-3 mt-4 md:hidden">
-        {/* Save button — glass primary */}
         <button
           onClick={handleSave}
           disabled={packedResult.errors.length > 0}
@@ -623,7 +855,6 @@ export function CalculatorPage() {
           </span>
         </button>
 
-        {/* WhatsApp button — glass green */}
         <button
           onClick={handleShareWhatsApp}
           disabled={packedResult.errors.length > 0}
@@ -648,7 +879,7 @@ export function CalculatorPage() {
         </button>
       </div>
 
-      </div>{/* end RIGHT COLUMN */}
+      </div>
 
       <UpgradePrompt
         open={showUpgrade}

@@ -56,13 +56,14 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 DTF (Direct to Film) printing quote calculator — React + Vite app with backend auth and subscription system.
 
 **Key Features:**
-- Quote calculator with multiple stamp types (width, height, quantity)
+- Quote calculator with multiple stamp types (width, height, quantity, custom title)
 - Skyline 2D strip packing algorithm for optimal stamp placement on a fixed-width roll
 - User profile page (`/profile`) with personal info editing, password change, subscription status, and logout
 - Roll visualizer (SVG) showing stamps packed with absolute positions
-- Cost calculation: linear meters × price per meter (default $10,000 CLP)
+- Cost calculation: linear meters × price per meter, with configurable margins, press pass surcharge, and talle surcharge
+- Per-user DTF settings (price per meter, roll width, base margin, wholesale margin, press pass threshold/extra cost, talle toggle/surcharge)
 - Quote history with detail view and roll visualization
-- Settings: configurable price per meter and roll width
+- Settings: per-user configurable DTF parameters (accessible to all users, not just master)
 - Server-side auth (JWT via httpOnly cookies) with register/login/guest modes
 - Subscription system with usage tracking (quotes, mockups, PDFs per month)
 - Upgrade prompt when usage limits are reached
@@ -113,14 +114,14 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `/reports` — Financial reports (authenticated, uses DashboardLayout)
 - `/accounts` — Cuentas corrientes (authenticated, uses DashboardLayout)
 - `/history` — Quote history (authenticated, uses DashboardLayout)
-- `/settings` — App settings (authenticated, master only, uses DashboardLayout)
+- `/settings` — DTF settings (authenticated, all users, uses DashboardLayout)
 - `/profile` — User profile (authenticated, uses DashboardLayout)
 - Unauthenticated access to protected routes redirects to `/auth?next=<path>` preserving intent
 
 **Navigation — Dual Layout Architecture:**
 - **AppShell** (public): Used for landing (`/`) and auth (`/auth`). Contains background blobs+noise, top Navbar with desktop horizontal nav + Planes/Nosotros (landing), and login/register buttons. No bottom mobile nav.
 - **DashboardLayout** (authenticated): Used for all authenticated routes. Contains background blobs+noise, persistent left sidebar (desktop 240px, mobile slide-in drawer), top header bar with breadcrumb/search/notifications/avatar, and scrollable content area.
-- **Sidebar** sections: Principal (Dashboard, Pedidos, Clientes, Proveedores), Herramientas (Cotizador DTF, Mockups, Quita Fondos, Blog), Finanzas (Ingresos/Gastos, Reportes, Cuentas Corrientes), Comunidad (Telegram link), bottom: Configuración (master only), Mi Perfil, Cerrar Sesión.
+- **Sidebar** sections: Principal (Dashboard, Pedidos, Clientes, Proveedores), Herramientas (Cotizador DTF, Mockups, Quita Fondos, Blog), Finanzas (Ingresos/Gastos, Reportes, Cuentas Corrientes), Comunidad (Telegram link), bottom: Configuración (all users), Mi Perfil, Cerrar Sesión.
 - Items marked "Pronto" are disabled (not yet built).
 
 **Key Files (layout):**
@@ -157,7 +158,7 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
 - `src/schema/index.ts` — barrel re-export of all models
 - Schema tables:
-  - `settings.ts` — `dtf_global_settings` (price per meter, roll width)
+  - `settings.ts` — `dtf_global_settings` (price per meter, roll width), `user_dtf_settings` (per-user: pricePerMeter, rollWidth, baseMargin, wholesaleMargin, pressPassThreshold, pressPassExtraCost, talleEnabled, talleSurcharge)
   - `users.ts` — `users` (email, name, passwordHash, role)
   - `plans.ts` — `subscription_plans` (name, slug, limits as JSONB, price)
   - `subscriptions.ts` — `user_subscriptions` (userId, planId, status, period dates)

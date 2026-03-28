@@ -107,8 +107,6 @@ function NavSection({ title, items, location, onNavigate }: {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { currentUser, logout } = useAuth();
-  const isMaster = currentUser?.role === "master";
-
   const handleLogout = async () => {
     onClose();
     await logout();
@@ -161,21 +159,19 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       </div>
 
       <div className="shrink-0 border-t border-white/5 px-2.5 py-2.5 space-y-0.5">
-        {isMaster && (
-          <Link
-            href="/settings"
-            onClick={handleNavigate}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all",
-              location === "/settings"
-                ? "bg-primary/12 text-primary font-bold"
-                : "text-foreground/80 hover:bg-white/8 hover:text-foreground"
-            )}
-          >
-            <Settings className="w-[18px] h-[18px] shrink-0" />
-            <span>Configuración</span>
-          </Link>
-        )}
+        <Link
+          href="/settings"
+          onClick={handleNavigate}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all",
+            location === "/settings"
+              ? "bg-primary/12 text-primary font-bold"
+              : "text-foreground/80 hover:bg-white/8 hover:text-foreground"
+          )}
+        >
+          <Settings className="w-[18px] h-[18px] shrink-0" />
+          <span>Configuración</span>
+        </Link>
         <Link
           href="/profile"
           onClick={handleNavigate}

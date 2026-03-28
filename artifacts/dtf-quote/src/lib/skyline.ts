@@ -4,6 +4,7 @@ export interface StampItem {
   h: number;
   qty: number;
   color?: string;
+  title?: string;
 }
 
 export interface PlacedStamp {
