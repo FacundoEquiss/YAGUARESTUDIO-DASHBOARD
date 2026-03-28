@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -92,10 +92,19 @@ export function CalculatorPage() {
     { id: uuidv4(), w: 28, h: 32, qty: 1, title: "" }
   ]);
   const [showWholesale, setShowWholesale] = useState(false);
-  const [pressPassesRaw, setPressPassesRaw] = useState("2");
+  const [pressPassesRaw, setPressPassesRaw] = useState(String(settings.pressPassThreshold));
   const [talleActive, setTalleActive] = useState(settings.talleEnabled);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showMathExplanation, setShowMathExplanation] = useState(false);
+  const [settingsSynced, setSettingsSynced] = useState(false);
+
+  useEffect(() => {
+    if (!settingsSynced && settings.pressPassThreshold > 0) {
+      setPressPassesRaw(String(settings.pressPassThreshold));
+      setTalleActive(settings.talleEnabled);
+      setSettingsSynced(true);
+    }
+  }, [settings.pressPassThreshold, settings.talleEnabled, settingsSynced]);
 
   const garmentsCount = Math.max(1, parseInt(garmentsCountRaw) || 0);
   const pressPasses = Math.max(0, parseInt(pressPassesRaw) || 0);
@@ -199,7 +208,7 @@ export function CalculatorPage() {
     setOrderName("");
     setNotes("");
     setGarmentsCountRaw("1");
-    setPressPassesRaw("2");
+    setPressPassesRaw(String(settings.pressPassThreshold));
     setTalleActive(settings.talleEnabled);
     setStamps([{ id: uuidv4(), w: 28, h: 32, qty: 1, title: "" }]);
     window.scrollTo({ top: 0, behavior: "smooth" });

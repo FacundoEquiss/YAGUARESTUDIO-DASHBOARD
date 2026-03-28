@@ -3,6 +3,12 @@ import { db, dtfGlobalSettings, userDtfSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
+type UserDtfSettingsUpdate = Partial<Pick<
+  typeof userDtfSettings.$inferInsert,
+  "pricePerMeter" | "rollWidth" | "baseMargin" | "wholesaleMargin" |
+  "pressPassThreshold" | "pressPassExtraCost" | "talleEnabled" | "talleSurcharge"
+>> & { updatedAt?: Date };
+
 const settingsRouter = Router();
 
 async function ensureSettingsRow() {
@@ -25,6 +31,10 @@ settingsRouter.get("/settings", async (_req, res) => {
 
 settingsRouter.put("/settings", requireAuth, async (req, res) => {
   try {
+    if (req.user!.role !== "master") {
+      res.status(403).json({ error: "Solo el administrador puede modificar configuración global" });
+      return;
+    }
     const { pricePerMeter, rollWidth } = req.body as { pricePerMeter?: number; rollWidth?: number };
 
     if (pricePerMeter !== undefined && (typeof pricePerMeter !== "number" || pricePerMeter <= 0)) {
@@ -122,7 +132,7 @@ settingsRouter.put("/user-settings", requireAuth, async (req, res) => {
 
     const existing = await db.select().from(userDtfSettings).where(eq(userDtfSettings.userId, userId));
 
-    const updateData: Record<string, any> = {};
+    const updateData: UserDtfSettingsUpdate = { updatedAt: new Date() };
     if (pricePerMeter !== undefined) updateData.pricePerMeter = pricePerMeter;
     if (rollWidth !== undefined) updateData.rollWidth = rollWidth;
     if (baseMargin !== undefined) updateData.baseMargin = baseMargin;
@@ -131,7 +141,6 @@ settingsRouter.put("/user-settings", requireAuth, async (req, res) => {
     if (pressPassExtraCost !== undefined) updateData.pressPassExtraCost = pressPassExtraCost;
     if (talleEnabled !== undefined) updateData.talleEnabled = !!talleEnabled;
     if (talleSurcharge !== undefined) updateData.talleSurcharge = talleSurcharge;
-    updateData.updatedAt = new Date();
 
     if (existing.length > 0) {
       const updated = await db

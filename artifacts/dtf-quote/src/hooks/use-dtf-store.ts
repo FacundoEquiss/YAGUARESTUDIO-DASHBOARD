@@ -46,7 +46,20 @@ const DEFAULT_SETTINGS: DTFSettings = {
   talleSurcharge: 0,
 };
 
-function mapApiData(raw: any): DTFSettings {
+interface UserSettingsResponse {
+  id: number | null;
+  userId: number;
+  pricePerMeter: number;
+  rollWidth: number;
+  baseMargin: number;
+  wholesaleMargin: number;
+  pressPassThreshold: number;
+  pressPassExtraCost: number;
+  talleEnabled: boolean;
+  talleSurcharge: number;
+}
+
+function mapApiData(raw: UserSettingsResponse): DTFSettings {
   return {
     pricePerMeter: raw.pricePerMeter ?? DEFAULT_SETTINGS.pricePerMeter,
     rollWidth: raw.rollWidth ?? DEFAULT_SETTINGS.rollWidth,
@@ -60,13 +73,13 @@ function mapApiData(raw: any): DTFSettings {
 }
 
 async function fetchUserSettings(): Promise<DTFSettings> {
-  const { data, error } = await apiFetch<any>("/user-settings");
+  const { data, error } = await apiFetch<UserSettingsResponse>("/user-settings");
   if (error || !data) throw new Error(error || "No data");
   return mapApiData(data);
 }
 
 async function pushUserSettings(settings: Partial<DTFSettings>): Promise<DTFSettings> {
-  const { data, error } = await apiFetch<any>("/user-settings", {
+  const { data, error } = await apiFetch<UserSettingsResponse>("/user-settings", {
     method: "PUT",
     body: JSON.stringify(settings),
   });
