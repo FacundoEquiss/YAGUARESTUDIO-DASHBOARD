@@ -150,12 +150,13 @@ settingsRouter.put("/user-settings", requireAuth, async (req, res) => {
         .returning();
       res.json(updated[0]);
     } else {
+      const globalRow = await ensureSettingsRow();
       const inserted = await db
         .insert(userDtfSettings)
         .values({
           userId,
-          pricePerMeter: pricePerMeter ?? 10000,
-          rollWidth: rollWidth ?? 58,
+          pricePerMeter: pricePerMeter ?? globalRow.pricePerMeter,
+          rollWidth: rollWidth ?? globalRow.rollWidth,
           baseMargin: baseMargin ?? 2000,
           wholesaleMargin: wholesaleMargin ?? 1200,
           pressPassThreshold: pressPassThreshold ?? 2,
