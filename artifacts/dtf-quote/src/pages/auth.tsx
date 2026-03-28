@@ -23,6 +23,7 @@ function getNextRoute(): string {
 }
 
 const PAGE_LABELS: Record<string, string> = {
+  "/dashboard": "YAGUAR ESTUDIO",
   "/app": "Cotizador DTF",
   "/mockups": "Generador de Mockups",
   "/history": "Historial",

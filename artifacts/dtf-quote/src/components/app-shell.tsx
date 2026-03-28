@@ -37,7 +37,7 @@ export function AppShell({ children }: AppShellProps) {
           <Navbar isLanding={isLanding} onScrollTo={isLanding ? scrollTo : undefined} />
         )}
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
+        <main className={`flex-1 overflow-y-auto custom-scrollbar scroll-smooth ${isLanding ? "pb-20 sm:pb-0" : ""}`}>
           <div key={location} className="animate-page-in min-h-full">
             {children}
           </div>
