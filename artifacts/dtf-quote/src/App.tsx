@@ -5,11 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AppShell } from "@/components/app-shell";
+import { DashboardLayout } from "@/components/dashboard-layout";
 import { CalculatorPage } from "@/pages/calculator";
 import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
 import { MockupsPage } from "@/pages/mockups";
 import { ProfilePage } from "@/pages/profile";
+import { DashboardPage } from "@/pages/dashboard";
 import { AuthPage } from "@/pages/auth";
 import { LandingPage } from "@/pages/landing";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -27,14 +29,14 @@ function Redirect({ to }: { to: string }) {
 
 function AuthRedirect() {
   const params = new URLSearchParams(window.location.search);
-  const next = params.get("next") || "/app";
+  const next = params.get("next") || "/dashboard";
   return <Redirect to={next} />;
 }
 
 function ProtectedRedirect() {
   const [location] = useLocation();
-  const validPaths = ["/app", "/mockups", "/history", "/settings", "/profile"];
-  const next = validPaths.includes(location) ? location : "/app";
+  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/profile"];
+  const next = validPaths.includes(location) ? location : "/dashboard";
   return <Redirect to={`/auth?next=${next}`} />;
 }
 
@@ -63,34 +65,58 @@ function Router() {
   }
 
   return (
-    <AppShell>
-      <Switch>
-        <Route path="/" component={LandingPage} />
-        <Route path="/auth">
+    <Switch>
+      <Route path="/">
+        <AppShell>
+          <LandingPage />
+        </AppShell>
+      </Route>
+      <Route path="/auth">
+        <AppShell>
           {currentUser.role === "guest" ? <AuthPage /> : <AuthRedirect />}
-        </Route>
-        <Route path="/app">
+        </AppShell>
+      </Route>
+
+      <Route path="/dashboard">
+        <DashboardLayout>
+          <DashboardPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/app">
+        <DashboardLayout>
           <PlanGuard feature="dtf_quotes" featureLabel="cotizaciones DTF">
             <CalculatorPage />
           </PlanGuard>
-        </Route>
-        <Route path="/mockups">
+        </DashboardLayout>
+      </Route>
+      <Route path="/mockups">
+        <DashboardLayout>
           <PlanGuard feature="mockup_pngs" featureLabel="mockups">
             <MockupsPage />
           </PlanGuard>
-        </Route>
-        <Route path="/history">
+        </DashboardLayout>
+      </Route>
+      <Route path="/history">
+        <DashboardLayout>
           <HistoryPage />
-        </Route>
-        <Route path="/settings">
+        </DashboardLayout>
+      </Route>
+      <Route path="/settings">
+        <DashboardLayout>
           <SettingsPage />
-        </Route>
-        <Route path="/profile">
+        </DashboardLayout>
+      </Route>
+      <Route path="/profile">
+        <DashboardLayout>
           <ProfilePage />
-        </Route>
-        <Route component={NotFound} />
-      </Switch>
-    </AppShell>
+        </DashboardLayout>
+      </Route>
+      <Route>
+        <DashboardLayout>
+          <NotFound />
+        </DashboardLayout>
+      </Route>
+    </Switch>
   );
 }
 

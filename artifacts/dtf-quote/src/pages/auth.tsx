@@ -19,7 +19,7 @@ function getInitialTab(): Tab {
 }
 
 function getNextRoute(): string {
-  return getSearchParams().get("next") || "/app";
+  return getSearchParams().get("next") || "/dashboard";
 }
 
 const PAGE_LABELS: Record<string, string> = {

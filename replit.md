@@ -87,21 +87,28 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/lib/storage.ts` — localStorage utility functions
 
 **Routing (wouter):**
-- `/` — Landing page (accessible to both auth and unauth users)
-- `/auth` — Login/register page; supports `?next=/path` param for deep linking after auth
-- `/app` — Calculator page (authenticated, wrapped in PlanGuard for dtf_quotes)
-- `/mockups` — Mockup generator (authenticated, wrapped in PlanGuard for mockup_pngs)
-- `/history` — Quote history (authenticated)
-- `/settings` — App settings (authenticated, master only)
+- `/` — Landing page (accessible to both auth and unauth users, uses AppShell with Navbar)
+- `/auth` — Login/register page; supports `?next=/path` param for deep linking after auth (uses AppShell, no navbar)
+- `/dashboard` — Dashboard home (authenticated, default post-login destination, uses DashboardLayout)
+- `/app` — Calculator page (authenticated, wrapped in PlanGuard for dtf_quotes, uses DashboardLayout)
+- `/mockups` — Mockup generator (authenticated, wrapped in PlanGuard for mockup_pngs, uses DashboardLayout)
+- `/history` — Quote history (authenticated, uses DashboardLayout)
+- `/settings` — App settings (authenticated, master only, uses DashboardLayout)
+- `/profile` — User profile (authenticated, uses DashboardLayout)
 - Unauthenticated access to protected routes redirects to `/auth?next=<path>` preserving intent
 
-**Navigation:** Unified Navbar component shared across all pages (except auth). Desktop: horizontal top navbar with Herramientas dropdown, Blog (disabled), Planes/Nosotros (landing only), profile menu. Mobile: bottom tab bar with popups. Landing page accessible via "Inicio" link.
-
-**App Shell Architecture:** Single persistent `AppShell` component wraps all routes. Contains background (blobs + noise SVG), Navbar, and scrollable main content area. Pages render content only — no duplicate backgrounds. Route transitions use CSS `animate-page-in` keyed by location for smooth fade-in on navigation. Auth page (`/auth`) hides the navbar.
+**Navigation — Dual Layout Architecture:**
+- **AppShell** (public): Used for landing (`/`) and auth (`/auth`). Contains background blobs+noise, top Navbar with desktop horizontal nav + Planes/Nosotros (landing), and login/register buttons. No bottom mobile nav.
+- **DashboardLayout** (authenticated): Used for all authenticated routes. Contains background blobs+noise, persistent left sidebar (desktop 240px, mobile slide-in drawer), top header bar with breadcrumb/search/notifications/avatar, and scrollable content area.
+- **Sidebar** sections: Principal (Dashboard, Pedidos, Clientes, Proveedores), Herramientas (Cotizador DTF, Mockups, Quita Fondos, Blog), Finanzas (Ingresos/Gastos, Reportes, Cuentas Corrientes), Comunidad (Telegram link), bottom: Configuración (master only), Mi Perfil, Cerrar Sesión.
+- Items marked "Pronto" are disabled (not yet built).
 
 **Key Files (layout):**
-- `src/components/app-shell.tsx` — Persistent shell with background, navbar, page transition animation
-- `src/components/navbar.tsx` — Unified navbar (desktop top bar + mobile bottom nav)
+- `src/components/app-shell.tsx` — Public shell with background, navbar (landing/auth only)
+- `src/components/navbar.tsx` — Public navbar (desktop top bar, used on landing page)
+- `src/components/sidebar.tsx` — Dashboard sidebar with nav sections, active states, mobile drawer
+- `src/components/dashboard-layout.tsx` — Dashboard layout wrapper (sidebar + header + content)
+- `src/pages/dashboard.tsx` — Dashboard home page (greeting, metrics, quick actions)
 
 **Design:** Dark mode only (forced via `<html class="dark">`), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design. No theme toggle.
 

@@ -143,7 +143,7 @@ export function ProfilePage() {
     <div className="px-4 py-6 md:px-10 md:py-10 max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setLocation("/app")}
+          onClick={() => setLocation("/dashboard")}
           className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
         >
           <ArrowLeft className="w-5 h-5" />
