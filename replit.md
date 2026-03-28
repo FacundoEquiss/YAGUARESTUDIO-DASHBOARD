@@ -95,7 +95,13 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `/settings` — App settings (authenticated, master only)
 - Unauthenticated access to protected routes redirects to `/auth?next=<path>` preserving intent
 
-**Navigation:** Horizontal top navbar (desktop) / bottom tab bar (mobile) with Inicio, Cotizador, Mockups, Historial, Ajustes tabs using wouter routing. Dynamic title in navbar changes per route (Cotizador, Mockups, Historial, Ajustes). Landing page accessible via "Inicio" link from app pages.
+**Navigation:** Unified Navbar component shared across all pages (except auth). Desktop: horizontal top navbar with Herramientas dropdown, Blog (disabled), Planes/Nosotros (landing only), profile menu. Mobile: bottom tab bar with popups. Landing page accessible via "Inicio" link.
+
+**App Shell Architecture:** Single persistent `AppShell` component wraps all routes. Contains background (blobs + noise SVG), Navbar, and scrollable main content area. Pages render content only — no duplicate backgrounds. Route transitions use CSS `animate-page-in` keyed by location for smooth fade-in on navigation. Auth page (`/auth`) hides the navbar.
+
+**Key Files (layout):**
+- `src/components/app-shell.tsx` — Persistent shell with background, navbar, page transition animation
+- `src/components/navbar.tsx` — Unified navbar (desktop top bar + mobile bottom nav)
 
 **Design:** Dark mode only (forced via `<html class="dark">`), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design. No theme toggle.
 

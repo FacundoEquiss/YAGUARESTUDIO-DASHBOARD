@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { Navbar } from "@/components/navbar";
 
 interface PlanLimits {
   dtfQuotes: number;
@@ -108,29 +107,9 @@ export function LandingPage() {
     });
   }, []);
 
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  };
 
   return (
-    <div className="auth-root">
-      <div className="auth-blobs" aria-hidden="true">
-        <div className="auth-blob auth-blob-1" />
-        <div className="auth-blob auth-blob-2" />
-        <div className="auth-blob auth-blob-3" />
-        <div className="auth-blob auth-blob-4" />
-      </div>
-
-      <svg className="auth-noise" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-        <filter id="landing-noise-f">
-          <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#landing-noise-f)" />
-      </svg>
-
-      <div className="relative z-10 overflow-y-auto h-[100dvh] custom-scrollbar scroll-smooth">
-        <Navbar isLanding onScrollTo={scrollTo} />
+    <>
 
         <section id="top" className="relative min-h-[calc(100dvh-3.5rem)] flex items-center justify-center px-4 sm:px-6">
           <div className="max-w-4xl mx-auto text-center py-20">
@@ -173,7 +152,7 @@ export function LandingPage() {
               className="flex items-center justify-center"
             >
               <button
-                onClick={() => scrollTo("herramientas")}
+                onClick={() => document.getElementById("herramientas")?.scrollIntoView({ behavior: "smooth" })}
                 className="px-8 py-3.5 rounded-2xl bg-white/5 border border-border text-foreground text-base font-bold hover:bg-white/10 transition-all flex items-center gap-2"
               >
                 Ver herramientas
@@ -438,7 +417,6 @@ export function LandingPage() {
             </p>
           </div>
         </footer>
-      </div>
-    </div>
+    </>
   );
 }

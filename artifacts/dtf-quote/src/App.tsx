@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/app-shell";
 import { CalculatorPage } from "@/pages/calculator";
 import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
@@ -52,51 +52,45 @@ function Router() {
 
   if (!currentUser) {
     return (
-      <Switch>
-        <Route path="/auth" component={AuthPage} />
-        <Route path="/" component={LandingPage} />
-        <Route><ProtectedRedirect /></Route>
-      </Switch>
+      <AppShell>
+        <Switch>
+          <Route path="/auth" component={AuthPage} />
+          <Route path="/" component={LandingPage} />
+          <Route><ProtectedRedirect /></Route>
+        </Switch>
+      </AppShell>
     );
   }
 
   return (
-    <Switch>
-      <Route path="/" component={LandingPage} />
-      <Route path="/auth">
-        {currentUser.role === "guest" ? <AuthPage /> : <AuthRedirect />}
-      </Route>
-      <Route path="/app">
-        <Layout>
+    <AppShell>
+      <Switch>
+        <Route path="/" component={LandingPage} />
+        <Route path="/auth">
+          {currentUser.role === "guest" ? <AuthPage /> : <AuthRedirect />}
+        </Route>
+        <Route path="/app">
           <PlanGuard feature="dtf_quotes" featureLabel="cotizaciones DTF">
             <CalculatorPage />
           </PlanGuard>
-        </Layout>
-      </Route>
-      <Route path="/mockups">
-        <Layout>
+        </Route>
+        <Route path="/mockups">
           <PlanGuard feature="mockup_pngs" featureLabel="mockups">
             <MockupsPage />
           </PlanGuard>
-        </Layout>
-      </Route>
-      <Route path="/history">
-        <Layout>
+        </Route>
+        <Route path="/history">
           <HistoryPage />
-        </Layout>
-      </Route>
-      <Route path="/settings">
-        <Layout>
+        </Route>
+        <Route path="/settings">
           <SettingsPage />
-        </Layout>
-      </Route>
-      <Route path="/profile">
-        <Layout>
+        </Route>
+        <Route path="/profile">
           <ProfilePage />
-        </Layout>
-      </Route>
-      <Route component={NotFound} />
-    </Switch>
+        </Route>
+        <Route component={NotFound} />
+      </Switch>
+    </AppShell>
   );
 }
 

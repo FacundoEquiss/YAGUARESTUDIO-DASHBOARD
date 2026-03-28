@@ -83,32 +83,6 @@ export function AuthPage() {
   };
 
   return (
-    <div className="auth-root">
-
-      <div className="auth-blobs" aria-hidden="true">
-        <div className="auth-blob auth-blob-1" />
-        <div className="auth-blob auth-blob-2" />
-        <div className="auth-blob auth-blob-3" />
-        <div className="auth-blob auth-blob-4" />
-      </div>
-
-      <svg
-        className="auth-noise"
-        aria-hidden="true"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <filter id="auth-noise-f">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.72"
-            numOctaves="4"
-            stitchTiles="stitch"
-          />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#auth-noise-f)" />
-      </svg>
-
       <div className="auth-card-wrapper">
         <div className="auth-card">
 
@@ -241,6 +215,5 @@ export function AuthPage() {
 
         </div>
       </div>
-    </div>
   );
 }
