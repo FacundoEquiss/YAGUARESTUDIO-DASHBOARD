@@ -234,7 +234,8 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
       if (!isNaN(parsed) && parsed > 0) {
         const [c] = await db.select({ id: clients.id }).from(clients)
           .where(and(eq(clients.id, parsed), eq(clients.userId, userId), isNull(clients.deletedAt)));
-        if (c) validClientId = parsed;
+        if (!c) { res.status(400).json({ error: "Cliente no encontrado" }); return; }
+        validClientId = parsed;
       }
     }
 
@@ -244,7 +245,8 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
       if (!isNaN(parsed) && parsed > 0) {
         const [s] = await db.select({ id: suppliers.id }).from(suppliers)
           .where(and(eq(suppliers.id, parsed), eq(suppliers.userId, userId), isNull(suppliers.deletedAt)));
-        if (s) validSupplierId = parsed;
+        if (!s) { res.status(400).json({ error: "Proveedor no encontrado" }); return; }
+        validSupplierId = parsed;
       }
     }
 
@@ -254,7 +256,8 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
       if (!isNaN(parsed) && parsed > 0) {
         const [o] = await db.select({ id: orders.id }).from(orders)
           .where(and(eq(orders.id, parsed), eq(orders.userId, userId), isNull(orders.deletedAt)));
-        if (o) validOrderId = parsed;
+        if (!o) { res.status(400).json({ error: "Pedido no encontrado" }); return; }
+        validOrderId = parsed;
       }
     }
 

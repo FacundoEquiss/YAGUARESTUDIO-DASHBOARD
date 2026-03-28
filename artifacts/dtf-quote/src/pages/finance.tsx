@@ -354,7 +354,7 @@ export function FinancePage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell truncate max-w-[150px]">
-                        {tx.clientName || tx.supplierName || "—"}
+                        {tx.clientName || tx.supplierName || (tx.orderId ? `Pedido #${tx.orderId}` : "—")}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
                         <span className={tx.type === "income" ? "text-emerald-400" : "text-red-400"}>
