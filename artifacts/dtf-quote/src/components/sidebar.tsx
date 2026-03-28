@@ -19,6 +19,7 @@ import {
   LogOut,
   X,
   Send,
+  FileText,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -44,6 +45,7 @@ const MAIN_NAV: NavItem[] = [
 const TOOLS_NAV: NavItem[] = [
   { href: "/app", label: "Cotizador DTF", icon: Calculator, ready: true },
   { href: "/mockups", label: "Mockups", icon: Shirt, ready: true },
+  { href: "/history", label: "Historial", icon: FileText, ready: true },
   { href: "/bg-remover", label: "Quita Fondos", icon: Scissors, ready: false },
   { href: "/blog", label: "Blog", icon: BookOpen, ready: false },
 ];
@@ -121,7 +123,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 h-14 shrink-0">
         <Link
-          href="/"
+          href="/dashboard"
           onClick={handleNavigate}
           className="flex items-center gap-1 cursor-pointer"
         >
