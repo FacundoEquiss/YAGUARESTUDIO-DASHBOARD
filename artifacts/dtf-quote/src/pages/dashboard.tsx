@@ -19,7 +19,6 @@ import {
   Calculator,
   Shirt,
   ClipboardList,
-  DollarSign,
   ArrowRight,
   Sparkles,
   TrendingUp,
@@ -114,6 +113,7 @@ export function DashboardPage() {
 
   const metrics = [
     {
+      id: "quotes",
       label: "Cotizaciones",
       sublabel: "este mes",
       value: usage.dtfQuotes,
@@ -121,6 +121,7 @@ export function DashboardPage() {
       color: "from-orange-500 to-amber-500",
     },
     {
+      id: "mockups",
       label: "Mockups",
       sublabel: "este mes",
       value: usage.mockupPngs,
@@ -128,21 +129,20 @@ export function DashboardPage() {
       color: "from-blue-500 to-indigo-500",
     },
     {
-      label: "Pedidos",
-      sublabel: "activos",
+      id: "orders-active",
+      label: "Pedidos activos",
+      sublabel: "en curso",
       value: orderStats.activeOrders,
       icon: ClipboardList,
       color: "from-emerald-500 to-teal-500",
-      href: "/orders",
     },
     {
-      label: "Ingresos del mes",
-      sublabel: "",
-      value: "$0",
-      icon: DollarSign,
+      id: "orders-month",
+      label: "Pedidos del mes",
+      sublabel: "creados",
+      value: orderStats.monthOrders,
+      icon: ClipboardList,
       color: "from-purple-500 to-violet-500",
-      isText: true,
-      soon: true,
     },
   ];
 
@@ -178,7 +178,7 @@ export function DashboardPage() {
           const Icon = m.icon;
           return (
             <div
-              key={m.label}
+              key={m.id}
               className="relative bg-card/60 backdrop-blur rounded-2xl p-4 border border-border overflow-hidden group hover:border-white/10 transition-colors"
             >
               <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${m.color} opacity-[0.06] rounded-full -mr-8 -mt-8 group-hover:opacity-[0.10] transition-opacity`} />
@@ -186,11 +186,10 @@ export function DashboardPage() {
                 <Icon className="w-[18px] h-[18px] text-white" />
               </div>
               <p className="text-2xl font-display font-black text-foreground leading-none">
-                {m.soon ? (m.isText ? m.value : "—") : m.value}
+                {m.value}
               </p>
               <p className="text-[11px] text-muted-foreground font-medium mt-1">
-                {m.label}
-                {m.soon ? " · Próximamente" : ` · ${m.sublabel}`}
+                {m.label} · {m.sublabel}
               </p>
             </div>
           );

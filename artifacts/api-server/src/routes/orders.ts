@@ -36,14 +36,16 @@ ordersRouter.get("/orders", requireAuth, async (req, res) => {
 
     const where = and(...conditions);
 
-    const sortColumns: Record<string, typeof orders.createdAt> = {
-      createdAt: orders.createdAt,
-      dueDate: orders.dueDate as typeof orders.createdAt,
-      totalPrice: orders.totalPrice as unknown as typeof orders.createdAt,
-      clientName: orders.clientName as unknown as typeof orders.createdAt,
-    };
-    const sortCol = sortColumns[sortBy] || orders.createdAt;
-    const orderFn = sortDir === "asc" ? asc(sortCol) : desc(sortCol);
+    function getSortOrder() {
+      const dir = sortDir === "asc" ? asc : desc;
+      switch (sortBy) {
+        case "dueDate": return dir(orders.dueDate);
+        case "totalPrice": return dir(orders.totalPrice);
+        case "clientName": return dir(orders.clientName);
+        default: return dir(orders.createdAt);
+      }
+    }
+    const orderFn = getSortOrder();
 
     const [items, countResult] = await Promise.all([
       db
