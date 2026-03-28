@@ -76,7 +76,7 @@ export function DashboardPage() {
             >
               <div className={`absolute top-0 right-0 w-20 h-20 bg-gradient-to-br ${m.color} opacity-[0.07] rounded-full -mr-6 -mt-6`} />
               <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${m.color} flex items-center justify-center mb-3 shadow-lg`}>
-                <Icon className="w-4.5 h-4.5 text-white" />
+                <Icon className="w-[18px] h-[18px] text-white" />
               </div>
               <p className="text-2xl font-display font-black text-foreground">
                 {m.soon ? "—" : m.value}

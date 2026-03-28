@@ -67,10 +67,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <div className="flex-1" />
 
             <button className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors" title="Buscar">
-              <Search className="w-4.5 h-4.5" />
+              <Search className="w-[18px] h-[18px]" />
             </button>
             <button className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors relative" title="Notificaciones">
-              <Bell className="w-4.5 h-4.5" />
+              <Bell className="w-[18px] h-[18px]" />
             </button>
             <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary">
               {initials}
