@@ -52,8 +52,38 @@ clientsRouter.get("/clients", requireAuth, async (req, res) => {
         .where(where),
     ]);
 
+    const clientIds = items.map((c) => c.id);
+    let metricsMap: Record<number, { orderCount: number; totalRevenue: string }> = {};
+    if (clientIds.length > 0) {
+      const metrics = await db
+        .select({
+          clientId: orders.clientId,
+          orderCount: sql<number>`count(*)::int`,
+          totalRevenue: sql<string>`coalesce(sum(${orders.totalPrice}), 0)`,
+        })
+        .from(orders)
+        .where(and(
+          sql`${orders.clientId} IN (${sql.join(clientIds.map(id => sql`${id}`), sql`, `)})`,
+          eq(orders.userId, userId),
+          isNull(orders.deletedAt),
+        ))
+        .groupBy(orders.clientId);
+
+      for (const m of metrics) {
+        if (m.clientId != null) {
+          metricsMap[m.clientId] = { orderCount: m.orderCount, totalRevenue: m.totalRevenue };
+        }
+      }
+    }
+
+    const clientsWithMetrics = items.map((c) => ({
+      ...c,
+      orderCount: metricsMap[c.id]?.orderCount ?? 0,
+      totalRevenue: metricsMap[c.id]?.totalRevenue ?? "0",
+    }));
+
     res.json({
-      clients: items,
+      clients: clientsWithMetrics,
       total: countResult[0].count,
       page,
       limit,

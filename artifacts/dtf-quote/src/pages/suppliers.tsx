@@ -165,7 +165,10 @@ function SupplierDetailModal({ supplier, onClose, onEdit, onDelete }: SupplierDe
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="text-lg font-semibold">{supplier.name}</h2>
+          <div>
+            <h2 className="text-lg font-semibold">{supplier.name}</h2>
+            {supplier.businessName && <p className="text-sm text-muted-foreground">{supplier.businessName}</p>}
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-4">
@@ -176,28 +179,30 @@ function SupplierDetailModal({ supplier, onClose, onEdit, onDelete }: SupplierDe
               </span>
             </div>
           )}
-          {supplier.businessName && (
-            <div className="flex items-center gap-2 text-sm">
-              <Building2 className="w-4 h-4 text-muted-foreground" />
-              <span>{supplier.businessName}</span>
-            </div>
-          )}
-          {supplier.email && (
-            <div className="flex items-center gap-2 text-sm">
-              <Mail className="w-4 h-4 text-muted-foreground" />
-              <a href={`mailto:${supplier.email}`} className="text-primary hover:underline">{supplier.email}</a>
-            </div>
-          )}
-          {supplier.phone && (
-            <div className="flex items-center gap-2 text-sm">
-              <Phone className="w-4 h-4 text-muted-foreground" />
-              <a href={`tel:${supplier.phone}`} className="text-primary hover:underline">{supplier.phone}</a>
-            </div>
-          )}
+
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Contacto</p>
+            {supplier.email && (
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <a href={`mailto:${supplier.email}`} className="text-primary hover:underline">{supplier.email}</a>
+              </div>
+            )}
+            {supplier.phone && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="w-4 h-4 text-muted-foreground" />
+                <a href={`tel:${supplier.phone}`} className="text-primary hover:underline">{supplier.phone}</a>
+              </div>
+            )}
+            {!supplier.email && !supplier.phone && (
+              <p className="text-sm text-muted-foreground">Sin datos de contacto</p>
+            )}
+          </div>
+
           {supplier.notes && (
-            <div className="flex items-start gap-2 text-sm">
-              <StickyNote className="w-4 h-4 text-muted-foreground mt-0.5" />
-              <p className="text-muted-foreground whitespace-pre-wrap">{supplier.notes}</p>
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Notas</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{supplier.notes}</p>
             </div>
           )}
           <div className="pt-2 text-xs text-muted-foreground">
@@ -299,47 +304,61 @@ export function SuppliersPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-3">
-            {suppliers.map((supplier) => (
-              <div
-                key={supplier.id}
-                onClick={() => setDetailSupplier(supplier)}
-                className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all cursor-pointer group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-sm truncate">{supplier.name}</h3>
-                      {supplier.businessName && (
-                        <span className="text-xs text-muted-foreground truncate">· {supplier.businessName}</span>
-                      )}
-                      {supplier.category && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-500/15 text-violet-400 border border-violet-500/20">
-                          {getCategoryLabel(supplier.category)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      {supplier.email && (
-                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{supplier.email}</span>
-                      )}
-                      {supplier.phone && (
-                        <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{supplier.phone}</span>
-                      )}
-                      <span>{formatDate(supplier.createdAt)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setEditSupplier(supplier); setShowForm(true); }}
-                      className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Contacto</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Categoría</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Registrado</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suppliers.map((supplier) => (
+                    <tr
+                      key={supplier.id}
+                      onClick={() => setDetailSupplier(supplier)}
+                      className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer group"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                      <td className="px-4 py-3">
+                        <p className="font-medium truncate max-w-[200px]">{supplier.name}</p>
+                        {supplier.businessName && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{supplier.businessName}</p>}
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <div className="space-y-0.5">
+                          {supplier.email && <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" />{supplier.email}</p>}
+                          {supplier.phone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{supplier.phone}</p>}
+                          {!supplier.email && !supplier.phone && <span className="text-xs text-muted-foreground/50">—</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {supplier.category ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-500/15 text-violet-400 border border-violet-500/20">
+                            {getCategoryLabel(supplier.category)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden md:table-cell">
+                        {formatDate(supplier.createdAt)}
+                      </td>
+                      <td className="px-2 py-3">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditSupplier(supplier); setShowForm(true); }}
+                          className="p-1.5 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {totalPages > 1 && (

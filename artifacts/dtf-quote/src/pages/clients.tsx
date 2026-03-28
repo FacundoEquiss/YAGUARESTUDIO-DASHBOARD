@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   useClients,
   createClient,
   updateClient,
   deleteClient,
+  fetchClientDetail,
   type ClientItem,
+  type ClientDetail,
   type CreateClientData,
 } from "@/hooks/use-clients";
 import {
@@ -21,7 +23,17 @@ import {
   Phone,
   Building2,
   StickyNote,
+  ShoppingBag,
+  DollarSign,
 } from "lucide-react";
+
+const STATUS_COLORS: Record<string, string> = {
+  nuevo: "bg-blue-500/15 text-blue-400",
+  en_proceso: "bg-orange-500/15 text-orange-400",
+  listo: "bg-yellow-500/15 text-yellow-400",
+  entregado: "bg-emerald-500/15 text-emerald-400",
+  cancelado: "bg-red-500/15 text-red-400",
+};
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
@@ -114,62 +126,143 @@ function ClientFormModal({ client, onClose, onSaved }: ClientFormProps) {
 }
 
 interface ClientDetailProps {
-  client: ClientItem;
+  clientId: number;
   onClose: () => void;
-  onEdit: () => void;
+  onEdit: (client: ClientItem) => void;
   onDelete: () => void;
 }
 
-function ClientDetailModal({ client, onClose, onEdit, onDelete }: ClientDetailProps) {
+function ClientDetailModal({ clientId, onClose, onEdit, onDelete }: ClientDetailProps) {
+  const [detail, setDetail] = useState<ClientDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchClientDetail(clientId).then((d) => {
+      setDetail(d);
+      setLoading(false);
+    });
+  }, [clientId]);
 
   const handleDelete = async () => {
     if (!confirm("¿Eliminar este cliente?")) return;
     setDeleting(true);
-    await deleteClient(client.id);
+    await deleteClient(clientId);
     setDeleting(false);
     onDelete();
     onClose();
   };
 
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+        <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl p-10 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!detail) {
+    onClose();
+    return null;
+  }
+
+  const { client, orders, stats } = detail;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="text-lg font-semibold">{client.name}</h2>
+          <div>
+            <h2 className="text-lg font-semibold">{client.name}</h2>
+            {client.businessName && <p className="text-sm text-muted-foreground">{client.businessName}</p>}
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X className="w-4 h-4" /></button>
         </div>
-        <div className="p-5 space-y-4">
-          {client.businessName && (
-            <div className="flex items-center gap-2 text-sm">
-              <Building2 className="w-4 h-4 text-muted-foreground" />
-              <span>{client.businessName}</span>
+
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-muted/50 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                <ShoppingBag className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-xl font-bold">{stats.orderCount}</p>
+                <p className="text-xs text-muted-foreground">Pedidos</p>
+              </div>
             </div>
-          )}
-          {client.email && (
-            <div className="flex items-center gap-2 text-sm">
-              <Mail className="w-4 h-4 text-muted-foreground" />
-              <a href={`mailto:${client.email}`} className="text-primary hover:underline">{client.email}</a>
+            <div className="bg-muted/50 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                <DollarSign className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xl font-bold">{formatCurrency(Number(stats.totalRevenue))}</p>
+                <p className="text-xs text-muted-foreground">Facturado</p>
+              </div>
             </div>
-          )}
-          {client.phone && (
-            <div className="flex items-center gap-2 text-sm">
-              <Phone className="w-4 h-4 text-muted-foreground" />
-              <a href={`tel:${client.phone}`} className="text-primary hover:underline">{client.phone}</a>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Contacto</p>
+            <div className="space-y-2">
+              {client.email && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  <a href={`mailto:${client.email}`} className="text-primary hover:underline">{client.email}</a>
+                </div>
+              )}
+              {client.phone && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="w-4 h-4 text-muted-foreground" />
+                  <a href={`tel:${client.phone}`} className="text-primary hover:underline">{client.phone}</a>
+                </div>
+              )}
+              {!client.email && !client.phone && (
+                <p className="text-sm text-muted-foreground">Sin datos de contacto</p>
+              )}
             </div>
-          )}
+          </div>
+
           {client.notes && (
-            <div className="flex items-start gap-2 text-sm">
-              <StickyNote className="w-4 h-4 text-muted-foreground mt-0.5" />
-              <p className="text-muted-foreground whitespace-pre-wrap">{client.notes}</p>
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Notas</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{client.notes}</p>
             </div>
           )}
-          <div className="pt-2 text-xs text-muted-foreground">
+
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Pedidos recientes</p>
+            {orders.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin pedidos vinculados</p>
+            ) : (
+              <div className="space-y-2">
+                {orders.map((o) => (
+                  <div key={o.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-sm">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{o.description || `Pedido #${o.id}`}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(o.createdAt)} · {o.quantity} un.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium", STATUS_COLORS[o.status] || "bg-gray-500/15 text-gray-400")}>
+                        {o.status.replace("_", " ")}
+                      </span>
+                      <span className="font-semibold text-xs">{formatCurrency(Number(o.totalPrice))}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="text-xs text-muted-foreground">
             Registrado el {formatDate(client.createdAt)}
           </div>
         </div>
+
         <div className="flex gap-3 p-5 pt-0">
-          <button onClick={onEdit} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2">
+          <button onClick={() => onEdit(client)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2">
             <Pencil className="w-3.5 h-3.5" /> Editar
           </button>
           <button onClick={handleDelete} disabled={deleting} className="py-2.5 px-4 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-sm font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
@@ -187,7 +280,7 @@ export function ClientsPage() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editClient, setEditClient] = useState<ClientItem | null>(null);
-  const [detailClient, setDetailClient] = useState<ClientItem | null>(null);
+  const [detailClientId, setDetailClientId] = useState<number | null>(null);
 
   const { clients, total, totalPages, loading, refresh } = useClients({
     search: debouncedSearch,
@@ -250,42 +343,61 @@ export function ClientsPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-3">
-            {clients.map((client) => (
-              <div
-                key={client.id}
-                onClick={() => setDetailClient(client)}
-                className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all cursor-pointer group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-sm truncate">{client.name}</h3>
-                      {client.businessName && (
-                        <span className="text-xs text-muted-foreground truncate">· {client.businessName}</span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      {client.email && (
-                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{client.email}</span>
-                      )}
-                      {client.phone && (
-                        <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{client.phone}</span>
-                      )}
-                      <span>{formatDate(client.createdAt)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setEditClient(client); setShowForm(true); }}
-                      className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Contacto</th>
+                    <th className="text-center px-4 py-3 font-medium text-muted-foreground">Pedidos</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Facturado</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Registrado</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.map((client) => (
+                    <tr
+                      key={client.id}
+                      onClick={() => setDetailClientId(client.id)}
+                      className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer group"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                      <td className="px-4 py-3">
+                        <p className="font-medium truncate max-w-[200px]">{client.name}</p>
+                        {client.businessName && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{client.businessName}</p>}
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <div className="space-y-0.5">
+                          {client.email && <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" />{client.email}</p>}
+                          {client.phone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{client.phone}</p>}
+                          {!client.email && !client.phone && <span className="text-xs text-muted-foreground/50">—</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", client.orderCount > 0 ? "bg-blue-500/15 text-blue-400" : "text-muted-foreground/50")}>
+                          {client.orderCount}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {Number(client.totalRevenue) > 0 ? formatCurrency(Number(client.totalRevenue)) : <span className="text-muted-foreground/50">$0</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden md:table-cell">
+                        {formatDate(client.createdAt)}
+                      </td>
+                      <td className="px-2 py-3">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditClient(client); setShowForm(true); }}
+                          className="p-1.5 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {totalPages > 1 && (
@@ -312,11 +424,11 @@ export function ClientsPage() {
         />
       )}
 
-      {detailClient && !showForm && (
+      {detailClientId != null && !showForm && (
         <ClientDetailModal
-          client={detailClient}
-          onClose={() => setDetailClient(null)}
-          onEdit={() => { setEditClient(detailClient); setShowForm(true); setDetailClient(null); }}
+          clientId={detailClientId}
+          onClose={() => setDetailClientId(null)}
+          onEdit={(client) => { setEditClient(client); setShowForm(true); setDetailClientId(null); }}
           onDelete={handleSaved}
         />
       )}

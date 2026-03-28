@@ -9,8 +9,29 @@ export interface ClientItem {
   phone: string | null;
   businessName: string | null;
   notes: string | null;
+  orderCount: number;
+  totalRevenue: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ClientDetail {
+  client: ClientItem;
+  orders: Array<{
+    id: number;
+    clientName: string;
+    description: string | null;
+    quantity: number;
+    unitPrice: string;
+    totalPrice: string;
+    status: string;
+    dueDate: string | null;
+    createdAt: string;
+  }>;
+  stats: {
+    orderCount: number;
+    totalRevenue: string;
+  };
 }
 
 export interface ClientsListResult {
@@ -84,6 +105,11 @@ export function useAllClients() {
   }, [refresh]);
 
   return { clients, loading, refresh };
+}
+
+export async function fetchClientDetail(id: number): Promise<ClientDetail | null> {
+  const { data } = await apiFetch<ClientDetail>(`/clients/${id}`);
+  return data ?? null;
 }
 
 export async function createClient(data: CreateClientData): Promise<{ client?: ClientItem; error?: string }> {
