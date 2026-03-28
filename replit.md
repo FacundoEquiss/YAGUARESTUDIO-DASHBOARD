@@ -66,7 +66,9 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - Server-side auth (JWT via httpOnly cookies) with register/login/guest modes
 - Subscription system with usage tracking (quotes, mockups, PDFs per month)
 - Upgrade prompt when usage limits are reached
-- Orders management system (CRUD, status workflow, filters, search, pagination)
+- Orders management system (CRUD, status workflow, filters, search, pagination, optional client linking)
+- Clients management system (CRUD, search, detail view with contact info)
+- Suppliers management system (CRUD, search, category filter, detail view)
 
 **Key Files:**
 - `src/lib/skyline.ts` — Skyline 2D strip packing algorithm
@@ -86,7 +88,11 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/hooks/use-usage.tsx` — Usage tracking context (limits, remaining, increment)
 - `src/hooks/use-usage-events.ts` — Fetches usage events from API for dashboard activity chart/feed
 - `src/hooks/use-orders.ts` — Orders CRUD hooks (useOrders, useOrderStats, createOrder, updateOrder, deleteOrder)
-- `src/pages/orders.tsx` — Orders list page with status filters, search, sortable table, create/edit/detail modals
+- `src/hooks/use-clients.ts` — Clients CRUD hooks (useClients, useAllClients, createClient, updateClient, deleteClient)
+- `src/hooks/use-suppliers.ts` — Suppliers CRUD hooks (useSuppliers, createSupplier, updateSupplier, deleteSupplier)
+- `src/pages/orders.tsx` — Orders list page with status filters, search, sortable table, create/edit/detail modals, client selection
+- `src/pages/clients.tsx` — Clients list page with search, create/edit/detail modals
+- `src/pages/suppliers.tsx` — Suppliers list page with search, category filter, create/edit/detail modals
 - `src/hooks/use-dtf-store.ts` — localStorage hooks for settings and quotes
 - `src/lib/storage.ts` — localStorage utility functions
 
@@ -97,6 +103,8 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `/app` — Calculator page (authenticated, wrapped in PlanGuard for dtf_quotes, uses DashboardLayout)
 - `/mockups` — Mockup generator (authenticated, wrapped in PlanGuard for mockup_pngs, uses DashboardLayout)
 - `/orders` — Orders management (authenticated, uses DashboardLayout)
+- `/clients` — Clients management (authenticated, uses DashboardLayout)
+- `/suppliers` — Suppliers management (authenticated, uses DashboardLayout)
 - `/history` — Quote history (authenticated, uses DashboardLayout)
 - `/settings` — App settings (authenticated, master only, uses DashboardLayout)
 - `/profile` — User profile (authenticated, uses DashboardLayout)
@@ -127,7 +135,9 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 - Auth middleware: `src/middleware/auth.ts` — JWT sign/verify, `requireAuth` middleware
 - Auth routes: `src/routes/auth.ts` — POST `/api/auth/register`, POST `/api/auth/login`, GET `/api/auth/me`, POST `/api/auth/logout`
 - Subscription routes: `src/routes/subscription.ts` — GET `/api/subscription`, GET `/api/subscription/plans`, POST `/api/subscription/upgrade`, GET `/api/usage`, POST `/api/usage/increment` (also logs to usage_events), GET `/api/usage/events?days=7` (returns last N days of events)
-- Orders routes: `src/routes/orders.ts` — GET `/api/orders` (list with filters/search/sort/pagination), GET `/api/orders/stats` (active + monthly counts), GET `/api/orders/:id`, POST `/api/orders`, PUT `/api/orders/:id`, DELETE `/api/orders/:id` (soft delete)
+- Orders routes: `src/routes/orders.ts` — GET `/api/orders` (list with filters/search/sort/pagination), GET `/api/orders/stats` (active + monthly counts), GET `/api/orders/:id`, POST `/api/orders` (with optional clientId), PUT `/api/orders/:id`, DELETE `/api/orders/:id` (soft delete)
+- Clients routes: `src/routes/clients.ts` — GET `/api/clients` (list with search/sort/pagination), GET `/api/clients/:id` (with related orders + stats), POST `/api/clients`, PUT `/api/clients/:id`, DELETE `/api/clients/:id` (soft delete)
+- Suppliers routes: `src/routes/suppliers.ts` — GET `/api/suppliers` (list with search/category/sort/pagination), GET `/api/suppliers/:id`, POST `/api/suppliers`, PUT `/api/suppliers/:id`, DELETE `/api/suppliers/:id` (soft delete)
 - Depends on: `@workspace/db`, `@workspace/api-zod`, bcryptjs, jsonwebtoken
 - JWT stored in httpOnly cookie named `token` (30-day expiry)
 - Master account: `yaguarestudio@gmail.com` / role `master` — auto-seeded on startup
@@ -144,7 +154,9 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
   - `plans.ts` — `subscription_plans` (name, slug, limits as JSONB, price)
   - `subscriptions.ts` — `user_subscriptions` (userId, planId, status, period dates)
   - `usage.ts` — `usage_counters` (userId, counterType, count, periodStart — auto-resets monthly) + `usage_events` (userId, eventType, metadata JSONB, createdAt — individual event log for activity history)
-  - `orders.ts` — `orders` (userId, clientName, description, quantity, unitPrice, totalPrice, status, dueDate, notes, deletedAt soft-delete, createdAt, updatedAt)
+  - `orders.ts` — `orders` (userId, clientId FK→clients nullable, clientName, description, quantity, unitPrice, totalPrice, status, dueDate, notes, deletedAt soft-delete, createdAt, updatedAt)
+  - `clients.ts` — `clients` (userId, name, email, phone, businessName, notes, deletedAt soft-delete, createdAt, updatedAt)
+  - `suppliers.ts` — `suppliers` (userId, name, email, phone, businessName, category, notes, deletedAt soft-delete, createdAt, updatedAt)
 - `src/seed-plans.ts` — Seeds 3 plans: Gratis (10/5/3), Estándar (40/30/25), Premium (unlimited)
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only), `./seed-plans` (seed function)

@@ -4,6 +4,8 @@ import settingsRouter from "./settings";
 import authRouter from "./auth";
 import subscriptionRouter from "./subscription";
 import ordersRouter from "./orders";
+import clientsRouter from "./clients";
+import suppliersRouter from "./suppliers";
 
 const router: IRouter = Router();
 
@@ -12,5 +14,7 @@ router.use(settingsRouter);
 router.use(authRouter);
 router.use(subscriptionRouter);
 router.use(ordersRouter);
+router.use(clientsRouter);
+router.use(suppliersRouter);
 
 export default router;

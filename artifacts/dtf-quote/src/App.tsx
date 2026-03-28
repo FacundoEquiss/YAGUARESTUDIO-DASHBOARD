@@ -13,6 +13,8 @@ import { MockupsPage } from "@/pages/mockups";
 import { ProfilePage } from "@/pages/profile";
 import { DashboardPage } from "@/pages/dashboard";
 import { OrdersPage } from "@/pages/orders";
+import { ClientsPage } from "@/pages/clients";
+import { SuppliersPage } from "@/pages/suppliers";
 import { AuthPage } from "@/pages/auth";
 import { LandingPage } from "@/pages/landing";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -36,7 +38,7 @@ function AuthRedirect() {
 
 function ProtectedRedirect() {
   const [location] = useLocation();
-  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/profile", "/orders"];
+  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/profile", "/orders", "/clients", "/suppliers"];
   const next = validPaths.includes(location) ? location : "/dashboard";
   return <Redirect to={`/auth?next=${next}`} />;
 }
@@ -100,6 +102,16 @@ function Router() {
       <Route path="/orders">
         <DashboardLayout>
           <OrdersPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/clients">
+        <DashboardLayout>
+          <ClientsPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/suppliers">
+        <DashboardLayout>
+          <SuppliersPage />
         </DashboardLayout>
       </Route>
       <Route path="/history">

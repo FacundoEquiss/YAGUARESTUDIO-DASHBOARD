@@ -38,8 +38,8 @@ interface NavItem {
 const MAIN_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: true },
   { href: "/orders", label: "Pedidos", icon: ClipboardList, ready: true },
-  { href: "/clients", label: "Clientes", icon: Users, ready: false },
-  { href: "/suppliers", label: "Proveedores", icon: Truck, ready: false },
+  { href: "/clients", label: "Clientes", icon: Users, ready: true },
+  { href: "/suppliers", label: "Proveedores", icon: Truck, ready: true },
 ];
 
 const TOOLS_NAV: NavItem[] = [

@@ -1,7 +1,15 @@
 import { Router } from "express";
-import { db, orders } from "@workspace/db";
+import { db, orders, clients } from "@workspace/db";
 import { eq, and, isNull, desc, asc, ilike, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+
+async function validateClientOwnership(clientId: number, userId: number): Promise<boolean> {
+  const [client] = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), eq(clients.userId, userId), isNull(clients.deletedAt)));
+  return !!client;
+}
 
 const ordersRouter = Router();
 
@@ -150,11 +158,26 @@ ordersRouter.get("/orders/:id", requireAuth, async (req, res) => {
 ordersRouter.post("/orders", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { clientName, description, quantity, unitPrice, totalPrice, status, dueDate, notes } = req.body;
+    const { clientName, clientId, description, quantity, unitPrice, totalPrice, status, dueDate, notes } = req.body;
 
     if (!clientName || typeof clientName !== "string" || clientName.trim().length === 0) {
       res.status(400).json({ error: "Nombre de cliente es requerido" });
       return;
+    }
+
+    let validClientId: number | null = null;
+    if (clientId != null && clientId !== "") {
+      const parsed = Number(clientId);
+      if (isNaN(parsed) || parsed <= 0) {
+        res.status(400).json({ error: "ID de cliente inválido" });
+        return;
+      }
+      const owns = await validateClientOwnership(parsed, userId);
+      if (!owns) {
+        res.status(400).json({ error: "Cliente no encontrado" });
+        return;
+      }
+      validClientId = parsed;
     }
 
     const qty = Math.max(1, Number(quantity) || 1);
@@ -166,6 +189,7 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
       .insert(orders)
       .values({
         userId,
+        clientId: validClientId,
         clientName: clientName.trim(),
         description: description?.trim() || null,
         quantity: qty,
@@ -210,9 +234,27 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       return;
     }
 
-    const { clientName, description, quantity, unitPrice, totalPrice, status, dueDate, notes } = req.body;
+    const { clientName, clientId, description, quantity, unitPrice, totalPrice, status, dueDate, notes } = req.body;
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+    if (clientId !== undefined) {
+      if (clientId == null || clientId === "") {
+        updates.clientId = null;
+      } else {
+        const parsed = Number(clientId);
+        if (isNaN(parsed) || parsed <= 0) {
+          res.status(400).json({ error: "ID de cliente inválido" });
+          return;
+        }
+        const owns = await validateClientOwnership(parsed, userId);
+        if (!owns) {
+          res.status(400).json({ error: "Cliente no encontrado" });
+          return;
+        }
+        updates.clientId = parsed;
+      }
+    }
 
     if (clientName !== undefined) {
       if (typeof clientName !== "string" || clientName.trim().length === 0) {

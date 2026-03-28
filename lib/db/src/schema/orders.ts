@@ -1,9 +1,11 @@
 import { pgTable, serial, integer, varchar, timestamp, text, numeric } from "drizzle-orm/pg-core";
 import { users } from "./users";
+import { clients } from "./clients";
 
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
   clientName: varchar("client_name", { length: 255 }).notNull(),
   description: text("description"),
   quantity: integer("quantity").notNull().default(1),

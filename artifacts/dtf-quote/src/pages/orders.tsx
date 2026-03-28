@@ -9,6 +9,7 @@ import {
   type OrderItem,
   type CreateOrderData,
 } from "@/hooks/use-orders";
+import { useAllClients, type ClientItem } from "@/hooks/use-clients";
 import {
   Plus,
   Search,
@@ -58,6 +59,8 @@ interface OrderFormProps {
 
 function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
   const isEdit = !!order;
+  const { clients: allClients } = useAllClients();
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(order?.clientId ?? null);
   const [clientName, setClientName] = useState(order?.clientName ?? "");
   const [description, setDescription] = useState(order?.description ?? "");
   const [quantity, setQuantity] = useState(order?.quantity ?? 1);
@@ -70,6 +73,19 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
 
   const totalPrice = quantity * unitPrice;
 
+  const handleClientSelect = (val: string) => {
+    if (val === "") {
+      setSelectedClientId(null);
+      return;
+    }
+    const id = Number(val);
+    const found = allClients.find((c) => c.id === id);
+    if (found) {
+      setSelectedClientId(found.id);
+      setClientName(found.name);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim()) {
@@ -81,6 +97,7 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
 
     const data: CreateOrderData = {
       clientName: clientName.trim(),
+      clientId: selectedClientId,
       description: description.trim() || undefined,
       quantity,
       unitPrice,
@@ -123,13 +140,25 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1.5 block">Cliente *</label>
+            {allClients.length > 0 && (
+              <select
+                value={selectedClientId ?? ""}
+                onChange={(e) => handleClientSelect(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm mb-2"
+              >
+                <option value="">Escribir manualmente</option>
+                {allClients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.businessName ? ` (${c.businessName})` : ""}</option>
+                ))}
+              </select>
+            )}
             <input
               type="text"
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              onChange={(e) => { setClientName(e.target.value); setSelectedClientId(null); }}
               placeholder="Nombre del cliente"
               className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
-              autoFocus
+              autoFocus={!allClients.length}
             />
           </div>
 

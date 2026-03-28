@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api";
 export interface OrderItem {
   id: number;
   userId: number;
+  clientId: number | null;
   clientName: string;
   description: string | null;
   quantity: number;
@@ -40,6 +41,7 @@ interface OrdersFilters {
 
 export interface CreateOrderData {
   clientName: string;
+  clientId?: number | null;
   description?: string;
   quantity: number;
   unitPrice: number;
