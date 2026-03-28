@@ -7,6 +7,7 @@ export const orders = pgTable("orders", {
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
   clientName: varchar("client_name", { length: 255 }).notNull(),
+  title: varchar("title", { length: 255 }),
   description: text("description"),
   quantity: integer("quantity").notNull().default(1),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull().default("0"),
@@ -20,3 +21,13 @@ export const orders = pgTable("orders", {
 });
 
 export type Order = typeof orders.$inferSelect;
+
+export const orderCosts = pgTable("order_costs", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type OrderCost = typeof orderCosts.$inferSelect;

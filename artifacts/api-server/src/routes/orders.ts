@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, orders, clients } from "@workspace/db";
+import { db, orders, orderCosts, clients } from "@workspace/db";
 import { eq, and, isNull, desc, asc, ilike, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -9,6 +9,11 @@ async function validateClientOwnership(clientId: number, userId: number): Promis
     .from(clients)
     .where(and(eq(clients.id, clientId), eq(clients.userId, userId), isNull(clients.deletedAt)));
   return !!client;
+}
+
+interface CostItemInput {
+  title: string;
+  amount: number;
 }
 
 const ordersRouter = Router();
@@ -38,6 +43,7 @@ ordersRouter.get("/orders", requireAuth, async (req, res) => {
         or(
           ilike(orders.clientName, `%${search}%`),
           ilike(orders.description, `%${search}%`),
+          ilike(orders.title, `%${search}%`),
         )!
       );
     }
@@ -69,8 +75,26 @@ ordersRouter.get("/orders", requireAuth, async (req, res) => {
         .where(where),
     ]);
 
+    const orderIds = items.map((o) => o.id);
+    let costsMap: Record<number, Array<{ id: number; title: string; amount: string }>> = {};
+    if (orderIds.length > 0) {
+      const allCosts = await db
+        .select()
+        .from(orderCosts)
+        .where(sql`${orderCosts.orderId} IN (${sql.join(orderIds.map(id => sql`${id}`), sql`, `)})`);
+      for (const c of allCosts) {
+        if (!costsMap[c.orderId]) costsMap[c.orderId] = [];
+        costsMap[c.orderId].push({ id: c.id, title: c.title, amount: c.amount });
+      }
+    }
+
+    const ordersWithCosts = items.map((o) => ({
+      ...o,
+      costItems: costsMap[o.id] || [],
+    }));
+
     res.json({
-      orders: items,
+      orders: ordersWithCosts,
       total: countResult[0].count,
       page,
       limit,
@@ -148,7 +172,17 @@ ordersRouter.get("/orders/:id", requireAuth, async (req, res) => {
       return;
     }
 
-    res.json({ order });
+    const costs = await db
+      .select()
+      .from(orderCosts)
+      .where(eq(orderCosts.orderId, orderId));
+
+    res.json({
+      order: {
+        ...order,
+        costItems: costs.map((c) => ({ id: c.id, title: c.title, amount: c.amount })),
+      },
+    });
   } catch (err) {
     console.error("GET /orders/:id error:", err);
     res.status(500).json({ error: "Error al obtener pedido" });
@@ -158,7 +192,7 @@ ordersRouter.get("/orders/:id", requireAuth, async (req, res) => {
 ordersRouter.post("/orders", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { clientName, clientId, description, quantity, unitPrice, totalPrice, status, dueDate, notes } = req.body;
+    const { clientName, clientId, title, description, quantity, unitPrice, totalPrice, status, dueDate, notes, costItems } = req.body;
 
     if (!clientName || typeof clientName !== "string" || clientName.trim().length === 0) {
       res.status(400).json({ error: "Nombre de cliente es requerido" });
@@ -180,9 +214,26 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
       validClientId = parsed;
     }
 
+    const parsedCostItems: CostItemInput[] = [];
+    if (Array.isArray(costItems)) {
+      for (const ci of costItems) {
+        if (ci.title && typeof ci.title === "string" && ci.title.trim().length > 0) {
+          parsedCostItems.push({
+            title: ci.title.trim(),
+            amount: Math.max(0, Number(ci.amount) || 0),
+          });
+        }
+      }
+    }
+
     const qty = Math.max(1, Number(quantity) || 1);
     const uPrice = Math.max(0, Number(unitPrice) || 0);
-    const tPrice = totalPrice != null ? Math.max(0, Number(totalPrice)) : qty * uPrice;
+    let tPrice: number;
+    if (parsedCostItems.length > 0) {
+      tPrice = parsedCostItems.reduce((sum, ci) => sum + ci.amount, 0);
+    } else {
+      tPrice = totalPrice != null ? Math.max(0, Number(totalPrice)) : qty * uPrice;
+    }
     const orderStatus = VALID_STATUSES.includes(status as OrderStatus) ? (status as OrderStatus) : "nuevo";
 
     const [order] = await db
@@ -191,6 +242,7 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
         userId,
         clientId: validClientId,
         clientName: clientName.trim(),
+        title: title?.trim() || null,
         description: description?.trim() || null,
         quantity: qty,
         unitPrice: uPrice.toFixed(2),
@@ -201,7 +253,22 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
       })
       .returning();
 
-    res.status(201).json({ order });
+    let insertedCosts: Array<{ id: number; title: string; amount: string }> = [];
+    if (parsedCostItems.length > 0) {
+      const rows = await db
+        .insert(orderCosts)
+        .values(
+          parsedCostItems.map((ci) => ({
+            orderId: order.id,
+            title: ci.title,
+            amount: ci.amount.toFixed(2),
+          }))
+        )
+        .returning();
+      insertedCosts = rows.map((r) => ({ id: r.id, title: r.title, amount: r.amount }));
+    }
+
+    res.status(201).json({ order: { ...order, costItems: insertedCosts } });
   } catch (err) {
     console.error("POST /orders error:", err);
     res.status(500).json({ error: "Error al crear pedido" });
@@ -234,7 +301,7 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       return;
     }
 
-    const { clientName, clientId, description, quantity, unitPrice, totalPrice, status, dueDate, notes } = req.body;
+    const { clientName, clientId, title, description, quantity, unitPrice, totalPrice, status, dueDate, notes, costItems } = req.body;
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
@@ -263,13 +330,47 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       }
       updates.clientName = clientName.trim();
     }
+    if (title !== undefined) updates.title = title?.trim() || null;
     if (description !== undefined) updates.description = description?.trim() || null;
     if (quantity !== undefined) updates.quantity = Math.max(1, Number(quantity) || 1);
     if (unitPrice !== undefined) updates.unitPrice = Math.max(0, Number(unitPrice) || 0).toFixed(2);
-    if (totalPrice !== undefined) updates.totalPrice = Math.max(0, Number(totalPrice) || 0).toFixed(2);
     if (status !== undefined && VALID_STATUSES.includes(status as OrderStatus)) updates.status = status;
     if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
     if (notes !== undefined) updates.notes = notes?.trim() || null;
+
+    let updatedCosts: Array<{ id: number; title: string; amount: string }> = [];
+    if (Array.isArray(costItems)) {
+      const parsedCostItems: CostItemInput[] = [];
+      for (const ci of costItems) {
+        if (ci.title && typeof ci.title === "string" && ci.title.trim().length > 0) {
+          parsedCostItems.push({
+            title: ci.title.trim(),
+            amount: Math.max(0, Number(ci.amount) || 0),
+          });
+        }
+      }
+
+      await db.delete(orderCosts).where(eq(orderCosts.orderId, orderId));
+
+      if (parsedCostItems.length > 0) {
+        const rows = await db
+          .insert(orderCosts)
+          .values(
+            parsedCostItems.map((ci) => ({
+              orderId,
+              title: ci.title,
+              amount: ci.amount.toFixed(2),
+            }))
+          )
+          .returning();
+        updatedCosts = rows.map((r) => ({ id: r.id, title: r.title, amount: r.amount }));
+      }
+
+      const costTotal = parsedCostItems.reduce((sum, ci) => sum + ci.amount, 0);
+      updates.totalPrice = costTotal.toFixed(2);
+    } else if (totalPrice !== undefined) {
+      updates.totalPrice = Math.max(0, Number(totalPrice) || 0).toFixed(2);
+    }
 
     const [order] = await db
       .update(orders)
@@ -277,7 +378,15 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
       .returning();
 
-    res.json({ order });
+    if (!Array.isArray(costItems)) {
+      const existingCosts = await db
+        .select()
+        .from(orderCosts)
+        .where(eq(orderCosts.orderId, orderId));
+      updatedCosts = existingCosts.map((r) => ({ id: r.id, title: r.title, amount: r.amount }));
+    }
+
+    res.json({ order: { ...order, costItems: updatedCosts } });
   } catch (err) {
     console.error("PUT /orders/:id error:", err);
     res.status(500).json({ error: "Error al actualizar pedido" });

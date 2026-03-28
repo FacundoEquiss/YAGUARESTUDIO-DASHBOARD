@@ -1,11 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 
+export interface CostItem {
+  id: number;
+  title: string;
+  amount: string;
+}
+
+export interface CostItemInput {
+  title: string;
+  amount: number;
+}
+
 export interface OrderItem {
   id: number;
   userId: number;
   clientId: number | null;
   clientName: string;
+  title: string | null;
   description: string | null;
   quantity: number;
   unitPrice: string;
@@ -13,6 +25,7 @@ export interface OrderItem {
   status: string;
   dueDate: string | null;
   notes: string | null;
+  costItems: CostItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +55,7 @@ interface OrdersFilters {
 export interface CreateOrderData {
   clientName: string;
   clientId?: number | null;
+  title?: string;
   description?: string;
   quantity: number;
   unitPrice: number;
@@ -49,6 +63,7 @@ export interface CreateOrderData {
   status?: string;
   dueDate?: string | null;
   notes?: string;
+  costItems?: CostItemInput[];
 }
 
 export function useOrders(filters: OrdersFilters = {}) {

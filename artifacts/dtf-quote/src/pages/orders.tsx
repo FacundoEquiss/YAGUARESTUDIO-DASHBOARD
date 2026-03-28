@@ -8,8 +8,9 @@ import {
   deleteOrder,
   type OrderItem,
   type CreateOrderData,
+  type CostItemInput,
 } from "@/hooks/use-orders";
-import { useAllClients, type ClientItem } from "@/hooks/use-clients";
+import { useAllClients } from "@/hooks/use-clients";
 import { HelpTooltip } from "@/components/help-tooltip";
 import {
   Plus,
@@ -52,6 +53,17 @@ function formatShortDate(dateStr: string | null): string {
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
 }
 
+interface FormCostItem {
+  key: string;
+  title: string;
+  amount: string;
+}
+
+let costKeyCounter = 0;
+function nextCostKey() {
+  return `cost-${++costKeyCounter}`;
+}
+
 interface OrderFormProps {
   order?: OrderItem | null;
   onClose: () => void;
@@ -63,16 +75,26 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
   const { clients: allClients } = useAllClients();
   const [selectedClientId, setSelectedClientId] = useState<number | null>(order?.clientId ?? null);
   const [clientName, setClientName] = useState(order?.clientName ?? "");
+  const [title, setTitle] = useState(order?.title ?? "");
   const [description, setDescription] = useState(order?.description ?? "");
-  const [quantity, setQuantity] = useState(order?.quantity ?? 1);
-  const [unitPrice, setUnitPrice] = useState(Number(order?.unitPrice ?? 0));
   const [status, setStatus] = useState(order?.status ?? "nuevo");
   const [dueDate, setDueDate] = useState(order?.dueDate ? order.dueDate.slice(0, 10) : "");
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const totalPrice = quantity * unitPrice;
+  const initialCosts: FormCostItem[] =
+    order && order.costItems && order.costItems.length > 0
+      ? order.costItems.map((ci) => ({
+          key: nextCostKey(),
+          title: ci.title,
+          amount: String(Number(ci.amount)),
+        }))
+      : [{ key: nextCostKey(), title: "", amount: "" }];
+
+  const [costItems, setCostItems] = useState<FormCostItem[]>(initialCosts);
+
+  const totalPrice = costItems.reduce((sum, ci) => sum + (Number(ci.amount) || 0), 0);
 
   const handleClientSelect = (val: string) => {
     if (val === "") {
@@ -87,25 +109,51 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
     }
   };
 
+  const addCostItem = () => {
+    setCostItems([...costItems, { key: nextCostKey(), title: "", amount: "" }]);
+  };
+
+  const updateCostItem = (key: string, field: "title" | "amount", value: string) => {
+    setCostItems(costItems.map((ci) => (ci.key === key ? { ...ci, [field]: value } : ci)));
+  };
+
+  const removeCostItem = (key: string) => {
+    if (costItems.length > 1) {
+      setCostItems(costItems.filter((ci) => ci.key !== key));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim()) {
       setError("El nombre del cliente es obligatorio");
       return;
     }
+
+    const validCosts: CostItemInput[] = costItems
+      .filter((ci) => ci.title.trim().length > 0)
+      .map((ci) => ({ title: ci.title.trim(), amount: Math.max(0, Number(ci.amount) || 0) }));
+
+    if (validCosts.length === 0) {
+      setError("Agregá al menos un ítem de costo con título");
+      return;
+    }
+
     setSaving(true);
     setError("");
 
     const data: CreateOrderData = {
       clientName: clientName.trim(),
       clientId: selectedClientId,
+      title: title.trim() || undefined,
       description: description.trim() || undefined,
-      quantity,
-      unitPrice,
+      quantity: 1,
+      unitPrice: 0,
       totalPrice,
       status,
       dueDate: dueDate || null,
       notes: notes.trim() || undefined,
+      costItems: validCosts,
     };
 
     const result = isEdit ? await updateOrder(order!.id, data) : await createOrder(data);
@@ -164,6 +212,20 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
           </div>
 
           <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block flex items-center gap-1.5">
+              Título del pedido
+              <HelpTooltip text="Un nombre para identificar este pedido, por ejemplo: 'Remeras Sandino' o 'Pedido Feria Mayo'." iconSize={12} />
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ej: Remeras para evento, Pedido Sandino..."
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            />
+          </div>
+
+          <div>
             <label className="text-sm font-medium text-foreground mb-1.5 block">Descripción</label>
             <textarea
               value={description}
@@ -174,28 +236,52 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">Cantidad</label>
-              <input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
-                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
-              />
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2 block flex items-center gap-1.5">
+              Costos del pedido *
+              <HelpTooltip text="Agregá todos los costos del pedido: materiales, mano de obra, envío, etc. El total se calcula automáticamente." iconSize={12} />
+            </label>
+            <div className="space-y-2">
+              {costItems.map((ci, idx) => (
+                <div key={ci.key} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={ci.title}
+                    onChange={(e) => updateCostItem(ci.key, "title", e.target.value)}
+                    placeholder={idx === 0 ? "Ej: Remera" : "Ej: DTF, Uber, etc."}
+                    className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                  />
+                  <div className="relative w-28">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      value={ci.amount}
+                      onChange={(e) => updateCostItem(ci.key, "amount", e.target.value)}
+                      placeholder="0"
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeCostItem(ci.key)}
+                    disabled={costItems.length <= 1}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-20 disabled:hover:text-muted-foreground disabled:hover:bg-transparent transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">Precio Unitario</label>
-              <input
-                type="number"
-                min={0}
-                step={100}
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(Math.max(0, Number(e.target.value) || 0))}
-                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={addCostItem}
+              className="mt-2 flex items-center gap-1.5 text-xs text-primary font-semibold hover:text-primary/80 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Agregar ítem
+            </button>
           </div>
 
           <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
@@ -277,14 +363,21 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete }: OrderDetailProps
     await onDelete();
   };
 
+  const hasCostItems = order.costItems && order.costItems.length > 0;
+
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg mx-4 bg-card border border-border rounded-2xl shadow-2xl max-h-[90dvh] overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="text-lg font-display font-bold text-foreground">
-            Pedido #{order.id}
-          </h2>
+          <div>
+            <h2 className="text-lg font-display font-bold text-foreground">
+              {order.title || `Pedido #${order.id}`}
+            </h2>
+            {order.title && (
+              <p className="text-xs text-muted-foreground mt-0.5">Pedido #{order.id}</p>
+            )}
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
             <X className="w-5 h-5" />
           </button>
@@ -309,20 +402,40 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete }: OrderDetailProps
                 <p className="text-sm text-foreground">{order.description}</p>
               </div>
             )}
-            <div className="grid grid-cols-3 gap-3">
+
+            {hasCostItems ? (
               <div>
-                <p className="text-xs text-muted-foreground font-medium mb-0.5">Cantidad</p>
-                <p className="text-sm font-semibold text-foreground">{order.quantity}</p>
+                <p className="text-xs text-muted-foreground font-medium mb-2">Desglose de costos</p>
+                <div className="space-y-1.5">
+                  {order.costItems.map((ci) => (
+                    <div key={ci.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-border/50">
+                      <span className="text-sm text-foreground">{ci.title}</span>
+                      <span className="text-sm font-semibold text-foreground">{formatCurrency(Number(ci.amount))}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 mt-2">
+                    <span className="text-sm font-bold text-foreground">Total</span>
+                    <span className="text-sm font-bold text-primary">{formatCurrency(Number(order.totalPrice))}</span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-0.5">Precio Unit.</p>
-                <p className="text-sm font-semibold text-foreground">{formatCurrency(Number(order.unitPrice))}</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Cantidad</p>
+                  <p className="text-sm font-semibold text-foreground">{order.quantity}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Precio Unit.</p>
+                  <p className="text-sm font-semibold text-foreground">{formatCurrency(Number(order.unitPrice))}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Total</p>
+                  <p className="text-sm font-bold text-primary">{formatCurrency(Number(order.totalPrice))}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-0.5">Total</p>
-                <p className="text-sm font-bold text-primary">{formatCurrency(Number(order.totalPrice))}</p>
-              </div>
-            </div>
+            )}
+
             {order.dueDate && (
               <div className="flex items-center gap-2">
                 <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
@@ -445,7 +558,7 @@ export function OrdersPage() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Buscar por cliente o descripción..."
+            placeholder="Buscar por cliente, título o descripción..."
             className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
           />
         </div>
@@ -482,12 +595,12 @@ export function OrdersPage() {
       <div className="bg-card/60 backdrop-blur rounded-2xl border border-border overflow-hidden">
         <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-border text-xs font-bold text-muted-foreground uppercase tracking-wider items-center">
           <button onClick={() => handleSort("clientName")} className="text-left flex items-center gap-1 hover:text-foreground transition-colors">
-            Cliente {sortBy === "clientName" && (sortDir === "asc" ? "↑" : "↓")}
+            Pedido {sortBy === "clientName" && (sortDir === "asc" ? "↑" : "↓")}
           </button>
           <span className="w-24 text-center">Estado</span>
           <button onClick={() => handleSort("totalPrice")} className="w-24 text-right flex items-center justify-end gap-1 hover:text-foreground transition-colors">
             Total {sortBy === "totalPrice" && (sortDir === "asc" ? "↑" : "↓")}
-            <HelpTooltip text="Precio total del pedido. Hacé clic en el encabezado para ordenar." iconSize={11} side="bottom" />
+            <HelpTooltip text="Precio total del pedido (suma de todos los ítems de costo). Hacé clic en el encabezado para ordenar." iconSize={11} side="bottom" />
           </button>
           <button onClick={() => handleSort("dueDate")} className="w-24 text-right flex items-center justify-end gap-1 hover:text-foreground transition-colors">
             Entrega {sortBy === "dueDate" && (sortDir === "asc" ? "↑" : "↓")}
@@ -520,6 +633,7 @@ export function OrdersPage() {
           <div className="divide-y divide-border">
             {orders.map((order) => {
               const badge = getStatusBadge(order.status);
+              const costCount = order.costItems?.length || 0;
               return (
                 <button
                   key={order.id}
@@ -528,8 +642,15 @@ export function OrdersPage() {
                 >
                   <div className="sm:hidden space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground truncate">{order.clientName}</p>
-                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md border", badge.color)}>
+                      <div className="min-w-0 flex-1 mr-2">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {order.title || order.clientName}
+                        </p>
+                        {order.title && (
+                          <p className="text-xs text-muted-foreground truncate">{order.clientName}</p>
+                        )}
+                      </div>
+                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0", badge.color)}>
                         {badge.label}
                       </span>
                     </div>
@@ -537,17 +658,24 @@ export function OrdersPage() {
                       <p className="text-xs text-muted-foreground truncate">{order.description}</p>
                     )}
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{order.quantity} u. · {formatCurrency(Number(order.totalPrice))}</span>
+                      <span>
+                        {costCount > 0 ? `${costCount} ítem${costCount > 1 ? "s" : ""}` : `${order.quantity} u.`}
+                        {" · "}
+                        {formatCurrency(Number(order.totalPrice))}
+                      </span>
                       <span>{formatShortDate(order.dueDate) || formatShortDate(order.createdAt)}</span>
                     </div>
                   </div>
 
                   <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{order.clientName}</p>
-                      {order.description && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">{order.description}</p>
-                      )}
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {order.title || order.clientName}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {order.title ? order.clientName : (order.description || "")}
+                        {order.title && order.description ? ` — ${order.description}` : ""}
+                      </p>
                     </div>
                     <div className="w-24 flex justify-center">
                       <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-lg border", badge.color)}>
