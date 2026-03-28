@@ -2,8 +2,7 @@ import { useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
-import { useDTFQuotes } from "@/hooks/use-dtf-store";
-import { formatCurrency } from "@/lib/utils";
+import { useUsageEvents, type UsageEventItem } from "@/hooks/use-usage-events";
 import {
   BarChart,
   Bar,
@@ -13,6 +12,8 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import type { TooltipProps } from "recharts";
+import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import {
   Calculator,
   Shirt,
@@ -34,14 +35,32 @@ function getDateKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+const EVENT_LABELS: Record<string, string> = {
+  dtf_quotes: "Cotización DTF",
+  mockup_pngs: "Mockup PNG",
+  pdf_exports: "Exportación PDF",
+};
+
+const EVENT_ICONS: Record<string, typeof Calculator> = {
+  dtf_quotes: Calculator,
+  mockup_pngs: Shirt,
+  pdf_exports: FileText,
+};
+
+const EVENT_COLORS: Record<string, string> = {
+  dtf_quotes: "text-orange-500 bg-orange-500/10",
+  mockup_pngs: "text-blue-500 bg-blue-500/10",
+  pdf_exports: "text-emerald-500 bg-emerald-500/10",
+};
+
+function CustomTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-gray-900/95 backdrop-blur border border-white/10 rounded-xl px-3 py-2 shadow-xl">
-      <p className="text-xs text-muted-foreground font-medium capitalize">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} className="text-sm font-bold" style={{ color: p.fill }}>
-          {p.value} {p.dataKey === "quotes" ? "cotizaciones" : "mockups"}
+      <p className="text-xs text-muted-foreground font-medium capitalize">{String(label)}</p>
+      {payload.map((p) => (
+        <p key={String(p.dataKey)} className="text-sm font-bold" style={{ color: String(p.fill) }}>
+          {String(p.value)} {p.dataKey === "quotes" ? "cotizaciones" : "mockups"}
         </p>
       ))}
     </div>
@@ -51,7 +70,7 @@ function CustomTooltip({ active, payload, label }: any) {
 export function DashboardPage() {
   const { currentUser, subscription } = useAuth();
   const { usage, limits } = useUsage();
-  const { quotes } = useDTFQuotes(currentUser?.id || "guest");
+  const { events } = useUsageEvents(7);
 
   const isMaster = currentUser?.role === "master";
   const isGuest = currentUser?.role === "guest";
@@ -62,7 +81,7 @@ export function DashboardPage() {
 
   const chartData = useMemo(() => {
     const now = new Date();
-    const days: { label: string; dateKey: string; quotes: number }[] = [];
+    const days: { label: string; dateKey: string; quotes: number; mockups: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
@@ -70,30 +89,26 @@ export function DashboardPage() {
         label: i === 0 ? "Hoy" : i === 1 ? "Ayer" : getDayLabel(d),
         dateKey: getDateKey(d),
         quotes: 0,
+        mockups: 0,
       });
     }
-    for (const q of quotes) {
-      const d = new Date(q.createdAt);
+    for (const ev of events) {
+      const d = new Date(ev.createdAt);
       const key = getDateKey(d);
       const day = days.find((dd) => dd.dateKey === key);
-      if (day) day.quotes++;
+      if (day) {
+        if (ev.eventType === "dtf_quotes") day.quotes++;
+        if (ev.eventType === "mockup_pngs") day.mockups++;
+      }
     }
     return days;
-  }, [quotes]);
+  }, [events]);
 
-  const totalQuotesThisWeek = chartData.reduce((sum, d) => sum + d.quotes, 0);
+  const totalWeeklyActivity = chartData.reduce((sum, d) => sum + d.quotes + d.mockups, 0);
 
-  const recentQuotes = useMemo(() => {
-    return [...quotes].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
-  }, [quotes]);
-
-  const totalRevenue = useMemo(() => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    return quotes
-      .filter((q) => q.createdAt >= monthStart)
-      .reduce((sum, q) => sum + q.totalPrice, 0);
-  }, [quotes]);
+  const recentEvents = useMemo(() => {
+    return events.slice(0, 8);
+  }, [events]);
 
   const metrics = [
     {
@@ -119,12 +134,13 @@ export function DashboardPage() {
       soon: true,
     },
     {
-      label: "Cotizado",
-      sublabel: "este mes",
-      value: formatCurrency(totalRevenue),
+      label: "Ingresos del mes",
+      sublabel: "",
+      value: "$0",
       icon: DollarSign,
       color: "from-purple-500 to-violet-500",
       isText: true,
+      soon: true,
     },
   ];
 
@@ -168,7 +184,7 @@ export function DashboardPage() {
                 <Icon className="w-[18px] h-[18px] text-white" />
               </div>
               <p className="text-2xl font-display font-black text-foreground leading-none">
-                {m.soon ? "—" : m.isText ? m.value : m.value}
+                {m.soon ? (m.isText ? m.value : "—") : m.value}
               </p>
               <p className="text-[11px] text-muted-foreground font-medium mt-1">
                 {m.label}
@@ -188,12 +204,12 @@ export function DashboardPage() {
                 Actividad semanal
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {totalQuotesThisWeek} cotización{totalQuotesThisWeek !== 1 ? "es" : ""} en los últimos 7 días
+                {totalWeeklyActivity} acción{totalWeeklyActivity !== 1 ? "es" : ""} en los últimos 7 días
               </p>
             </div>
           </div>
           <div className="h-[200px] sm:h-[220px]">
-            {totalQuotesThisWeek > 0 ? (
+            {totalWeeklyActivity > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} barCategoryGap="25%">
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
@@ -211,7 +227,8 @@ export function DashboardPage() {
                     width={24}
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                  <Bar dataKey="quotes" fill="#f97316" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="quotes" fill="#f97316" radius={[6, 6, 0, 0]} maxBarSize={36} name="Cotizaciones" />
+                  <Bar dataKey="mockups" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={36} name="Mockups" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -231,40 +248,41 @@ export function DashboardPage() {
             <Clock className="w-4 h-4 text-primary" />
             Actividad reciente
           </h2>
-          {recentQuotes.length > 0 ? (
+          {recentEvents.length > 0 ? (
             <div className="flex-1 space-y-2.5 overflow-y-auto custom-scrollbar">
-              {recentQuotes.map((q) => {
-                const date = new Date(q.createdAt);
+              {recentEvents.map((ev) => {
+                const Icon = EVENT_ICONS[ev.eventType] ?? FileText;
+                const colorClass = EVENT_COLORS[ev.eventType] ?? "text-gray-500 bg-gray-500/10";
+                const [textColor, bgColor] = colorClass.split(" ");
+                const date = new Date(ev.createdAt);
                 const isToday = getDateKey(date) === getDateKey(new Date());
                 const timeStr = isToday
                   ? `Hoy ${date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}`
                   : date.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
                 return (
-                  <Link
-                    key={q.id}
-                    href="/history"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors group"
+                  <div
+                    key={ev.id}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
-                      <Calculator className="w-4 h-4 text-orange-500" />
+                    <div className={`w-8 h-8 rounded-lg ${bgColor} flex items-center justify-center shrink-0`}>
+                      <Icon className={`w-4 h-4 ${textColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{q.clientName}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {q.stamps.reduce((s, st) => s + st.qty, 0)} ítem{q.stamps.reduce((s, st) => s + st.qty, 0) !== 1 ? "s" : ""} · {formatCurrency(q.totalPrice)}
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {EVENT_LABELS[ev.eventType] ?? ev.eventType}
                       </p>
                     </div>
                     <span className="text-[10px] text-muted-foreground/70 font-medium shrink-0">
                       {timeStr}
                     </span>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
               <FileText className="w-8 h-8 text-muted-foreground/20 mb-2" />
-              <p className="text-sm text-muted-foreground">Sin cotizaciones aún</p>
+              <p className="text-sm text-muted-foreground">Sin actividad aún</p>
               <Link
                 href="/app"
                 className="text-xs text-primary font-semibold mt-2 hover:underline"
@@ -272,15 +290,6 @@ export function DashboardPage() {
                 Crear primera cotización
               </Link>
             </div>
-          )}
-          {recentQuotes.length > 0 && (
-            <Link
-              href="/history"
-              className="mt-3 text-xs text-primary font-semibold flex items-center gap-1 hover:underline"
-            >
-              Ver todo el historial
-              <ArrowRight className="w-3 h-3" />
-            </Link>
           )}
         </div>
       </div>

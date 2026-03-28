@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, subscriptionPlans, userSubscriptions, usageCounters } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { db, subscriptionPlans, userSubscriptions, usageCounters, usageEvents } from "@workspace/db";
+import { eq, and, sql, desc, gte } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import type { PlanLimits } from "@workspace/db/schema";
 
@@ -305,6 +305,12 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
       return;
     }
 
+    await db.insert(usageEvents).values({
+      userId,
+      eventType: type,
+      metadata: req.body.metadata ?? null,
+    });
+
     res.json({
       current: newCount,
       limit,
@@ -313,6 +319,37 @@ subscriptionRouter.post("/usage/increment", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("POST /usage/increment error:", err);
     res.status(500).json({ error: "Error al incrementar uso" });
+  }
+});
+
+subscriptionRouter.get("/usage/events", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const events = await db
+      .select({
+        id: usageEvents.id,
+        eventType: usageEvents.eventType,
+        metadata: usageEvents.metadata,
+        createdAt: usageEvents.createdAt,
+      })
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.userId, userId),
+          gte(usageEvents.createdAt, since),
+        )
+      )
+      .orderBy(desc(usageEvents.createdAt))
+      .limit(100);
+
+    res.json({ events });
+  } catch (err) {
+    console.error("GET /usage/events error:", err);
+    res.status(500).json({ error: "Error al obtener eventos" });
   }
 });
 

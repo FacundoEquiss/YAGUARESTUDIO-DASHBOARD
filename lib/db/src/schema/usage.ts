@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, timestamp, unique, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 export const usageCounters = pgTable("usage_counters", {
@@ -12,3 +12,13 @@ export const usageCounters = pgTable("usage_counters", {
 ]);
 
 export type UsageCounter = typeof usageCounters.$inferSelect;
+
+export const usageEvents = pgTable("usage_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type UsageEvent = typeof usageEvents.$inferSelect;

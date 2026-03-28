@@ -83,6 +83,7 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/pages/auth.tsx` — Login/register page (async API calls)
 - `src/hooks/use-auth.tsx` — Auth context (API-backed, JWT sessions, refreshSession)
 - `src/hooks/use-usage.tsx` — Usage tracking context (limits, remaining, increment)
+- `src/hooks/use-usage-events.ts` — Fetches usage events from API for dashboard activity chart/feed
 - `src/hooks/use-dtf-store.ts` — localStorage hooks for settings and quotes
 - `src/lib/storage.ts` — localStorage utility functions
 
@@ -108,7 +109,7 @@ DTF (Direct to Film) printing quote calculator — React + Vite app with backend
 - `src/components/navbar.tsx` — Public navbar (desktop top bar, used on landing page)
 - `src/components/sidebar.tsx` — Dashboard sidebar with nav sections, active states, mobile drawer
 - `src/components/dashboard-layout.tsx` — Dashboard layout wrapper (sidebar + header + content)
-- `src/pages/dashboard.tsx` — Dashboard home page (greeting, metrics, quick actions)
+- `src/pages/dashboard.tsx` — Dashboard home page (greeting, plan badge, 4 metric cards, weekly activity chart via Recharts with quotes+mockups from API events, activity feed, plan usage bars, quick actions, coming soon section)
 
 **Design:** Dark mode only (forced via `<html class="dark">`), orange primary (#F97316), Outfit + DM Sans fonts, mobile-first responsive design. No theme toggle.
 
@@ -121,7 +122,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 - Routes: `src/routes/index.ts` mounts sub-routers (health, settings, auth, subscription)
 - Auth middleware: `src/middleware/auth.ts` — JWT sign/verify, `requireAuth` middleware
 - Auth routes: `src/routes/auth.ts` — POST `/api/auth/register`, POST `/api/auth/login`, GET `/api/auth/me`, POST `/api/auth/logout`
-- Subscription routes: `src/routes/subscription.ts` — GET `/api/subscription`, GET `/api/subscription/plans`, POST `/api/subscription/upgrade`, GET `/api/usage`, POST `/api/usage/increment`
+- Subscription routes: `src/routes/subscription.ts` — GET `/api/subscription`, GET `/api/subscription/plans`, POST `/api/subscription/upgrade`, GET `/api/usage`, POST `/api/usage/increment` (also logs to usage_events), GET `/api/usage/events?days=7` (returns last N days of events)
 - Depends on: `@workspace/db`, `@workspace/api-zod`, bcryptjs, jsonwebtoken
 - JWT stored in httpOnly cookie named `token` (30-day expiry)
 - Master account: `yaguarestudio@gmail.com` / role `master` — auto-seeded on startup
@@ -137,7 +138,7 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
   - `users.ts` — `users` (email, name, passwordHash, role)
   - `plans.ts` — `subscription_plans` (name, slug, limits as JSONB, price)
   - `subscriptions.ts` — `user_subscriptions` (userId, planId, status, period dates)
-  - `usage.ts` — `usage_counters` (userId, counterType, count, periodStart — auto-resets monthly)
+  - `usage.ts` — `usage_counters` (userId, counterType, count, periodStart — auto-resets monthly) + `usage_events` (userId, eventType, metadata JSONB, createdAt — individual event log for activity history)
 - `src/seed-plans.ts` — Seeds 3 plans: Gratis (10/5/3), Estándar (40/30/25), Premium (unlimited)
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only), `./seed-plans` (seed function)
