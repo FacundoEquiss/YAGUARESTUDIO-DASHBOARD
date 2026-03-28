@@ -11,6 +11,7 @@ import {
 } from "@/hooks/use-transactions";
 import { useAllClients } from "@/hooks/use-clients";
 import { useAllSuppliers } from "@/hooks/use-suppliers";
+import { useAllOrders } from "@/hooks/use-orders";
 import {
   Plus,
   Search,
@@ -61,12 +62,14 @@ function TransactionFormModal({ tx, onClose, onSaved }: TxFormProps) {
   const isEdit = !!tx;
   const { clients: allClients } = useAllClients();
   const { suppliers: allSuppliers } = useAllSuppliers();
+  const { orders: allOrders } = useAllOrders();
   const [type, setType] = useState<"income" | "expense">(tx?.type ?? "income");
   const [amount, setAmount] = useState(tx ? Number(tx.amount) : 0);
   const [description, setDescription] = useState(tx?.description ?? "");
   const [category, setCategory] = useState(tx?.category ?? "venta");
   const [clientId, setClientId] = useState<number | null>(tx?.clientId ?? null);
   const [supplierId, setSupplierId] = useState<number | null>(tx?.supplierId ?? null);
+  const [orderId, setOrderId] = useState<number | null>(tx?.orderId ?? null);
   const [date, setDate] = useState(tx?.date ? new Date(tx.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -95,6 +98,7 @@ function TransactionFormModal({ tx, onClose, onSaved }: TxFormProps) {
       category,
       clientId: clientId || undefined,
       supplierId: supplierId || undefined,
+      orderId: orderId || undefined,
       date: date || undefined,
     };
 
@@ -168,6 +172,16 @@ function TransactionFormModal({ tx, onClose, onSaved }: TxFormProps) {
             )}
           </div>
 
+          {allOrders.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Pedido (opcional)</label>
+              <select value={orderId ?? ""} onChange={(e) => setOrderId(e.target.value ? Number(e.target.value) : null)} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                <option value="">Sin pedido</option>
+                {allOrders.map((o) => <option key={o.id} value={o.id}>#{o.id} — {o.clientName} ({formatCurrency(Number(o.totalPrice))})</option>)}
+              </select>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Cancelar</button>
             <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar" : "Crear"}</button>
@@ -224,6 +238,11 @@ export function FinancePage() {
   const monthIncome = Number(summary?.monthIncome || 0);
   const monthExpenses = Number(summary?.monthExpenses || 0);
   const balance = monthIncome - monthExpenses;
+
+  const filteredIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
+  const filteredExpenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
+  const filteredBalance = filteredIncome - filteredExpenses;
+  const hasFilters = !!typeFilter || !!categoryFilter || !!debouncedSearch || !!dateFrom || !!dateTo;
 
   return (
     <div className="space-y-6">
@@ -355,6 +374,20 @@ export function FinancePage() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="bg-muted/40">
+                    <td colSpan={3} className="px-4 py-3 text-xs font-medium text-muted-foreground">
+                      {hasFilters ? "Totales filtrados" : "Totales de página"}
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell"></td>
+                    <td className="px-4 py-3 text-right text-xs font-semibold">
+                      {filteredIncome > 0 && <span className="text-emerald-400 block">+{formatCurrency(filteredIncome)}</span>}
+                      {filteredExpenses > 0 && <span className="text-red-400 block">-{formatCurrency(filteredExpenses)}</span>}
+                      <span className={cn("font-bold", filteredBalance >= 0 ? "text-emerald-400" : "text-red-400")}>{formatCurrency(filteredBalance)}</span>
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>

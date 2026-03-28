@@ -101,6 +101,24 @@ export function useOrderStats() {
   return { ...stats, loading, refresh };
 }
 
+export function useAllOrders() {
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const { data } = await apiFetch<OrdersListResult>("/orders?limit=50");
+    if (data) setOrders(data.orders);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { orders, loading, refresh };
+}
+
 export async function createOrder(data: CreateOrderData): Promise<{ order?: OrderItem; error?: string }> {
   const { data: result, error } = await apiFetch<{ order: OrderItem }>("/orders", {
     method: "POST",

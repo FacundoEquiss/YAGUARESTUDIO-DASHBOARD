@@ -116,7 +116,7 @@ transactionsRouter.get("/transactions/summary", requireAuth, async (req, res) =>
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const baseCond = and(eq(transactions.userId, userId), isNull(transactions.deletedAt));
-    const monthCond = and(baseCond, gte(transactions.date, monthStart), lte(transactions.date, nextMonthStart));
+    const monthCond = and(baseCond, gte(transactions.date, monthStart), sql`${transactions.date} < ${nextMonthStart}`);
 
     const [monthlyTotals] = await db
       .select({
