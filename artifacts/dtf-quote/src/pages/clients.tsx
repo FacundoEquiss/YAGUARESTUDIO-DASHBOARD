@@ -10,6 +10,7 @@ import {
   type ClientDetail,
   type CreateClientData,
 } from "@/hooks/use-clients";
+import { HelpTooltip } from "@/components/help-tooltip";
 import {
   Plus,
   Search,
@@ -303,10 +304,10 @@ export function ClientsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">Clientes <HelpTooltip text="Tu base de datos de clientes. Hacé clic en un cliente para ver sus pedidos y monto facturado." /></h1>
           <p className="text-sm text-muted-foreground mt-0.5">{total} cliente{total !== 1 ? "s" : ""} registrado{total !== 1 ? "s" : ""}</p>
         </div>
         <button onClick={() => { setEditClient(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">

@@ -12,6 +12,7 @@ import {
 import { useAllClients } from "@/hooks/use-clients";
 import { useAllSuppliers } from "@/hooks/use-suppliers";
 import { useAllOrders } from "@/hooks/use-orders";
+import { HelpTooltip } from "@/components/help-tooltip";
 import {
   Plus,
   Search,
@@ -245,10 +246,10 @@ export function FinancePage() {
   const hasFilters = !!typeFilter || !!categoryFilter || !!debouncedSearch || !!dateFrom || !!dateTo;
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ingresos / Gastos</h1>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">Ingresos / Gastos <HelpTooltip text="Registrá todos los movimientos de dinero de tu negocio: ventas, anticipos, materiales, envíos, etc. Podés vincularlos a clientes, proveedores y pedidos." /></h1>
           <p className="text-sm text-muted-foreground mt-0.5">{total} transaccion{total !== 1 ? "es" : ""}</p>
         </div>
         <button onClick={() => { setEditTx(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">

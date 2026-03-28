@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Trash2, FileText, ChevronRight, MessageCircle, X, Package, Ruler, Shirt, Tag } from "lucide-react";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFQuotes, Quote } from "@/hooks/use-dtf-store";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils";
@@ -44,10 +45,10 @@ export function HistoryPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div className="px-5 py-8 md:px-10 md:py-10 flex flex-col gap-6 pb-12 md:max-w-4xl">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col gap-6 pb-12 md:max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-foreground font-display font-bold">Historial</h1>
+          <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">Historial <HelpTooltip text="Todas las cotizaciones DTF que guardaste. Podés reenviarlas por WhatsApp o eliminarlas." /></h1>
           <p className="text-muted-foreground mt-1 font-medium">Tus cotizaciones guardadas</p>
         </div>
         <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">

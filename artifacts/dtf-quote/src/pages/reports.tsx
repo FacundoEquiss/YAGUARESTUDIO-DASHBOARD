@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import type { TooltipProps } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { BarChart3, TrendingUp, PieChart as PieChartIcon, DollarSign } from "lucide-react";
 
 const MONTH_LABELS: Record<string, string> = {};
@@ -106,9 +107,9 @@ export function ReportsPage() {
   const balance = monthIncome - monthExpenses;
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Reportes</h1>
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">Reportes <HelpTooltip text="Gráficos y análisis de tus ingresos, gastos y ganancia. Incluye desglose por categoría y proyecciones futuras basadas en promedios." /></h1>
         <p className="text-sm text-muted-foreground mt-0.5">Análisis financiero de tu negocio</p>
       </div>
 

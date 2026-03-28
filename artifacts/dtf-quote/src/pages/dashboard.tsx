@@ -6,6 +6,7 @@ import { useUsage } from "@/hooks/use-usage";
 import { useUsageEvents } from "@/hooks/use-usage-events";
 import { useOrderStats } from "@/hooks/use-orders";
 import { useTransactionSummary } from "@/hooks/use-transactions";
+import { HelpTooltip } from "@/components/help-tooltip";
 import {
   BarChart,
   Bar,
@@ -29,6 +30,7 @@ import {
   FileText,
   Clock,
   Crown,
+  Zap,
 } from "lucide-react";
 
 function getDayLabel(date: Date): string {
@@ -168,7 +170,7 @@ export function DashboardPage() {
   const showUsageBars = !isMaster && !isGuest && limits.dtfQuotes !== -1;
 
   return (
-    <div className="px-4 py-5 sm:px-8 sm:py-8 space-y-6 max-w-6xl">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-6 max-w-6xl">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
@@ -179,9 +181,18 @@ export function DashboardPage() {
           </p>
         </div>
         {!isMaster && !isGuest && subscription && (
-          <div className="shrink-0 flex items-center gap-2 bg-primary/8 px-3 py-1.5 rounded-xl">
-            <Crown className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-bold text-primary">{subscription.planName}</span>
+          <div className="shrink-0 flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-primary/8 px-3 py-1.5 rounded-xl">
+              <Crown className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-bold text-primary">{subscription.planName}</span>
+            </div>
+            <Link
+              href="/profile"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-lg shadow-orange-500/20"
+            >
+              <Zap className="w-3 h-3" />
+              Mejorar plan
+            </Link>
           </div>
         )}
       </div>
@@ -209,6 +220,35 @@ export function DashboardPage() {
         })}
       </div>
 
+      <div>
+        <h2 className="text-base font-display font-bold text-foreground mb-3 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" />
+          Acciones rápidas
+          <HelpTooltip text="Accesos directos a las herramientas más usadas de tu plataforma." side="right" />
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="group flex items-center gap-4 bg-card/60 backdrop-blur rounded-2xl p-4 border border-border hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all"
+              >
+                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg shrink-0`}>
+                  <Icon className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-foreground text-sm">{action.label}</p>
+                  <p className="text-xs text-muted-foreground">{action.desc}</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5">
         <div className="lg:col-span-3 bg-card/60 backdrop-blur rounded-2xl p-5 border border-border">
           <div className="flex items-center justify-between mb-4">
@@ -216,6 +256,7 @@ export function DashboardPage() {
               <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
                 Actividad semanal
+                <HelpTooltip text="Cotizaciones y mockups creados en los últimos 7 días. Te ayuda a ver tu ritmo de trabajo." />
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {totalWeeklyActivity} acción{totalWeeklyActivity !== 1 ? "es" : ""} en los últimos 7 días
@@ -261,6 +302,7 @@ export function DashboardPage() {
           <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2 mb-4">
             <Clock className="w-4 h-4 text-primary" />
             Actividad reciente
+            <HelpTooltip text="Últimas acciones que realizaste en la plataforma: cotizaciones, mockups y exportaciones." />
           </h2>
           {recentEvents.length > 0 ? (
             <div className="flex-1 space-y-2.5 overflow-y-auto custom-scrollbar">
@@ -314,6 +356,7 @@ export function DashboardPage() {
             <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
               <Crown className="w-4 h-4 text-primary" />
               Uso del plan
+              <HelpTooltip text="Cuánto del límite mensual de tu plan actual has utilizado. Al llegar al 100% no podrás crear más hasta el próximo ciclo." />
             </h2>
             <Link href="/profile" className="text-xs text-primary font-semibold hover:underline">
               Ver plan
@@ -350,43 +393,6 @@ export function DashboardPage() {
           </div>
         </div>
       )}
-
-      <div>
-        <h2 className="text-base font-display font-bold text-foreground mb-3 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          Acciones rápidas
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="group flex items-center gap-4 bg-card/60 backdrop-blur rounded-2xl p-4 border border-border hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all"
-              >
-                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg shrink-0`}>
-                  <Icon className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-foreground text-sm">{action.label}</p>
-                  <p className="text-xs text-muted-foreground">{action.desc}</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="bg-card/60 backdrop-blur rounded-2xl p-5 border border-border">
-        <h2 className="text-base font-display font-bold text-foreground mb-2">
-          Próximamente
-        </h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Estamos construyendo un sistema completo de gestión para tu negocio textil: pedidos, clientes, proveedores, finanzas, reportes y más. Todo integrado en esta misma plataforma.
-        </p>
-      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Settings, Save, LogOut, User, ShieldCheck } from "lucide-react";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFSettings } from "@/hooks/use-dtf-store";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +24,7 @@ export function SettingsPage() {
 
   if (currentUser?.role !== "master") {
     return (
-      <div className="px-5 py-8 flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
+      <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
         <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
           <ShieldCheck className="w-8 h-8 text-primary opacity-40" />
         </div>
@@ -54,10 +55,10 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="px-5 py-8 md:px-10 md:py-10 flex flex-col gap-6 pb-12 md:max-w-lg">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col gap-6 pb-12 md:max-w-lg">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-foreground font-display font-bold">Ajustes</h1>
+          <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">Ajustes <HelpTooltip text="Configuración global del cotizador DTF: precio por metro y ancho del rollo. Solo disponible para administradores." /></h1>
           <p className="text-muted-foreground mt-1 font-medium">Configura el cotizador</p>
         </div>
         <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">

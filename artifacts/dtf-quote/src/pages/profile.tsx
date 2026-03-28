@@ -109,7 +109,7 @@ export function ProfilePage() {
 
   if (isGuest) {
     return (
-      <div className="px-5 py-8 flex flex-col items-center justify-center min-h-[60vh] gap-5 text-center">
+      <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col items-center justify-center min-h-[60vh] gap-5 text-center">
         <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
           <User className="w-8 h-8 text-primary opacity-40" />
         </div>
@@ -140,7 +140,7 @@ export function ProfilePage() {
     : null;
 
   return (
-    <div className="px-4 py-6 md:px-10 md:py-10 max-w-2xl mx-auto space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <button
           onClick={() => setLocation("/dashboard")}

@@ -1,5 +1,6 @@
 import { formatCurrency } from "@/lib/utils";
 import { useBalances } from "@/hooks/use-transactions";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { Users, Truck, Landmark, DollarSign } from "lucide-react";
 
 export function AccountsPage() {
@@ -20,9 +21,9 @@ export function AccountsPage() {
   const totalSupplierOwed = supplierBalances.reduce((s, c) => s + (Number(c.totalExpense) - Number(c.totalIncome)), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cuentas Corrientes</h1>
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">Cuentas Corrientes <HelpTooltip text="Resumen de saldos con clientes y proveedores, calculados en base a las transacciones registradas en Ingresos/Gastos." /></h1>
         <p className="text-sm text-muted-foreground mt-0.5">Saldos con clientes y proveedores</p>
       </div>
 

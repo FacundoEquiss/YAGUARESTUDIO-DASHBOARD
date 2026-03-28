@@ -205,7 +205,7 @@ export function CalculatorPage() {
   const validStampsCount = stamps.filter(s => s.w > 0 && s.h > 0).length;
 
   return (
-    <div className="px-5 py-8 md:px-10 md:py-10 pb-12 md:flex md:gap-8 md:items-start">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 pb-12 md:flex md:gap-8 md:items-start">
 
       {/* ── LEFT COLUMN (form inputs) ── */}
       <div className="flex flex-col gap-8 md:gap-4 md:flex-1 md:min-w-0">

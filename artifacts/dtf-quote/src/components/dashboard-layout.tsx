@@ -77,7 +77,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
+          <main className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth pb-8">
             <div key={location} className="animate-page-in min-h-full">
               {children}
             </div>

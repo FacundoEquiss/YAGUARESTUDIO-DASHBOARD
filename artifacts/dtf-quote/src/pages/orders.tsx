@@ -10,6 +10,7 @@ import {
   type CreateOrderData,
 } from "@/hooks/use-orders";
 import { useAllClients, type ClientItem } from "@/hooks/use-clients";
+import { HelpTooltip } from "@/components/help-tooltip";
 import {
   Plus,
   Search,
@@ -415,12 +416,13 @@ export function OrdersPage() {
   };
 
   return (
-    <div className="px-4 py-5 sm:px-8 sm:py-8 space-y-5 max-w-6xl">
+    <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-5 max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
             <ClipboardList className="w-6 h-6 text-primary" />
             Pedidos
+            <HelpTooltip text="Gestioná todos tus pedidos de producción. Podés asignar clientes, cambiar estados y llevar un seguimiento completo." />
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {stats.activeOrders} activo{stats.activeOrders !== 1 ? "s" : ""} · {stats.monthOrders} este mes · {total} total
