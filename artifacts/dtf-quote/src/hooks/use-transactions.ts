@@ -39,15 +39,15 @@ export interface BalancesResult {
   clientBalances: {
     clientId: number;
     clientName: string;
-    totalInvoiced: string;
-    totalPaid: string;
+    totalIncome: string;
+    totalExpense: string;
     transactionCount: number;
   }[];
   supplierBalances: {
     supplierId: number;
     supplierName: string;
-    totalOwed: string;
-    totalPaid: string;
+    totalExpense: string;
+    totalIncome: string;
     transactionCount: number;
   }[];
 }

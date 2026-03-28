@@ -149,6 +149,14 @@ export function DashboardPage() {
       icon: TrendingDown,
       color: "from-red-500 to-rose-500",
     },
+    {
+      id: "balance-month",
+      label: "Balance",
+      sublabel: "este mes",
+      value: formatCurrency(Number(financeSummary?.monthIncome || 0) - Number(financeSummary?.monthExpenses || 0)),
+      icon: DollarSign,
+      color: "from-purple-500 to-violet-500",
+    },
   ];
 
   const quickActions = [
@@ -178,7 +186,7 @@ export function DashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         {metrics.map((m) => {
           const Icon = m.icon;
           return (

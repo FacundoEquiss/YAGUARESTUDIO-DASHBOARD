@@ -24,7 +24,6 @@ import {
   DollarSign,
   TrendingUp,
   TrendingDown,
-  Filter,
 } from "lucide-react";
 
 const INCOME_CATEGORIES = [
@@ -182,6 +181,8 @@ function TransactionFormModal({ tx, onClose, onSaved }: TxFormProps) {
 export function FinancePage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -199,6 +200,8 @@ export function FinancePage() {
   const { transactions, total, totalPages, loading, refresh } = useTransactions({
     type: typeFilter || undefined,
     category: categoryFilter || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
     search: debouncedSearch || undefined,
     page,
     limit: 20,
@@ -283,6 +286,8 @@ export function FinancePage() {
             {EXPENSE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </optgroup>
         </select>
+        <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} placeholder="Desde" className="px-3 py-2.5 rounded-xl bg-card border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+        <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} placeholder="Hasta" className="px-3 py-2.5 rounded-xl bg-card border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
       </div>
 
       {loading && transactions.length === 0 ? (

@@ -5,10 +5,18 @@ import { requireAuth } from "../middleware/auth";
 
 const transactionsRouter = Router();
 
-const VALID_TYPES = ["income", "expense"] as const;
+type TransactionType = "income" | "expense";
+const VALID_TYPES: readonly TransactionType[] = ["income", "expense"];
 const INCOME_CATEGORIES = ["venta", "anticipo", "otro"] as const;
 const EXPENSE_CATEGORIES = ["materiales", "envio", "servicios", "impuestos", "otros"] as const;
-const ALL_CATEGORIES = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
+function isValidType(val: string): val is TransactionType {
+  return VALID_TYPES.includes(val as TransactionType);
+}
+
+function isValidCategoryForType(category: string, type: TransactionType): boolean {
+  if (type === "income") return (INCOME_CATEGORIES as readonly string[]).includes(category);
+  return (EXPENSE_CATEGORIES as readonly string[]).includes(category);
+}
 
 transactionsRouter.get("/transactions", requireAuth, async (req, res) => {
   try {
@@ -26,7 +34,7 @@ transactionsRouter.get("/transactions", requireAuth, async (req, res) => {
 
     const conditions: ReturnType<typeof eq>[] = [eq(transactions.userId, userId), isNull(transactions.deletedAt)];
 
-    if (type && VALID_TYPES.includes(type as any)) {
+    if (type && isValidType(type)) {
       conditions.push(eq(transactions.type, type));
     }
     if (category) {
@@ -170,8 +178,8 @@ transactionsRouter.get("/transactions/balances", requireAuth, async (req, res) =
       .select({
         clientId: transactions.clientId,
         clientName: clients.name,
-        totalInvoiced: sql<string>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} else 0 end), 0)`,
-        totalPaid: sql<string>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} else 0 end), 0)`,
+        totalIncome: sql<string>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} else 0 end), 0)`,
+        totalExpense: sql<string>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} else 0 end), 0)`,
         transactionCount: sql<number>`count(*)::int`,
       })
       .from(transactions)
@@ -183,8 +191,8 @@ transactionsRouter.get("/transactions/balances", requireAuth, async (req, res) =
       .select({
         supplierId: transactions.supplierId,
         supplierName: suppliers.name,
-        totalOwed: sql<string>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} else 0 end), 0)`,
-        totalPaid: sql<string>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} else 0 end), 0)`,
+        totalExpense: sql<string>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} else 0 end), 0)`,
+        totalIncome: sql<string>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} else 0 end), 0)`,
         transactionCount: sql<number>`count(*)::int`,
       })
       .from(transactions)
@@ -204,7 +212,7 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
     const userId = req.user!.userId;
     const { type, amount, description, category, clientId, supplierId, orderId, date } = req.body;
 
-    if (!type || !VALID_TYPES.includes(type)) {
+    if (!type || !isValidType(type)) {
       res.status(400).json({ error: "Tipo inválido (income o expense)" });
       return;
     }
@@ -215,8 +223,8 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
       return;
     }
 
-    if (!category || !ALL_CATEGORIES.includes(category)) {
-      res.status(400).json({ error: "Categoría inválida" });
+    if (!category || !isValidCategoryForType(category, type)) {
+      res.status(400).json({ error: "Categoría inválida para este tipo de transacción" });
       return;
     }
 
@@ -287,7 +295,7 @@ transactionsRouter.put("/transactions/:id", requireAuth, async (req, res) => {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (type !== undefined) {
-      if (!VALID_TYPES.includes(type)) { res.status(400).json({ error: "Tipo inválido" }); return; }
+      if (!isValidType(type)) { res.status(400).json({ error: "Tipo inválido" }); return; }
       updates.type = type;
     }
     if (amount !== undefined) {
@@ -297,7 +305,8 @@ transactionsRouter.put("/transactions/:id", requireAuth, async (req, res) => {
     }
     if (description !== undefined) updates.description = description?.trim() || null;
     if (category !== undefined) {
-      if (!ALL_CATEGORIES.includes(category)) { res.status(400).json({ error: "Categoría inválida" }); return; }
+      const effectiveType = (type ?? existing.type) as TransactionType;
+      if (!isValidCategoryForType(category, effectiveType)) { res.status(400).json({ error: "Categoría inválida para este tipo" }); return; }
       updates.category = category;
     }
     if (clientId !== undefined) {

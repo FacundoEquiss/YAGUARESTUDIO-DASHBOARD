@@ -1,5 +1,4 @@
 import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
 import { useBalances } from "@/hooks/use-transactions";
 import { Users, Truck, Landmark, DollarSign } from "lucide-react";
 
@@ -17,8 +16,8 @@ export function AccountsPage() {
   const clientBalances = balances?.clientBalances || [];
   const supplierBalances = balances?.supplierBalances || [];
 
-  const totalClientOwed = clientBalances.reduce((s, c) => s + (Number(c.totalInvoiced) - Number(c.totalPaid)), 0);
-  const totalSupplierOwed = supplierBalances.reduce((s, c) => s + (Number(c.totalOwed) - Number(c.totalPaid)), 0);
+  const totalClientOwed = clientBalances.reduce((s, c) => s + (Number(c.totalIncome) - Number(c.totalExpense)), 0);
+  const totalSupplierOwed = supplierBalances.reduce((s, c) => s + (Number(c.totalExpense) - Number(c.totalIncome)), 0);
 
   return (
     <div className="space-y-6">
@@ -64,20 +63,20 @@ export function AccountsPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Cliente</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Facturado</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Pagado</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ingresos</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Gastos</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Saldo</th>
                   <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Transacciones</th>
                 </tr>
               </thead>
               <tbody>
                 {clientBalances.map((c) => {
-                  const balance = Number(c.totalInvoiced) - Number(c.totalPaid);
+                  const balance = Number(c.totalIncome) - Number(c.totalExpense);
                   return (
                     <tr key={c.clientId} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3 font-medium">{c.clientName}</td>
-                      <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(Number(c.totalInvoiced))}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(Number(c.totalPaid))}</td>
+                      <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(Number(c.totalIncome))}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(Number(c.totalExpense))}</td>
                       <td className="px-4 py-3 text-right font-semibold">
                         <span className={balance > 0 ? "text-emerald-400" : balance < 0 ? "text-red-400" : "text-muted-foreground"}>
                           {formatCurrency(balance)}
@@ -109,20 +108,20 @@ export function AccountsPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Proveedor</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Adeudado</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Pagado</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Gastos</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ingresos</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Saldo</th>
                   <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Transacciones</th>
                 </tr>
               </thead>
               <tbody>
                 {supplierBalances.map((s) => {
-                  const balance = Number(s.totalOwed) - Number(s.totalPaid);
+                  const balance = Number(s.totalExpense) - Number(s.totalIncome);
                   return (
                     <tr key={s.supplierId} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3 font-medium">{s.supplierName}</td>
-                      <td className="px-4 py-3 text-right text-red-400">{formatCurrency(Number(s.totalOwed))}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(Number(s.totalPaid))}</td>
+                      <td className="px-4 py-3 text-right text-red-400">{formatCurrency(Number(s.totalExpense))}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(Number(s.totalIncome))}</td>
                       <td className="px-4 py-3 text-right font-semibold">
                         <span className={balance > 0 ? "text-red-400" : balance < 0 ? "text-emerald-400" : "text-muted-foreground"}>
                           {formatCurrency(balance)}
