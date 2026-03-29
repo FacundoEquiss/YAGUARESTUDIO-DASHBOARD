@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { getStorage, setStorage } from "@/lib/storage";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, waitForApiReady } from "@/lib/api";
 
 export interface AuthUser {
   id: string;
@@ -87,16 +87,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/me")
-      .then(({ data }) => {
-        if (data?.user) {
-          setCurrentUser(mapUser(data.user));
-          setSubscription(data.subscription || null);
-          setStorage(SESSION_KEY, "api");
-        } else {
-          setStorage<string | null>(SESSION_KEY, null);
-        }
-      })
+    void waitForApiReady();
+
+    const restoreSession = async () => {
+      if (sessionType === "api") {
+        await waitForApiReady();
+      }
+
+      const { data } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/me");
+      if (data?.user) {
+        setCurrentUser(mapUser(data.user));
+        setSubscription(data.subscription || null);
+        setStorage(SESSION_KEY, "api");
+      } else {
+        setStorage<string | null>(SESSION_KEY, null);
+      }
+    };
+
+    restoreSession()
       .catch(() => {
         setStorage<string | null>(SESSION_KEY, null);
       })
@@ -110,6 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
+    const apiReady = await waitForApiReady();
+    if (!apiReady) {
+      return "El servidor está despertando. Probá de nuevo en unos segundos.";
+    }
+
     const { data, error } = await apiFetch<{ user: ApiUser }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
@@ -126,6 +139,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string): Promise<string | null> => {
+    const apiReady = await waitForApiReady();
+    if (!apiReady) {
+      return "El servidor está despertando. Probá de nuevo en unos segundos.";
+    }
+
     const { data, error } = await apiFetch<{ user: ApiUser }>("/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, name }),

@@ -9,6 +9,36 @@ function normalizeApiBase(rawUrl?: string): string {
 // En producción acepta VITE_API_URL con o sin sufijo /api.
 const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL);
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function waitForApiReady(
+  attempts = 8,
+  delayMs = 1500
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const res = await fetch(`${API_BASE}/healthz/db`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        return true;
+      }
+    } catch {
+      // El backend puede estar despertando o reiniciando.
+    }
+
+    if (attempt < attempts) {
+      await sleep(delayMs);
+    }
+  }
+
+  return false;
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
