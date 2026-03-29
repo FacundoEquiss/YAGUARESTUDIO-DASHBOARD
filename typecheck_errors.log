@@ -1,0 +1,9 @@
+
+> @workspace/dtf-quote@0.0.0 typecheck C:\Users\Ceska\OneDrive\Escritorio\Programacion\SUPER SISTEMA YAGUAR ESTUDIO\ReplitExport-yaguarestudio\DTF-Optimizer\artifacts\dtf-quote
+> tsc -p tsconfig.json --noEmit
+
+src/App.tsx(4,27): error TS2307: Cannot find module '@vercel/analytics/react' or its corresponding type declarations.
+src/App.tsx(5,31): error TS2307: Cannot find module '@vercel/speed-insights/react' or its corresponding type declarations.
+C:\Users\Ceska\OneDrive\Escritorio\Programacion\SUPER SISTEMA YAGUAR ESTUDIO\ReplitExport-yaguarestudio\DTF-Optimizer\artifacts\dtf-quote:
+ÔÇëERR_PNPM_RECURSIVE_RUN_FIRST_FAILÔÇë @workspace/dtf-quote@0.0.0 typecheck: `tsc -p tsconfig.json --noEmit`
+Exit status 2
