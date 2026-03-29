@@ -1,7 +1,7 @@
 {
   "version": 2,
   "framework": "vite",
-  "buildCommand": "pnpm --filter @workspace/dtf-quote build",
+  "buildCommand": "pnpm --filter @workspace/dtf-quote run build",
   "installCommand": "pnpm install",
   "outputDirectory": "artifacts/dtf-quote/dist/public"
 }

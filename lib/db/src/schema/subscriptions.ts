@@ -9,6 +9,9 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   status: varchar("status", { length: 20 }).notNull().default("active"),
   currentPeriodStart: timestamp("current_period_start").notNull().defaultNow(),
   currentPeriodEnd: timestamp("current_period_end").notNull(),
+  // Campos Mercado Pago para tracking e Idempotencia
+  mpSubscriptionId: varchar("mp_subscription_id", { length: 255 }),
+  mpLastEventId: varchar("mp_last_event_id", { length: 255 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
