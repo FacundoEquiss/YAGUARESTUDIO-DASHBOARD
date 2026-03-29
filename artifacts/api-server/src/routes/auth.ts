@@ -6,6 +6,26 @@ import { signToken, requireAuth } from "../middleware/auth";
 
 const authRouter = Router();
 
+function isSecureCookieEnvironment(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.RAILWAY_ENVIRONMENT_NAME !== undefined ||
+    process.env.RAILWAY_PUBLIC_DOMAIN !== undefined ||
+    process.env.RENDER !== undefined
+  );
+}
+
+function getAuthCookieOptions() {
+  const secure = isSecureCookieEnvironment();
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? "none" as const : "lax" as const,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  };
+}
+
 export async function seedMasterAccount() {
   const masterEmail = process.env.MASTER_EMAIL;
   const masterPassword = process.env.MASTER_PASSWORD;
@@ -110,12 +130,7 @@ authRouter.post("/auth/register", async (req, res) => {
       role: newUser.role,
     });
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, getAuthCookieOptions());
 
     res.json({ user: userProfile(newUser) });
   } catch (err) {
@@ -153,12 +168,7 @@ authRouter.post("/auth/login", async (req, res) => {
       role: user.role,
     });
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, getAuthCookieOptions());
 
     res.json({ user: userProfile(user) });
   } catch (err) {
@@ -283,7 +293,11 @@ authRouter.put("/auth/password", requireAuth, async (req, res) => {
 });
 
 authRouter.post("/auth/logout", (_req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: getAuthCookieOptions().secure,
+    sameSite: getAuthCookieOptions().sameSite,
+  });
   res.json({ ok: true });
 });
 

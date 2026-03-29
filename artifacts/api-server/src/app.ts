@@ -6,11 +6,42 @@ import webhooksRouter from "./routes/webhooks";
 
 const app: Express = express();
 
-const frontendUrl = process.env.FRONTEND_URL;
+function normalizeOrigin(origin: string): string {
+  return origin.trim().replace(/\/+$/, "");
+}
+
+const allowedOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean)
+  .map(normalizeOrigin);
 
 app.use(cors({
   credentials: true,
-  origin: process.env.NODE_ENV === "production" && frontendUrl ? frontendUrl : true,
+  origin(origin, callback) {
+    if (process.env.NODE_ENV !== "production" || allowedOrigins.length === 0) {
+      callback(null, true);
+      return;
+    }
+
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    const normalizedOrigin = normalizeOrigin(origin);
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+      return;
+    }
+
+    console.warn("Blocked CORS origin", {
+      origin: normalizedOrigin,
+      allowedOrigins,
+    });
+    callback(new Error("Not allowed by CORS"));
+  },
 }));
 
 app.use(cookieParser());

@@ -16,7 +16,7 @@ Para hacer el deploy robusto y libre de ambigüedades de Vercel (Front-end), **e
 
 ### Variables de Entorno (Environment Variables) obligatorias en Vercel:
 Asegúrate de agregar lo siguiente antes de darle a Deploy:
-* `VITE_API_URL` 👉 El link de tu back-end (Por ejemplo: `https://tu-backend-railway.up.railway.app`).
+* `VITE_API_URL` 👉 El link de tu back-end (Por ejemplo: `https://tu-backend-railway.up.railway.app`). El frontend ahora tolera ese valor con o sin `/api`.
 
 --- 
 *Con esta configuración Vite compilará transparentemente hacia el directorio `dist` nativo y Vercel lo subirá sin chocar con configuraciones ambiguas "dist/public".*
@@ -36,6 +36,12 @@ Para hacer el deploy robusto en Railway del Backend (`@workspace/api-server`), d
 * **Root Directory:** `/` (Déjalo la raíz en blanco o símobolo vacío/raíz del panel). *Bajo ninguna circunstancia pongas artifacts/api-server como root folder, porque Railway no encontrará las librerías `lib/db`!*
 * **Build Command:** `pnpm --filter @workspace/api-server run build`
 * **Start Command:** `pnpm --filter @workspace/api-server run start`
+
+### Variables de Entorno importantes en Railway:
+* `FRONTEND_URL` 👉 Usa uno o varios orígenes exactos separados por comas. Ejemplo:
+  `https://tu-produccion.vercel.app,https://tu-preview.vercel.app`
+  No uses barras finales.
+* `NODE_ENV=production` 👉 Recomendado para mantener el comportamiento esperado de producción en logs y middlewares.
 
 ### ¿Por qué forzamos el Lockfile / pnpm@10.x.x?
 El `package.json` de la raíz ahora incluye el anclaje `"packageManager": "pnpm@10.32.1"`. Nixpacks (el compilador oficial de Railway) usa esto automáticamente para instalar exactamente esa versión de la herramienta y evitar así las disonancias en la versión o el `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Railway compilará con "frozen-lockfile" perfecto usando la misma firma que tus pruebas locales.
