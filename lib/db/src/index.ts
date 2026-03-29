@@ -25,7 +25,16 @@ export const pool = new Pool({
   ssl: shouldUseSsl(process.env.DATABASE_URL)
     ? { rejectUnauthorized: false }
     : undefined,
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 30_000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10_000,
 });
+
+pool.on("error", (error) => {
+  console.error("Unexpected PostgreSQL pool error", error);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

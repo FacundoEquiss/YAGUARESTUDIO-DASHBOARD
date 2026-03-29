@@ -69,6 +69,8 @@ function userProfile(user: typeof users.$inferSelect) {
 }
 
 authRouter.post("/auth/register", async (req, res) => {
+  let trimmedEmail = "";
+
   try {
     const { email, password, name } = req.body as {
       email?: string;
@@ -81,7 +83,7 @@ authRouter.post("/auth/register", async (req, res) => {
       return;
     }
 
-    const trimmedEmail = email.trim().toLowerCase();
+    trimmedEmail = email.trim().toLowerCase();
 
     if (password.length < 6) {
       res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
@@ -134,12 +136,18 @@ authRouter.post("/auth/register", async (req, res) => {
 
     res.json({ user: userProfile(newUser) });
   } catch (err) {
-    console.error("POST /auth/register error:", err);
+    console.error("POST /auth/register error:", {
+      email: trimmedEmail || req.body?.email || null,
+      origin: req.headers.origin ?? null,
+      error: err,
+    });
     res.status(500).json({ error: "Error al crear cuenta" });
   }
 });
 
 authRouter.post("/auth/login", async (req, res) => {
+  let trimmedEmail = "";
+
   try {
     const { email, password } = req.body as { email?: string; password?: string };
 
@@ -148,7 +156,7 @@ authRouter.post("/auth/login", async (req, res) => {
       return;
     }
 
-    const trimmedEmail = email.trim().toLowerCase();
+    trimmedEmail = email.trim().toLowerCase();
     const [user] = await db.select().from(users).where(eq(users.email, trimmedEmail));
 
     if (!user) {
@@ -172,7 +180,11 @@ authRouter.post("/auth/login", async (req, res) => {
 
     res.json({ user: userProfile(user) });
   } catch (err) {
-    console.error("POST /auth/login error:", err);
+    console.error("POST /auth/login error:", {
+      email: trimmedEmail || req.body?.email || null,
+      origin: req.headers.origin ?? null,
+      error: err,
+    });
     res.status(500).json({ error: "Error al iniciar sesión" });
   }
 });
