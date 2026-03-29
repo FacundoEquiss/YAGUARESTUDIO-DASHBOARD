@@ -291,7 +291,7 @@ export function ClientsPage() {
     sortDir: "desc",
   });
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setPage(1);

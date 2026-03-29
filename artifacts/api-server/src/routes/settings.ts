@@ -3,6 +3,8 @@ import { db, dtfGlobalSettings, userDtfSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
+type GlobalSettingsRow = typeof dtfGlobalSettings.$inferSelect;
+
 type UserDtfSettingsUpdate = Partial<Pick<
   typeof userDtfSettings.$inferInsert,
   "pricePerMeter" | "rollWidth" | "baseMargin" | "wholesaleMargin" |
@@ -11,18 +13,26 @@ type UserDtfSettingsUpdate = Partial<Pick<
 
 const settingsRouter = Router();
 
-async function ensureSettingsRow() {
+/**
+ * Ensures the single global settings row (id=1) exists.
+ * Returns it whether it was just created or already existed.
+ */
+async function ensureSettingsRow(): Promise<GlobalSettingsRow> {
   const rows = await db.select().from(dtfGlobalSettings).where(eq(dtfGlobalSettings.id, 1));
-  if (rows.length === 0) {
-    await db.insert(dtfGlobalSettings).values({ id: 1, pricePerMeter: 10000, rollWidth: 58 });
+  if (rows.length > 0) {
+    return rows[0];
   }
+  const inserted = await db
+    .insert(dtfGlobalSettings)
+    .values({ id: 1, pricePerMeter: 10000, rollWidth: 58 })
+    .returning();
+  return inserted[0];
 }
 
 settingsRouter.get("/settings", async (_req, res) => {
   try {
-    await ensureSettingsRow();
-    const rows = await db.select().from(dtfGlobalSettings).where(eq(dtfGlobalSettings.id, 1));
-    res.json(rows[0]);
+    const row = await ensureSettingsRow();
+    res.json(row);
   } catch (err) {
     console.error("GET /settings error:", err);
     res.status(500).json({ error: "Failed to fetch settings" });
@@ -74,13 +84,12 @@ settingsRouter.get("/user-settings", requireAuth, async (req, res) => {
       return;
     }
 
-    await ensureSettingsRow();
-    const global = await db.select().from(dtfGlobalSettings).where(eq(dtfGlobalSettings.id, 1));
+    const global = await ensureSettingsRow();
     res.json({
       id: null,
       userId,
-      pricePerMeter: global[0].pricePerMeter,
-      rollWidth: global[0].rollWidth,
+      pricePerMeter: global.pricePerMeter,
+      rollWidth: global.rollWidth,
       baseMargin: 2000,
       wholesaleMargin: 1200,
       pressPassThreshold: 2,
@@ -151,6 +160,7 @@ settingsRouter.put("/user-settings", requireAuth, async (req, res) => {
       res.json(updated[0]);
     } else {
       const globalRow = await ensureSettingsRow();
+      // globalRow is guaranteed non-null — ensureSettingsRow() always returns the row
       const inserted = await db
         .insert(userDtfSettings)
         .values({

@@ -1,4 +1,5 @@
-const API_BASE = "/api";
+// En local por default apunta a la misma URL o puerto proxyado, en prod usa VITE_API_URL (configurable en Vercel)
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 export async function apiFetch<T = unknown>(
   path: string,

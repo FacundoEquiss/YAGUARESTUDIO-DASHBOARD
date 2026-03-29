@@ -6,23 +6,32 @@ import { signToken, requireAuth } from "../middleware/auth";
 
 const authRouter = Router();
 
-const MASTER_EMAIL = process.env.MASTER_EMAIL || "yaguarestudio@gmail.com";
-const MASTER_PASSWORD = process.env.MASTER_PASSWORD || "Sanignacio43391475";
-const MASTER_NAME = process.env.MASTER_NAME || "YAGUAR ESTUDIO";
-
 export async function seedMasterAccount() {
-  const existing = await db.select().from(users).where(eq(users.email, MASTER_EMAIL));
+  const masterEmail = process.env.MASTER_EMAIL;
+  const masterPassword = process.env.MASTER_PASSWORD;
+  const masterName = process.env.MASTER_NAME ?? "YAGUAR ESTUDIO";
+
+  if (!masterEmail || !masterPassword) {
+    console.warn(
+      "⚠️  MASTER_EMAIL or MASTER_PASSWORD env vars are not set. " +
+      "Master account will NOT be seeded. Set them before first run."
+    );
+    return;
+  }
+
+  const existing = await db.select().from(users).where(eq(users.email, masterEmail));
   if (existing.length === 0) {
-    const hash = await bcrypt.hash(MASTER_PASSWORD, 10);
+    const hash = await bcrypt.hash(masterPassword, 10);
     await db.insert(users).values({
-      email: MASTER_EMAIL,
-      name: MASTER_NAME,
+      email: masterEmail,
+      name: masterName,
       passwordHash: hash,
       role: "master",
     });
     console.log("Seeded master account");
   }
 }
+
 
 function userProfile(user: typeof users.$inferSelect) {
   return {
@@ -104,7 +113,7 @@ authRouter.post("/auth/register", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
@@ -147,7 +156,7 @@ authRouter.post("/auth/login", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 

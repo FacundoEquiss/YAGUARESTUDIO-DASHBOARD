@@ -204,7 +204,7 @@ export function FinancePage() {
   const [showForm, setShowForm] = useState(false);
   const [editTx, setEditTx] = useState<TransactionItem | null>(null);
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setPage(1);
