@@ -21,7 +21,13 @@ export interface SubscriptionSyncResult {
 }
 
 function normalizeOrigin(origin: string): string {
-  return origin.trim().replace(/\/+$/, "");
+  const trimmed = origin.trim().replace(/^["']|["']$/g, "");
+  if (!trimmed) {
+    throw new Error("FRONTEND_URL contiene un origen vacío");
+  }
+
+  const candidate = /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return new URL(candidate).origin;
 }
 
 function getPrimaryFrontendOrigin(): string {
@@ -93,9 +99,36 @@ function resolvePeriodEnd(nextPaymentDate?: string | null): Date {
 }
 
 function assertMercadoPagoConfigured() {
-  if (!process.env.MP_ACCESS_TOKEN) {
+  const token = process.env.MP_ACCESS_TOKEN?.trim();
+
+  if (!token) {
     throw new Error("MP_ACCESS_TOKEN no está configurado");
   }
+
+  if (token.includes("xxxx") || token.startsWith("your_")) {
+    throw new Error("MP_ACCESS_TOKEN parece seguir siendo un placeholder y no un token real");
+  }
+}
+
+export function getMercadoPagoErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  const maybeObject = error as {
+    message?: string;
+    cause?: { message?: string };
+    response?: { data?: { message?: string } };
+    api_response?: { message?: string };
+  } | null;
+
+  return (
+    maybeObject?.response?.data?.message ||
+    maybeObject?.api_response?.message ||
+    maybeObject?.cause?.message ||
+    maybeObject?.message ||
+    "No se pudo iniciar el checkout con Mercado Pago"
+  );
 }
 
 export async function createMercadoPagoSubscriptionCheckout(args: {

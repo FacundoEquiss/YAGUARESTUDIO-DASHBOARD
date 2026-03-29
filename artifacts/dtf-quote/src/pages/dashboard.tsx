@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -7,6 +7,7 @@ import { useUsageEvents } from "@/hooks/use-usage-events";
 import { useOrderStats } from "@/hooks/use-orders";
 import { useTransactionSummary } from "@/hooks/use-transactions";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 import {
   BarChart,
   Bar,
@@ -82,6 +83,7 @@ export function DashboardPage() {
 
   const isMaster = currentUser?.role === "master";
   const isGuest = currentUser?.role === "guest";
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const greeting = currentUser?.name
     ? `Hola, ${currentUser.name.split(" ")[0]}`
@@ -191,13 +193,14 @@ export function DashboardPage() {
               <Crown className="w-3.5 h-3.5 text-primary" />
               <span className="text-xs font-bold text-primary">{subscription.planName}</span>
             </div>
-            <Link
-              href="/profile"
+            <button
+              type="button"
+              onClick={() => setShowUpgrade(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-lg shadow-orange-500/20"
             >
               <Zap className="w-3 h-3" />
               Mejorar plan
-            </Link>
+            </button>
           </div>
         )}
       </div>
@@ -399,6 +402,13 @@ export function DashboardPage() {
           </div>
         </div>
       )}
+
+      <UpgradePrompt
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature="herramientas y límites"
+        mode="plans"
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth";
 import type { PlanLimits } from "@workspace/db/schema";
 import {
   createMercadoPagoSubscriptionCheckout,
+  getMercadoPagoErrorMessage,
   syncMercadoPagoPreapprovalById,
 } from "../lib/subscription-billing";
 
@@ -195,7 +196,7 @@ subscriptionRouter.post("/subscription/checkout", requireAuth, async (req, res) 
     res.json({ checkout });
   } catch (err) {
     console.error("POST /subscription/checkout error:", err);
-    res.status(500).json({ error: "No se pudo iniciar el checkout con Mercado Pago" });
+    res.status(500).json({ error: getMercadoPagoErrorMessage(err) });
   }
 });
 

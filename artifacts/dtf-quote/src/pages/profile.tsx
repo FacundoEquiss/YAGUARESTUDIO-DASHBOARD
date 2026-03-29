@@ -493,6 +493,7 @@ export function ProfilePage() {
         open={showUpgrade}
         onClose={() => setShowUpgrade(false)}
         feature="herramientas y límites"
+        mode="plans"
       />
     </div>
   );
