@@ -3,6 +3,10 @@ import { db, subscriptionPlans, userSubscriptions, usageCounters, usageEvents } 
 import { eq, and, sql, desc, gte } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import type { PlanLimits } from "@workspace/db/schema";
+import {
+  createMercadoPagoSubscriptionCheckout,
+  syncMercadoPagoPreapprovalById,
+} from "../lib/subscription-billing";
 
 const subscriptionRouter = Router();
 
@@ -134,8 +138,115 @@ subscriptionRouter.get("/subscription/plans", async (_req, res) => {
   }
 });
 
+subscriptionRouter.post("/subscription/checkout", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+    const { planSlug } = req.body as { planSlug?: string };
+
+    if (!planSlug) {
+      res.status(400).json({ error: "planSlug es requerido" });
+      return;
+    }
+
+    const [plan] = await db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.slug, planSlug));
+
+    if (!plan || !plan.isActive) {
+      res.status(404).json({ error: "Plan no encontrado" });
+      return;
+    }
+
+    if (plan.price <= 0) {
+      res.status(400).json({ error: "El plan gratuito no requiere checkout" });
+      return;
+    }
+
+    const [existing] = await db
+      .select({
+        planSlug: subscriptionPlans.slug,
+        status: userSubscriptions.status,
+        mpSubscriptionId: userSubscriptions.mpSubscriptionId,
+      })
+      .from(userSubscriptions)
+      .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
+      .where(eq(userSubscriptions.userId, userId));
+
+    if (existing?.planSlug === plan.slug && existing.status === "active") {
+      res.status(409).json({ error: "Ya tenés ese plan activo" });
+      return;
+    }
+
+    if (existing?.mpSubscriptionId && existing.planSlug !== "free" && existing.status === "active") {
+      res.status(409).json({
+        error: "Todavía no automatizamos el cambio entre planes pagos. Cancelá o cerrá la suscripción actual primero.",
+      });
+      return;
+    }
+
+    const checkout = await createMercadoPagoSubscriptionCheckout({
+      userId,
+      email: userEmail,
+      plan,
+    });
+
+    res.json({ checkout });
+  } catch (err) {
+    console.error("POST /subscription/checkout error:", err);
+    res.status(500).json({ error: "No se pudo iniciar el checkout con Mercado Pago" });
+  }
+});
+
+subscriptionRouter.post("/subscription/sync", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { preapprovalId } = req.body as { preapprovalId?: string };
+
+    if (!preapprovalId) {
+      res.status(400).json({ error: "preapprovalId es requerido" });
+      return;
+    }
+
+    const result = await syncMercadoPagoPreapprovalById(preapprovalId);
+
+    if (result.userId !== userId) {
+      res.status(403).json({ error: "La suscripción no pertenece al usuario autenticado" });
+      return;
+    }
+
+    const [subscription] = await db
+      .select({
+        planName: subscriptionPlans.name,
+        planSlug: subscriptionPlans.slug,
+        limits: subscriptionPlans.limits,
+        price: subscriptionPlans.price,
+        status: userSubscriptions.status,
+        periodStart: userSubscriptions.currentPeriodStart,
+        periodEnd: userSubscriptions.currentPeriodEnd,
+      })
+      .from(userSubscriptions)
+      .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
+      .where(eq(userSubscriptions.userId, userId));
+
+    res.json({ result, subscription: subscription || null });
+  } catch (err) {
+    console.error("POST /subscription/sync error:", err);
+    res.status(500).json({ error: "No se pudo sincronizar la suscripción" });
+  }
+});
+
 subscriptionRouter.post("/subscription/upgrade", requireAuth, async (req, res) => {
   try {
+    if (req.user!.role !== "master") {
+      res.status(403).json({
+        error: "El cambio directo de plan ya no está habilitado. Usá el checkout de suscripciones.",
+        requiresCheckout: true,
+      });
+      return;
+    }
+
     const userId = req.user!.userId;
     const { planSlug } = req.body as { planSlug?: string };
 

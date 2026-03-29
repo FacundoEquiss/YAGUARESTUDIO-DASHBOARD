@@ -22,11 +22,42 @@ import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
+
+function getSubscriptionStatusLabel(status?: string | null): string {
+  switch ((status || "").toLowerCase()) {
+    case "active":
+      return "Activo";
+    case "pending":
+      return "Pendiente";
+    case "paused":
+      return "Pausado";
+    case "cancelled":
+      return "Cancelado";
+    default:
+      return "Sin plan";
+  }
+}
+
+function getSubscriptionStatusClass(status?: string | null): string {
+  switch ((status || "").toLowerCase()) {
+    case "active":
+      return "text-green-400";
+    case "pending":
+      return "text-amber-400";
+    case "paused":
+      return "text-yellow-400";
+    case "cancelled":
+      return "text-red-400";
+    default:
+      return "text-muted-foreground";
+  }
+}
 
 export function ProfilePage() {
   const [, setLocation] = useLocation();
-  const { currentUser, subscription, logout, updateProfile } = useAuth();
-  const { usage, limits } = useUsage();
+  const { currentUser, subscription, logout, updateProfile, refreshSession } = useAuth();
+  const { usage, limits, refresh: refreshUsage } = useUsage();
   const { toast } = useToast();
 
   const [name, setName] = useState(currentUser?.name || "");
@@ -40,6 +71,8 @@ export function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [syncingSubscription, setSyncingSubscription] = useState(false);
 
   const isGuest = currentUser?.role === "guest";
   const isMaster = currentUser?.role === "master";
@@ -53,6 +86,67 @@ export function ProfilePage() {
       setBirthDate(currentUser.birthDate || "");
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("billing") !== "returned") return;
+
+    const pendingPreapprovalId = window.sessionStorage.getItem("mp:pending-preapproval-id");
+    const cleanupUrl = () => {
+      window.sessionStorage.removeItem("mp:pending-preapproval-id");
+      window.history.replaceState({}, document.title, "/profile");
+    };
+
+    if (!pendingPreapprovalId) {
+      refreshSession().finally(cleanupUrl);
+      return;
+    }
+
+    let cancelled = false;
+    setSyncingSubscription(true);
+
+    apiFetch<{ result?: { localStatus?: string } }>("/subscription/sync", {
+      method: "POST",
+      body: JSON.stringify({ preapprovalId: pendingPreapprovalId }),
+    })
+      .then(async ({ data, error }) => {
+        if (cancelled) return;
+
+        if (error) {
+          toast({
+            title: "Suscripción pendiente",
+            description: "Volvimos de Mercado Pago, pero todavía no se pudo confirmar el estado de tu plan.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        await Promise.all([refreshSession(), refreshUsage()]);
+
+        const localStatus = data?.result?.localStatus;
+        if (localStatus === "active") {
+          toast({
+            title: "Suscripción activada",
+            description: "Tu plan quedó actualizado correctamente.",
+          });
+        } else {
+          toast({
+            title: "Suscripción en revisión",
+            description: "Mercado Pago devolvió el checkout, pero la activación todavía no está confirmada.",
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSyncingSubscription(false);
+          cleanupUrl();
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshSession, refreshUsage, toast]);
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -195,11 +289,16 @@ export function ProfilePage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setLocation("/")}
+                onClick={() => setShowUpgrade(true)}
                 className="rounded-xl text-xs"
+                disabled={syncingSubscription}
               >
-                <Crown className="w-3.5 h-3.5 mr-1" />
-                Mejorar plan
+                {syncingSubscription ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Crown className="w-3.5 h-3.5 mr-1" />
+                )}
+                {syncingSubscription ? "Sincronizando..." : "Mejorar plan"}
               </Button>
             )}
           </div>
@@ -210,7 +309,9 @@ export function ProfilePage() {
             </div>
             <div className="bg-white/5 rounded-xl p-3">
               <p className="text-xs text-muted-foreground mb-1">Estado</p>
-              <p className="text-sm font-bold text-green-400">Activo</p>
+              <p className={`text-sm font-bold ${getSubscriptionStatusClass(subscription?.status)}`}>
+                {getSubscriptionStatusLabel(subscription?.status)}
+              </p>
             </div>
             {periodEndDate && (
               <div className="bg-white/5 rounded-xl p-3 col-span-2">
@@ -219,6 +320,9 @@ export function ProfilePage() {
               </div>
             )}
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Los planes pagos se autorizan en Mercado Pago y luego se sincronizan automáticamente con tu cuenta.
+          </p>
           {subscription && limits.dtfQuotes !== -1 && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between text-xs">
@@ -384,6 +488,12 @@ export function ProfilePage() {
             })
           : "—"}
       </div>
+
+      <UpgradePrompt
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature="herramientas y límites"
+      />
     </div>
   );
 }

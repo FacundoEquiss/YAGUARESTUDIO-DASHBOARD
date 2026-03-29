@@ -42,6 +42,21 @@ Para hacer el deploy robusto en Railway del Backend (`@workspace/api-server`), d
   `https://tu-produccion.vercel.app,https://tu-preview.vercel.app`
   No uses barras finales.
 * `NODE_ENV=production` 👉 Recomendado para mantener el comportamiento esperado de producción en logs y middlewares.
+* `DATABASE_URL` 👉 En Railway conviene usar el **Session pooler** de Supabase.
+* `JWT_SECRET` 👉 Obligatorio para firmar y validar sesión.
+* `MP_ACCESS_TOKEN` 👉 Access token real de Mercado Pago para crear suscripciones.
+* `MP_WEBHOOK_SECRET` 👉 Recomendado para validar la firma del webhook cuando cierres la integración.
+* `MP_CURRENCY_ID=ARS` 👉 Opcional, pero deja explícita la moneda de cobro.
+
+### URL pública de Webhook para Mercado Pago:
+Si tu backend está expuesto en Railway, configurá en Mercado Pago la URL:
+
+`https://TU-BACKEND.up.railway.app/webhooks/mercadopago`
+
+Esta app ya puede:
+* iniciar checkout de suscripciones desde el backend,
+* redirigir al usuario al checkout de Mercado Pago,
+* y sincronizar el plan local al volver del checkout o al recibir el webhook.
 
 ### ¿Por qué forzamos el Lockfile / pnpm@10.x.x?
 El `package.json` de la raíz ahora incluye el anclaje `"packageManager": "pnpm@10.32.1"`. Nixpacks (el compilador oficial de Railway) usa esto automáticamente para instalar exactamente esa versión de la herramienta y evitar así las disonancias en la versión o el `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Railway compilará con "frozen-lockfile" perfecto usando la misma firma que tus pruebas locales.

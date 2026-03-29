@@ -1,16 +1,51 @@
 import { Router, Request, Response } from "express";
-import crypto from "crypto";
-import { db, userSubscriptions } from "@workspace/db";
-import { eq } from "drizzle-orm";
-// import { mpPayment, mpPreApproval } from "../lib/mercadopago"; // Para consultar si es necesario
+import { syncMercadoPagoPreapprovalById } from "../lib/subscription-billing";
 
 const webhooksRouter = Router();
 
-// Endpoint enfocado a recibir notificaciones IPN/Webhooks de Mercado Pago
+function getWebhookEventId(req: Request): string {
+  const body = req.body as {
+    id?: string | number;
+    type?: string;
+    action?: string;
+    data?: { id?: string | number };
+  };
+
+  if (body.id !== undefined && body.id !== null) {
+    return String(body.id);
+  }
+
+  const eventType = String(body.type || req.query.topic || body.action || "unknown");
+  const resourceId = body.data?.id !== undefined && body.data?.id !== null
+    ? String(body.data.id)
+    : "unknown";
+
+  return `${eventType}:${resourceId}`;
+}
+
+function isMercadoPagoSubscriptionEvent(type?: string, topic?: string, action?: string): boolean {
+  const candidates = [type, topic, action]
+    .filter(Boolean)
+    .map(value => String(value).toLowerCase());
+
+  return candidates.some(value =>
+    value === "subscription_preapproval" ||
+    value === "preapproval" ||
+    value.includes("subscription_preapproval") ||
+    value.includes("preapproval"),
+  );
+}
+
 webhooksRouter.post("/mercadopago", async (req: Request, res: Response) => {
   try {
-    const { type, data } = req.body;
-    const action = req.query.topic || req.body.action;
+    const { type, data } = req.body as {
+      type?: string;
+      data?: { id?: string | number };
+      action?: string;
+    };
+    const action = String(req.query.topic || req.body.action || "");
+    const eventId = getWebhookEventId(req);
+    const resourceId = data?.id !== undefined && data?.id !== null ? String(data.id) : undefined;
 
     // TODO: En producción estricta, validar firma x-signature con MP_WEBHOOK_SECRET
     // https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
@@ -24,18 +59,21 @@ webhooksRouter.post("/mercadopago", async (req: Request, res: Response) => {
       // if (signature !== expectedSignature) throw new Error("Firma inválida");
     }
 
-    // Procesamiento Idempotente
-    console.log(`[Webhook MP] Evento recibido: type=${type}, action=${action}`);
-    
-    // Aquí implementamos la lógica de actualización del UserSubscription 
-    if (type === "subscription_preapproval") {
-      const subscriptionId = data.id;
-      console.log(`Verificando subscripción: ${subscriptionId}`);
-      // Lógica de consultar a MP (mpPreApproval.get({ id: subscriptionId })) y hacer db.update()
-    } else if (type === "payment") {
-      const paymentId = data.id;
-      console.log(`Verificando pago: ${paymentId}`);
-      // Lógica de consultar a MP (mpPayment.get({ id: paymentId })) y actualizar billing
+    console.log("[Webhook MP] Evento recibido", {
+      eventId,
+      type,
+      action,
+      resourceId,
+    });
+
+    if (isMercadoPagoSubscriptionEvent(type, String(req.query.topic || ""), action) && resourceId) {
+      const syncResult = await syncMercadoPagoPreapprovalById(resourceId, {
+        notificationId: eventId,
+      });
+
+      console.log("[Webhook MP] Suscripción sincronizada", syncResult);
+    } else if (type === "payment" && resourceId) {
+      console.log(`[Webhook MP] Pago recibido ${resourceId}. Aún no se procesa billing puntual.`);
     }
 
     res.status(200).send("OK");

@@ -278,7 +278,7 @@ export function LandingPage() {
                     <h3 className="text-lg font-display font-bold text-foreground">{plan.name}</h3>
                     <div className="mt-2 mb-5">
                       <span className="text-3xl font-display font-black text-foreground">
-                        {plan.price === 0 ? "Gratis" : `$${plan.price.toLocaleString("es-CL")}`}
+                        {plan.price === 0 ? "Gratis" : `$${plan.price.toLocaleString("es-AR")}`}
                       </span>
                       {plan.price > 0 && <span className="text-sm text-muted-foreground font-medium">/mes</span>}
                     </div>

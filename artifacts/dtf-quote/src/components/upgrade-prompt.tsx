@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Crown, X, Check, Zap } from "lucide-react";
+import { Crown, X, Check, Zap, ExternalLink } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useUsage } from "@/hooks/use-usage";
 import { apiFetch } from "@/lib/api";
 
 interface UpgradePromptProps {
@@ -66,13 +65,14 @@ const FALLBACK_PLANS: DisplayPlan[] = [
 ];
 
 export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
-  const { subscription, refreshSession } = useAuth();
-  const { refresh } = useUsage();
+  const { subscription } = useAuth();
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [plans, setPlans] = useState<DisplayPlan[]>(FALLBACK_PLANS);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setError(null);
     apiFetch<{ plans: ApiPlan[] }>("/subscription/plans").then(({ data }) => {
       if (data?.plans) {
         setPlans(data.plans.map(apiPlanToDisplay));
@@ -81,16 +81,29 @@ export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
   }, [open]);
 
   const handleUpgrade = async (planSlug: string) => {
+    setError(null);
     setUpgrading(planSlug);
-    const { error } = await apiFetch("/subscription/upgrade", {
-      method: "POST",
-      body: JSON.stringify({ planSlug }),
-    });
+    const { data, error } = await apiFetch<{ checkout: { id: string; initPoint: string } }>(
+      "/subscription/checkout",
+      {
+        method: "POST",
+        body: JSON.stringify({ planSlug }),
+      },
+    );
     setUpgrading(null);
-    if (!error) {
-      await Promise.all([refresh(), refreshSession()]);
-      onClose();
+
+    if (error) {
+      setError(error);
+      return;
     }
+
+    if (data?.checkout?.initPoint && data.checkout.id) {
+      window.sessionStorage.setItem("mp:pending-preapproval-id", data.checkout.id);
+      window.location.href = data.checkout.initPoint;
+      return;
+    }
+
+    setError("Mercado Pago no devolvió una URL válida para continuar.");
   };
 
   return (
@@ -126,13 +139,14 @@ export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
                 Necesitás más {feature}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Mejorá tu plan para seguir usando esta función
+                Mejorá tu plan para seguir usando esta función. El cobro se autoriza en Mercado Pago.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-6 pt-2">
               {plans.map((plan) => {
                 const isCurrent = subscription?.planSlug === plan.slug;
+                const isPaidPlan = plan.price > 0;
                 return (
                   <div
                     key={plan.slug}
@@ -160,7 +174,7 @@ export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
 
                     <h3 className="font-bold text-foreground">{plan.name}</h3>
                     <div className="text-2xl font-black text-foreground mt-1">
-                      {plan.price === 0 ? "Gratis" : `$${plan.price.toLocaleString("es-CL")}`}
+                      {plan.price === 0 ? "Gratis" : `$${plan.price.toLocaleString("es-AR")}`}
                       {plan.price > 0 && <span className="text-xs font-normal text-muted-foreground">/mes</span>}
                     </div>
 
@@ -175,25 +189,42 @@ export function UpgradePrompt({ open, onClose, feature }: UpgradePromptProps) {
 
                     <button
                       onClick={() => handleUpgrade(plan.slug)}
-                      disabled={isCurrent || upgrading !== null}
+                      disabled={isCurrent || !isPaidPlan || upgrading !== null}
                       className={`w-full mt-4 py-2 rounded-xl text-sm font-bold transition-all ${
                         isCurrent
                           ? "bg-secondary text-muted-foreground cursor-default"
-                          : plan.popular
+                          : !isPaidPlan
+                            ? "bg-secondary text-muted-foreground cursor-default"
+                            : plan.popular
                             ? "bg-primary text-primary-foreground hover:opacity-90"
                             : "bg-secondary hover:bg-secondary/80 text-foreground"
                       }`}
                     >
                       {isCurrent
                         ? "Plan actual"
-                        : upgrading === plan.slug
-                          ? "Actualizando..."
-                          : "Elegir plan"}
+                        : !isPaidPlan
+                          ? "Plan base"
+                          : upgrading === plan.slug
+                          ? "Conectando..."
+                          : "Ir a Mercado Pago"}
                     </button>
+                    {isPaidPlan && (
+                      <p className="mt-2 text-[11px] text-muted-foreground flex items-center gap-1.5">
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                        Se abre el checkout seguro de Mercado Pago
+                      </p>
+                    )}
                   </div>
                 );
               })}
             </div>
+            {error && (
+              <div className="px-6 pb-5">
+                <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {error}
+                </div>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
