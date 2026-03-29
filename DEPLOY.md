@@ -20,3 +20,22 @@ Asegúrate de agregar lo siguiente antes de darle a Deploy:
 
 --- 
 *Con esta configuración Vite compilará transparentemente hacia el directorio `dist` nativo y Vercel lo subirá sin chocar con configuraciones ambiguas "dist/public".*
+
+---
+
+# Railway Deployment Guide para Monorepo (pnpm)
+
+Para hacer el deploy robusto en Railway del Backend (`@workspace/api-server`), debemos forzar a Railway a que respete la gestión completa del monorepo, instalando las dependencias nativas del proyecto a nivel raíz.
+
+### Pasos exactos en el Panel de Railway:
+
+1. Importa este repositorio desde Github en un servicio base (Deploy from Repo).
+2. Ve a las configuraciones del servicio (**Settings** de la app deployada).
+3. Asegúrate que en "Build" y "Deploy" estén configurados *exactamente* de la siguiente manera:
+
+* **Root Directory:** `/` (Déjalo la raíz en blanco o símobolo vacío/raíz del panel). *Bajo ninguna circunstancia pongas artifacts/api-server como root folder, porque Railway no encontrará las librerías `lib/db`!*
+* **Build Command:** `pnpm --filter @workspace/api-server run build`
+* **Start Command:** `pnpm --filter @workspace/api-server run start`
+
+### ¿Por qué forzamos el Lockfile / pnpm@10.x.x?
+El `package.json` de la raíz ahora incluye el anclaje `"packageManager": "pnpm@10.32.1"`. Nixpacks (el compilador oficial de Railway) usa esto automáticamente para instalar exactamente esa versión de la herramienta y evitar así las disonancias en la versión o el `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Railway compilará con "frozen-lockfile" perfecto usando la misma firma que tus pruebas locales.
