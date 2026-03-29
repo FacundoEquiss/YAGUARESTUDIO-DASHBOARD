@@ -15,7 +15,8 @@ async function start() {
     await seedMasterAccount();
     console.log("Database seeded successfully");
   } catch (err) {
-    console.error("Seed error:", err);
+    console.error("Database initialization error:", err);
+    process.exit(1);
   }
 
   app.listen(port, () => {
