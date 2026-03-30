@@ -1,18 +1,25 @@
-import { db, subscriptionPlans, userSubscriptions } from "@workspace/db";
+import { db, subscriptionPlans, userSubscriptions, users } from "@workspace/db";
 import type { SubscriptionPlan } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { mpPreApproval } from "./mercadopago";
 
 const EXTERNAL_REFERENCE_PREFIX = "subscription";
 
-const PREAPPROVAL_PLANS: Record<string, string> = {
-  standard: "8b039046a1c04525ae701638863d2217",
-  premium: "334e828403a245d89b4dc0f24bd6e458",
+const PREAPPROVAL_PLANS: Record<string, { id: string; initPoint: string }> = {
+  standard: {
+    id: "8b039046a1c04525ae701638863d2217",
+    initPoint: "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=8b039046a1c04525ae701638863d2217",
+  },
+  premium: {
+    id: "334e828403a245d89b4dc0f24bd6e458",
+    initPoint: "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=334e828403a245d89b4dc0f24bd6e458",
+  },
 };
 
 export interface MercadoPagoCheckoutResult {
-  id: string;
+  id?: string;
   initPoint: string;
+  mode: "hosted_plan" | "preapproval";
 }
 
 export interface SubscriptionSyncResult {
@@ -24,28 +31,15 @@ export interface SubscriptionSyncResult {
   skipped?: boolean;
 }
 
-function normalizeOrigin(origin: string): string {
-  const trimmed = origin.trim().replace(/^["']|["']$/g, "");
-  if (!trimmed) {
-    throw new Error("FRONTEND_URL contiene un origen vacío");
-  }
-
-  const candidate = /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  return new URL(candidate).origin;
+function getPlanConfig(planSlug: string) {
+  return PREAPPROVAL_PLANS[planSlug];
 }
 
-function getPrimaryFrontendOrigin(): string {
-  const origin = (process.env.FRONTEND_URL || "")
-    .split(",")
-    .map(value => value.trim())
-    .filter(Boolean)
-    .map(normalizeOrigin)[0];
+function resolvePlanSlugFromPlanId(preapprovalPlanId?: string | null): string | null {
+  if (!preapprovalPlanId) return null;
 
-  if (!origin) {
-    throw new Error("FRONTEND_URL must be configured to create subscription checkout links");
-  }
-
-  return origin;
+  const found = Object.entries(PREAPPROVAL_PLANS).find(([, value]) => value.id === preapprovalPlanId);
+  return found?.[0] ?? null;
 }
 
 export function buildSubscriptionExternalReference(userId: number, planSlug: string): string {
@@ -138,35 +132,20 @@ export async function createMercadoPagoSubscriptionCheckout(args: {
 }): Promise<MercadoPagoCheckoutResult> {
   assertMercadoPagoConfigured();
 
-  const { userId, email, plan } = args;
+  const { plan } = args;
 
   if (plan.price <= 0) {
     throw new Error("El plan gratuito no requiere checkout");
   }
 
-  const preapprovalPlanId = PREAPPROVAL_PLANS[plan.slug];
-  if (!preapprovalPlanId) {
+  const planConfig = getPlanConfig(plan.slug);
+  if (!planConfig) {
     throw new Error(`El plan '${plan.name}' aún no está asociado a Mercado Pago.`);
   }
 
-  const response = await mpPreApproval.create({
-    body: {
-      reason: `${plan.name} - Yaguar Estudio`,
-      payer_email: email,
-      external_reference: buildSubscriptionExternalReference(userId, plan.slug),
-      back_url: `${getPrimaryFrontendOrigin()}/profile?billing=returned`,
-      preapproval_plan_id: preapprovalPlanId,
-      status: "pending",
-    },
-  });
-
-  if (!response.id || !response.init_point) {
-    throw new Error("Mercado Pago no devolvió una URL de checkout válida");
-  }
-
   return {
-    id: response.id,
-    initPoint: response.init_point,
+    initPoint: planConfig.initPoint,
+    mode: "hosted_plan",
   };
 }
 
@@ -176,32 +155,49 @@ export async function syncMercadoPagoPreapprovalById(
 ): Promise<SubscriptionSyncResult> {
   assertMercadoPagoConfigured();
 
-  const response = await mpPreApproval.get({ id: preapprovalId });
+  const response = await mpPreApproval.get({ id: preapprovalId }) as Awaited<ReturnType<typeof mpPreApproval.get>> & {
+    preapproval_plan_id?: string | null;
+    payer_email?: string | null;
+  };
   const parsedReference = parseSubscriptionExternalReference(response.external_reference);
+  const payerEmail = response.payer_email?.trim().toLowerCase() || null;
+  const fallbackPlanSlug = resolvePlanSlugFromPlanId(response.preapproval_plan_id);
 
-  if (!parsedReference) {
-    throw new Error(`External reference inválida para la suscripción ${preapprovalId}`);
+  let userId = parsedReference?.userId ?? null;
+  let planSlug = parsedReference?.planSlug ?? fallbackPlanSlug ?? null;
+
+  if (!userId && payerEmail) {
+    const [matchedUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, payerEmail));
+
+    userId = matchedUser?.id ?? null;
+  }
+
+  if (!userId || !planSlug) {
+    throw new Error(`No se pudo vincular la suscripción ${preapprovalId} con un usuario o plan local`);
   }
 
   const [plan] = await db
     .select()
     .from(subscriptionPlans)
-    .where(eq(subscriptionPlans.slug, parsedReference.planSlug));
+    .where(eq(subscriptionPlans.slug, planSlug));
 
   if (!plan) {
-    throw new Error(`Plan no encontrado para slug ${parsedReference.planSlug}`);
+    throw new Error(`Plan no encontrado para slug ${planSlug}`);
   }
 
   const [existing] = await db
     .select()
     .from(userSubscriptions)
-    .where(eq(userSubscriptions.userId, parsedReference.userId));
+    .where(eq(userSubscriptions.userId, userId));
 
   const notificationId = options?.notificationId;
   if (existing?.mpLastEventId && notificationId && existing.mpLastEventId === notificationId) {
     return {
-      userId: parsedReference.userId,
-      planSlug: parsedReference.planSlug,
+      userId,
+      planSlug,
       mpSubscriptionId: response.id || preapprovalId,
       mpStatus: (response.status || "pending").toLowerCase(),
       localStatus: existing.status,
@@ -229,8 +225,8 @@ export async function syncMercadoPagoPreapprovalById(
     }
 
     return {
-      userId: parsedReference.userId,
-      planSlug: parsedReference.planSlug,
+      userId,
+      planSlug,
       mpSubscriptionId,
       mpStatus,
       localStatus,
@@ -253,7 +249,7 @@ export async function syncMercadoPagoPreapprovalById(
       .where(eq(userSubscriptions.id, existing.id));
   } else {
     await db.insert(userSubscriptions).values({
-      userId: parsedReference.userId,
+      userId,
       planId: plan.id,
       status: localStatus,
       currentPeriodStart,
@@ -263,8 +259,8 @@ export async function syncMercadoPagoPreapprovalById(
   }
 
   return {
-    userId: parsedReference.userId,
-    planSlug: parsedReference.planSlug,
+    userId,
+    planSlug,
     mpSubscriptionId,
     mpStatus,
     localStatus,

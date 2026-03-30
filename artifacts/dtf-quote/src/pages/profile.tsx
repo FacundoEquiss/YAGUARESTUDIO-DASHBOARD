@@ -92,18 +92,63 @@ export function ProfilePage() {
     if (params.get("billing") !== "returned") return;
 
     const pendingPreapprovalId = window.sessionStorage.getItem("mp:pending-preapproval-id");
+    const pendingPlanSlug = window.sessionStorage.getItem("mp:pending-plan-slug");
     const cleanupUrl = () => {
       window.sessionStorage.removeItem("mp:pending-preapproval-id");
+      window.sessionStorage.removeItem("mp:pending-plan-slug");
       window.history.replaceState({}, document.title, "/profile");
     };
 
-    if (!pendingPreapprovalId) {
+    if (!pendingPreapprovalId && !pendingPlanSlug) {
       refreshSession().finally(cleanupUrl);
       return;
     }
 
     let cancelled = false;
     setSyncingSubscription(true);
+
+    const pollForWebhookSync = async () => {
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const [{ data }] = await Promise.all([
+          apiFetch<{ subscription: { planSlug?: string; status?: string } | null }>("/auth/me"),
+          refreshSession(),
+          refreshUsage(),
+        ]);
+
+        if (data?.subscription?.planSlug === pendingPlanSlug && data.subscription.status === "active") {
+          return "active";
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
+      return "pending";
+    };
+
+    if (!pendingPreapprovalId && pendingPlanSlug) {
+      pollForWebhookSync()
+        .then((status) => {
+          if (cancelled) return;
+
+          toast({
+            title: status === "active" ? "Suscripción activada" : "Suscripción en revisión",
+            description: status === "active"
+              ? "Tu plan quedó actualizado correctamente."
+              : "Mercado Pago devolvió el checkout, pero la activación todavía no está confirmada.",
+            variant: status === "active" ? "default" : "destructive",
+          });
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setSyncingSubscription(false);
+            cleanupUrl();
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
 
     apiFetch<{ result?: { localStatus?: string } }>("/subscription/sync", {
       method: "POST",

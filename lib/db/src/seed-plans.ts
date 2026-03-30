@@ -14,7 +14,7 @@ const PLANS: { name: string; slug: string; limits: PlanLimits; price: number }[]
     name: "Estándar",
     slug: "standard",
     limits: { dtfQuotes: 40, mockupPngs: 30, pdfExports: 25 },
-    price: 4990,
+    price: 7990,
   },
   {
     name: "Premium",
@@ -35,9 +35,20 @@ export async function seedPlans() {
       console.log(`Seeded plan: ${plan.name}`);
     } else {
       const dbPlan = existing[0];
-      if (dbPlan.price !== plan.price) {
-        await db.update(subscriptionPlans).set({ price: plan.price }).where(eq(subscriptionPlans.slug, plan.slug));
-        console.log(`Updated price for plan ${plan.name} from ${dbPlan.price} to ${plan.price}`);
+      const sameName = dbPlan.name === plan.name;
+      const samePrice = dbPlan.price === plan.price;
+      const sameLimits = JSON.stringify(dbPlan.limits) === JSON.stringify(plan.limits);
+
+      if (!sameName || !samePrice || !sameLimits) {
+        await db
+          .update(subscriptionPlans)
+          .set({
+            name: plan.name,
+            price: plan.price,
+            limits: plan.limits,
+          })
+          .where(eq(subscriptionPlans.slug, plan.slug));
+        console.log(`Updated plan ${plan.slug}`);
       }
     }
   }

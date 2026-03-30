@@ -101,7 +101,7 @@ export function UpgradePrompt({ open, onClose, feature, mode = "limit" }: Upgrad
   const handleUpgrade = async (planSlug: string) => {
     setError(null);
     setUpgrading(planSlug);
-    const { data, error } = await apiFetch<{ checkout: { id: string; initPoint: string } }>(
+    const { data, error } = await apiFetch<{ checkout: { id?: string; initPoint: string; mode?: "hosted_plan" | "preapproval" } }>(
       "/subscription/checkout",
       {
         method: "POST",
@@ -115,8 +115,13 @@ export function UpgradePrompt({ open, onClose, feature, mode = "limit" }: Upgrad
       return;
     }
 
-    if (data?.checkout?.initPoint && data.checkout.id) {
-      window.sessionStorage.setItem("mp:pending-preapproval-id", data.checkout.id);
+    if (data?.checkout?.initPoint) {
+      if (data.checkout.mode === "preapproval" && data.checkout.id) {
+        window.sessionStorage.setItem("mp:pending-preapproval-id", data.checkout.id);
+      } else {
+        window.sessionStorage.removeItem("mp:pending-preapproval-id");
+        window.sessionStorage.setItem("mp:pending-plan-slug", planSlug);
+      }
       window.location.href = data.checkout.initPoint;
       return;
     }

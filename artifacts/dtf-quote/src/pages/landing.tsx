@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 
 interface PlanLimits {
   dtfQuotes: number;
@@ -92,14 +93,15 @@ const fadeUp = {
 
 const FALLBACK_PLANS: ApiPlan[] = [
   { id: 1, name: "Gratis", slug: "free", limits: { dtfQuotes: 10, mockupPngs: 5, pdfExports: 3 }, price: 0, isActive: true },
-  { id: 2, name: "Estándar", slug: "standard", limits: { dtfQuotes: 40, mockupPngs: 30, pdfExports: 25 }, price: 4990, isActive: true },
-  { id: 3, name: "Premium", slug: "premium", limits: { dtfQuotes: -1, mockupPngs: -1, pdfExports: -1 }, price: 9990, isActive: true },
+  { id: 2, name: "Estándar", slug: "standard", limits: { dtfQuotes: 40, mockupPngs: 30, pdfExports: 25 }, price: 7990, isActive: true },
+  { id: 3, name: "Premium", slug: "premium", limits: { dtfQuotes: -1, mockupPngs: -1, pdfExports: -1 }, price: 14990, isActive: true },
 ];
 
 export function LandingPage() {
   const [, setLocation] = useLocation();
   const { currentUser, subscription } = useAuth();
   const [plans, setPlans] = useState<ApiPlan[]>(FALLBACK_PLANS);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   useEffect(() => {
     apiFetch<{ plans: ApiPlan[] }>("/subscription/plans").then(({ data }) => {
@@ -312,7 +314,7 @@ export function LandingPage() {
                         <button
                           onClick={() => {
                             if (isLoggedIn) {
-                              setLocation("/profile");
+                              setShowUpgrade(true);
                             } else {
                               setLocation("/auth?tab=register");
                             }
@@ -417,6 +419,13 @@ export function LandingPage() {
             </p>
           </div>
         </footer>
+
+        <UpgradePrompt
+          open={showUpgrade}
+          onClose={() => setShowUpgrade(false)}
+          feature="herramientas y límites"
+          mode="plans"
+        />
     </>
   );
 }
