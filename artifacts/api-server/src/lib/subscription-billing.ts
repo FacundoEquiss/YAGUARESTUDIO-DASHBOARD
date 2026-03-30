@@ -26,6 +26,19 @@ export interface SubscriptionSyncResult {
   skipped?: boolean;
 }
 
+function normalizeOrigin(origin?: string | null): string | null {
+  const trimmed = origin?.trim().replace(/^["']|["']$/g, "");
+  if (!trimmed) return null;
+
+  const candidate = /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    return new URL(candidate).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+}
+
 function extractPlanIdFromInput(value?: string | null): string | null {
   const normalized = value?.trim();
   if (!normalized) return null;
@@ -44,6 +57,19 @@ function extractPlanIdFromInput(value?: string | null): string | null {
 
 function buildHostedPlanUrl(planId: string): string {
   return `https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=${planId}`;
+}
+
+function resolveSubscriptionBackUrl(): string | null {
+  const frontendOrigin = (env.frontendUrl || "")
+    .split(",")
+    .map(normalizeOrigin)
+    .find((origin): origin is string => Boolean(origin));
+
+  if (!frontendOrigin) {
+    return null;
+  }
+
+  return `${frontendOrigin}/profile?billing=returned`;
 }
 
 function getPlanConfig(planSlug: string) {
@@ -184,9 +210,32 @@ export async function createMercadoPagoSubscriptionCheckout(args: {
     throw new Error(`El plan '${plan.name}' aún no está asociado a Mercado Pago.`);
   }
 
+  const backUrl = resolveSubscriptionBackUrl();
+  if (!backUrl) {
+    throw new Error("FRONTEND_URL no permite construir el retorno desde Mercado Pago.");
+  }
+
+  const response = await mpPreApproval.create({
+    body: {
+      preapproval_plan_id: planConfig.id,
+      payer_email: args.email.trim().toLowerCase(),
+      external_reference: buildSubscriptionExternalReference(args.userId, plan.slug),
+      back_url: backUrl,
+      status: "pending",
+    },
+  });
+
+  const initPoint = response.init_point?.trim();
+  const id = response.id?.trim();
+
+  if (!initPoint || !id) {
+    throw new Error("Mercado Pago no devolvió una suscripción válida para continuar el checkout.");
+  }
+
   return {
-    initPoint: planConfig.initPoint,
-    mode: "hosted_plan",
+    id,
+    initPoint,
+    mode: "preapproval",
   };
 }
 

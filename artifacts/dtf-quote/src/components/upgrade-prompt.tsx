@@ -118,6 +118,7 @@ export function UpgradePrompt({ open, onClose, feature, mode = "limit" }: Upgrad
     if (data?.checkout?.initPoint) {
       if (data.checkout.mode === "preapproval" && data.checkout.id) {
         window.sessionStorage.setItem("mp:pending-preapproval-id", data.checkout.id);
+        window.sessionStorage.setItem("mp:pending-plan-slug", planSlug);
       } else {
         window.sessionStorage.removeItem("mp:pending-preapproval-id");
         window.sessionStorage.setItem("mp:pending-plan-slug", planSlug);

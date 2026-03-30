@@ -158,6 +158,21 @@ export function ProfilePage() {
         if (cancelled) return;
 
         if (error) {
+          if (pendingPlanSlug) {
+            const status = await pollForWebhookSync();
+
+            if (cancelled) return;
+
+            toast({
+              title: status === "active" ? "Suscripción activada" : "Suscripción pendiente",
+              description: status === "active"
+                ? "Tu plan quedó actualizado correctamente."
+                : "Volvimos de Mercado Pago, pero la activación todavía no se pudo confirmar.",
+              variant: status === "active" ? "default" : "destructive",
+            });
+            return;
+          }
+
           toast({
             title: "Suscripción pendiente",
             description: "Volvimos de Mercado Pago, pero todavía no se pudo confirmar el estado de tu plan.",
@@ -175,9 +190,16 @@ export function ProfilePage() {
             description: "Tu plan quedó actualizado correctamente.",
           });
         } else {
+          const status = pendingPlanSlug ? await pollForWebhookSync() : "pending";
+
+          if (cancelled) return;
+
           toast({
-            title: "Suscripción en revisión",
-            description: "Mercado Pago devolvió el checkout, pero la activación todavía no está confirmada.",
+            title: status === "active" ? "Suscripción activada" : "Suscripción en revisión",
+            description: status === "active"
+              ? "Tu plan quedó actualizado correctamente."
+              : "Mercado Pago devolvió el checkout, pero la activación todavía no está confirmada.",
+            variant: status === "active" ? "default" : "destructive",
           });
         }
       })
