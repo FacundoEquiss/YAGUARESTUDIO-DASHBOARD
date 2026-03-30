@@ -135,6 +135,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <span className="text-[11px] font-medium text-muted-foreground mt-1">by Yaguar Estudio</span>
         </Link>
         <button
+          type="button"
+          aria-label="Cerrar menú lateral"
           onClick={onClose}
           className="sm:hidden p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground"
         >
@@ -173,8 +175,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           {/* iPhone switch */}
           <button
+            type="button"
             role="switch"
             aria-checked={theme === "dark"}
+            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className={cn(
               "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",

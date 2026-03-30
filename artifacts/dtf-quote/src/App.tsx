@@ -36,9 +36,15 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
+function sanitizeNextPath(rawNext: string | null): string {
+  if (!rawNext || !rawNext.startsWith("/")) return "/dashboard";
+  if (rawNext.startsWith("//")) return "/dashboard";
+  return rawNext;
+}
+
 function AuthRedirect() {
   const params = new URLSearchParams(window.location.search);
-  const next = params.get("next") || "/dashboard";
+  const next = sanitizeNextPath(params.get("next"));
   return <Redirect to={next} />;
 }
 
@@ -46,7 +52,7 @@ function ProtectedRedirect() {
   const [location] = useLocation();
   const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/support", "/profile", "/orders", "/clients", "/suppliers", "/finance", "/reports", "/accounts"];
   const next = validPaths.includes(location) ? location : "/dashboard";
-  return <Redirect to={`/auth?next=${next}`} />;
+  return <Redirect to={`/auth?next=${encodeURIComponent(next)}`} />;
 }
 
 function Router() {
