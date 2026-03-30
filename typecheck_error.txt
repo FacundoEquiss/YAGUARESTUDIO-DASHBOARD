@@ -1,8 +1,0 @@
-
-> @workspace/api-server@0.0.0 typecheck C:\Users\Ceska\OneDrive\Escritorio\Programacion\SUPER SISTEMA YAGUAR ESTUDIO\ReplitExport-yaguarestudio\DTF-Optimizer\artifacts\api-server
-> tsc -p tsconfig.json --noEmit
-
-src/routes/feedback.ts(4,10): error TS2305: Module '"@workspace/db/schema"' has no exported member 'feedbacks'.
-C:\Users\Ceska\OneDrive\Escritorio\Programacion\SUPER SISTEMA YAGUAR ESTUDIO\ReplitExport-yaguarestudio\DTF-Optimizer\artifacts\api-server:
-ÔÇëERR_PNPM_RECURSIVE_RUN_FIRST_FAILÔÇë @workspace/api-server@0.0.0 typecheck: `tsc -p tsconfig.json --noEmit`
-Exit status 2

@@ -21,51 +21,50 @@ export function SidebarActions() {
   }
 
   return (
-    <div className="flex flex-col gap-1 w-full pt-4">
-      <div className="px-3 mb-2">
-        <span className="text-xs font-medium text-muted-foreground tracking-wider uppercase">
+    <div className="flex flex-col gap-0.5 w-full">
+      <div className="px-3 mb-1">
+        <span className="text-[10px] font-bold text-muted-foreground/60 tracking-widest uppercase">
           Support
         </span>
       </div>
 
       <button
         onClick={handleFeedbackClick}
-        className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+        className="flex items-center gap-2.5 px-3 py-1.5 text-sm font-medium rounded-lg text-foreground/70 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/8 transition-colors text-left w-full"
       >
-        <MessageSquare className="h-4 w-4 shrink-0" />
+        <MessageSquare className="h-[16px] w-[16px] shrink-0" />
         <span>Feedback</span>
       </button>
 
       <Link href="/support">
         <a className={cn(
-          "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+          "flex items-center gap-2.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
           location === "/support"
-            ? "bg-sidebar-accent text-sidebar-foreground"
-            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            ? "bg-primary/10 text-primary"
+            : "text-foreground/70 hover:bg-black/5 dark:hover:bg-white/8 hover:text-foreground"
         )}>
-          <HeadphonesIcon className="h-4 w-4 shrink-0" />
+          <HeadphonesIcon className="h-[16px] w-[16px] shrink-0" />
           <span>Help & Support</span>
         </a>
       </Link>
 
       <Link href="/settings">
         <a className={cn(
-          "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+          "flex items-center gap-2.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
           location === "/settings"
-            ? "bg-sidebar-accent text-sidebar-foreground"
-            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            ? "bg-primary/10 text-primary"
+            : "text-foreground/70 hover:bg-black/5 dark:hover:bg-white/8 hover:text-foreground"
         )}>
-          <Settings className="h-4 w-4 shrink-0" />
+          <Settings className="h-[16px] w-[16px] shrink-0" />
           <span>Settings</span>
         </a>
       </Link>
 
-      {/* User angular card mimicking SaaS style */}
-      <div className="mt-2 pt-2 border-t border-border/50">
+      {/* User card */}
+      <div className="mt-1.5 pt-1.5 border-t border-black/8 dark:border-white/5">
         <UserCard />
       </div>
 
-      {/* Modal is rendered out of normal UI flow */}
       <FeedbackModal isOpen={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />
     </div>
   );

@@ -35,28 +35,28 @@ export function UserCard() {
         <div
           role="button"
           tabIndex={0}
-          className="flex items-center gap-3 w-full p-2.5 rounded-xl border border-transparent hover:border-border hover:bg-muted/30 transition-all duration-200 cursor-pointer group mt-4 overflow-hidden"
+          className="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all duration-200 cursor-pointer group overflow-hidden"
         >
           <div className="relative shrink-0">
-            <Avatar className="h-10 w-10 border border-border bg-background">
+            <Avatar className="h-7 w-7 border border-border bg-background">
               <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${displayName}`} />
-              <AvatarFallback className="text-sm font-medium">
+              <AvatarFallback className="text-xs font-medium">
                 {getInitials(displayName)}
               </AvatarFallback>
             </Avatar>
-            <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-green-500" />
           </div>
 
-          <div className="flex-1 overflow-hidden flex flex-col items-start gap-0.5 min-w-0">
-            <span className="text-sm font-semibold truncate leading-tight w-full text-left">
+          <div className="flex-1 overflow-hidden flex flex-col items-start gap-0 min-w-0">
+            <span className="text-[13px] font-semibold truncate leading-tight w-full text-left">
               {displayName}
             </span>
-            <span className="text-xs text-muted-foreground truncate w-full leading-tight text-left">
+            <span className="text-[11px] text-muted-foreground truncate w-full leading-tight text-left">
               {currentUser.email}
             </span>
           </div>
 
-          <ChevronsUpDown className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
+          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
         </div>
       </DropdownMenuTrigger>
       

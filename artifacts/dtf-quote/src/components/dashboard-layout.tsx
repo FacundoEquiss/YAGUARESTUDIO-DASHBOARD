@@ -50,7 +50,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-40 h-14 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-white/5 backdrop-blur-xl bg-gray-950/40">
+          <header className="sticky top-0 z-40 h-12 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-border bg-background/95 backdrop-blur-md">
             <button
               onClick={() => setSidebarOpen(true)}
               className="sm:hidden p-2 -ml-2 rounded-xl hover:bg-white/8 text-muted-foreground"
