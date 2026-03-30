@@ -4,7 +4,11 @@ import { eq } from "drizzle-orm";
 import { mpPreApproval } from "./mercadopago";
 
 const EXTERNAL_REFERENCE_PREFIX = "subscription";
-const DEFAULT_CURRENCY_ID = "ARS";
+
+const PREAPPROVAL_PLANS: Record<string, string> = {
+  standard: "8b039046a1c04525ae701638863d2217",
+  premium: "334e828403a245d89b4dc0f24bd6e458",
+};
 
 export interface MercadoPagoCheckoutResult {
   id: string;
@@ -42,10 +46,6 @@ function getPrimaryFrontendOrigin(): string {
   }
 
   return origin;
-}
-
-function getCurrencyId(): string {
-  return process.env.MP_CURRENCY_ID || DEFAULT_CURRENCY_ID;
 }
 
 export function buildSubscriptionExternalReference(userId: number, planSlug: string): string {
@@ -144,18 +144,18 @@ export async function createMercadoPagoSubscriptionCheckout(args: {
     throw new Error("El plan gratuito no requiere checkout");
   }
 
+  const preapprovalPlanId = PREAPPROVAL_PLANS[plan.slug];
+  if (!preapprovalPlanId) {
+    throw new Error(`El plan '${plan.name}' aún no está asociado a Mercado Pago.`);
+  }
+
   const response = await mpPreApproval.create({
     body: {
       reason: `${plan.name} - Yaguar Estudio`,
       payer_email: email,
       external_reference: buildSubscriptionExternalReference(userId, plan.slug),
       back_url: `${getPrimaryFrontendOrigin()}/profile?billing=returned`,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: "months",
-        transaction_amount: plan.price,
-        currency_id: getCurrencyId(),
-      },
+      preapproval_plan_id: preapprovalPlanId,
       status: "pending",
     },
   });
