@@ -21,7 +21,7 @@ function buildWhatsAppMessage(q: Quote): string {
     })
     .join("\n");
 
-  let msg = `*Cotización DTF - YAGUAR ESTUDIO*\n`;
+  let msg = `*Cotización DTF - Trazo by YAGUAR ESTUDIO*\n`;
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   msg += `👤 Cliente: ${q.clientName}\n`;
   if (q.orderName) msg += `📦 Pedido: ${q.orderName}\n`;
@@ -34,7 +34,7 @@ function buildWhatsAppMessage(q: Quote): string {
   if (q.talleEnabled) msg += `📐 Incluye talle: Sí\n`;
   if (q.pricePerGarment) msg += `💰 Precio por prenda: ${formatCurrency(q.pricePerGarment)}\n`;
   msg += `\n*TOTAL PEDIDO: ${formatCurrency(q.totalPrice)}*\n`;
-  msg += `\n_Cotizado con Cotizador DTF by YAGUAR ESTUDIO_`;
+  msg += `\n_Cotizado con Trazo by YAGUAR ESTUDIO_`;
   return msg;
 }
 

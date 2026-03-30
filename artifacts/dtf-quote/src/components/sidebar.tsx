@@ -123,10 +123,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <Link
           href="/dashboard"
           onClick={handleNavigate}
-          className="flex items-center gap-1 cursor-pointer"
+          className="flex flex-col items-start leading-none cursor-pointer"
         >
-          <span className="text-lg font-display font-black text-primary">YAGUAR</span>
-          <span className="text-lg font-display font-light text-foreground">ESTUDIO</span>
+          <span className="text-lg font-display font-black text-primary">TRAZO</span>
+          <span className="text-[11px] font-medium text-muted-foreground mt-1">by Yaguar Estudio</span>
         </Link>
         <button
           onClick={onClose}

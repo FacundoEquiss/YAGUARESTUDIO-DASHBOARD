@@ -23,8 +23,8 @@ function getNextRoute(): string {
 }
 
 const PAGE_LABELS: Record<string, string> = {
-  "/dashboard": "YAGUAR ESTUDIO",
-  "/app": "Cotizador DTF",
+  "/dashboard": "TRAZO",
+  "/app": "TRAZO",
   "/mockups": "Generador de Mockups",
   "/history": "Historial",
   "/profile": "Mi Perfil",
@@ -41,7 +41,7 @@ export function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   const nextRoute = getNextRoute();
-  const pageLabel = PAGE_LABELS[nextRoute] || "YAGUAR ESTUDIO";
+  const pageLabel = PAGE_LABELS[nextRoute] || "TRAZO";
 
   const handleSuccess = () => {
     setLocation(nextRoute);
@@ -98,7 +98,7 @@ export function AuthPage() {
           <div className="mb-8">
             <h1 className="text-4xl font-display font-bold text-primary">{pageLabel}</h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              powered by <span className="font-black text-foreground">YAGUAR</span> ESTUDIO
+              <span className="font-black text-foreground">Trazo</span> by Yaguar Estudio
             </p>
           </div>
 

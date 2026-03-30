@@ -51,7 +51,7 @@ function buildWhatsAppFromCalc(params: {
 
   const date = format(new Date(), "d 'de' MMMM, yyyy", { locale: es });
 
-  let msg = `*Cotización DTF - YAGUAR ESTUDIO*\n`;
+  let msg = `*Cotización DTF - Trazo by YAGUAR ESTUDIO*\n`;
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   if (params.clientName) msg += `👤 Cliente: ${params.clientName}\n`;
   if (params.orderName) msg += `📦 Pedido: ${params.orderName}\n`;
@@ -71,7 +71,7 @@ function buildWhatsAppFromCalc(params: {
     msg += `💰 Precio por prenda: ${formatCurrency(params.pricePerGarment)}\n`;
     msg += `\n*TOTAL PEDIDO: ${formatCurrency(params.totalOrder)}*\n`;
   }
-  msg += `\n_Cotizado con Cotizador DTF by YAGUAR ESTUDIO_`;
+  msg += `\n_Cotizado con Trazo by YAGUAR ESTUDIO_`;
   return msg;
 }
 
@@ -249,7 +249,7 @@ export function CalculatorPage() {
           Cotizador DTF
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          powered by <span className="font-black">YAGUAR</span> ESTUDIO
+          <span className="font-black">Trazo</span> by Yaguar Estudio
         </p>
       </div>
 
