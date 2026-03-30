@@ -6,8 +6,8 @@ import { mpPreApproval } from "./mercadopago";
 const EXTERNAL_REFERENCE_PREFIX = "subscription";
 
 const DEFAULT_PREAPPROVAL_PLAN_INPUTS: Record<string, string> = {
-  standard: "60aec72878fc43a5bf6ddecd696b86ce",
-  premium: "9f8924a625164247a86365d6dcf8a904",
+  standard: "8b039046a1c04525ae701638863d2217",
+  premium: "334e828403a245d89b4dc0f24bd6e458",
 };
 
 export interface MercadoPagoCheckoutResult {
