@@ -3,16 +3,12 @@ import bcrypt from "bcryptjs";
 import { db, users, subscriptionPlans, userSubscriptions } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { signToken, requireAuth } from "../middleware/auth";
+import { env } from "../env";
 
 const authRouter = Router();
 
 function isSecureCookieEnvironment(): boolean {
-  return (
-    process.env.NODE_ENV === "production" ||
-    process.env.RAILWAY_ENVIRONMENT_NAME !== undefined ||
-    process.env.RAILWAY_PUBLIC_DOMAIN !== undefined ||
-    process.env.RENDER !== undefined
-  );
+  return env.isHosted;
 }
 
 function getAuthCookieOptions() {
@@ -27,9 +23,9 @@ function getAuthCookieOptions() {
 }
 
 export async function seedMasterAccount() {
-  const masterEmail = process.env.MASTER_EMAIL;
-  const masterPassword = process.env.MASTER_PASSWORD;
-  const masterName = process.env.MASTER_NAME ?? "YAGUAR ESTUDIO";
+  const masterEmail = env.masterEmail;
+  const masterPassword = env.masterPassword;
+  const masterName = env.masterName;
 
   if (!masterEmail || !masterPassword) {
     console.warn(

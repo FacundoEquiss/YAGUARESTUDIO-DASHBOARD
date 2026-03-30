@@ -52,6 +52,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="sticky top-0 z-40 h-12 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-border bg-background/95 backdrop-blur-md">
             <button
+              type="button"
+              aria-label="Abrir menú lateral"
               onClick={() => setSidebarOpen(true)}
               className="sm:hidden p-2 -ml-2 rounded-xl hover:bg-white/8 text-muted-foreground"
             >
@@ -66,10 +68,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             <div className="flex-1" />
 
-            <button className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors" title="Buscar">
+            <button type="button" aria-label="Buscar" className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors" title="Buscar">
               <Search className="w-[18px] h-[18px]" />
             </button>
-            <button className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors relative" title="Notificaciones">
+            <button type="button" aria-label="Notificaciones" className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors relative" title="Notificaciones">
               <Bell className="w-[18px] h-[18px]" />
             </button>
             <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary">

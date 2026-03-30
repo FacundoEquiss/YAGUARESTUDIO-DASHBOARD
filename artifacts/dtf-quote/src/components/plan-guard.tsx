@@ -18,7 +18,7 @@ export function PlanGuard({ feature, featureLabel, children }: PlanGuardProps) {
   const isGuest = currentUser?.role === "guest";
   const isMaster = currentUser?.role === "master";
 
-  if (isMaster || isGuest) {
+  if (isMaster) {
     return <>{children}</>;
   }
 

@@ -14,6 +14,7 @@ import { useUsage } from "@/hooks/use-usage";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { ToolSessionGate } from "@/components/tool-session-gate";
 import { AnimatePresence } from "framer-motion";
 
 interface DesignLayer {
@@ -213,6 +214,8 @@ export function MockupsPage() {
   const [exporting, setExporting] = useState(false);
   const [mobileTab, setMobileTab] = useState<"front" | "back">("front");
   const [brandName, setBrandName] = useState("");
+  const [mockupSessionStarted, setMockupSessionStarted] = useState(false);
+  const [startingMockupSession, setStartingMockupSession] = useState(false);
 
   const frontStageRef = useRef<Konva.Stage>(null);
   const backStageRef = useRef<Konva.Stage>(null);
@@ -224,9 +227,11 @@ export function MockupsPage() {
   const frontImg = useLoadedImage(frontImgSrc);
   const backImg = useLoadedImage(backImgSrc);
 
-  const { canUse, increment } = useUsage();
+  const { canUse, increment, remaining } = useUsage();
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const isMaster = currentUser?.role === "master";
+  const isMockupSessionUnlocked = isMaster || mockupSessionStarted;
 
   const frontLayers = useMemo(() => layers.filter((l) => l.side === "front"), [layers]);
   const backLayers = useMemo(() => layers.filter((l) => l.side === "back"), [layers]);
@@ -351,13 +356,49 @@ export function MockupsPage() {
   const handleResetAll = useCallback(() => {
     setLayers([]);
     setSelectedLayerId(null);
+    setMockupSessionStarted(false);
   }, []);
+
+  const handleStartMockupSession = useCallback(async () => {
+    if (isMockupSessionUnlocked) {
+      return;
+    }
+
+    if (!canUse("mockup_pngs")) {
+      setShowUpgrade(true);
+      return;
+    }
+
+    setStartingMockupSession(true);
+    const sessionId = `mockup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ok = await increment("mockup_pngs", {
+      source: "mockups",
+      stage: "tool_unlock",
+      sessionId,
+    });
+    setStartingMockupSession(false);
+
+    if (!ok) {
+      setShowUpgrade(true);
+      return;
+    }
+
+    setMockupSessionStarted(true);
+    toast({
+      title: "Edición iniciada",
+      description: "Ya podés cargar, editar y exportar este mockup.",
+    });
+  }, [canUse, increment, isMockupSessionUnlocked, toast]);
 
   const handleExport = useCallback(async () => {
     if (!frontStageRef.current || !backStageRef.current) return;
 
-    if (!canUse("mockup_pngs")) {
-      setShowUpgrade(true);
+    if (!isMockupSessionUnlocked) {
+      toast({
+        title: "Primero iniciá la edición",
+        description: "Así registramos el uso y desbloqueamos la herramienta.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -423,13 +464,6 @@ export function MockupsPage() {
       ctx.fillText("FRENTE", imgW / 2, totalH - 30);
       ctx.fillText("ESPALDA", imgW + centerW + imgW / 2, totalH - 30);
 
-      const ok = await increment("mockup_pngs");
-      if (!ok) {
-        setShowUpgrade(true);
-        setExporting(false);
-        return;
-      }
-
       const link = document.createElement("a");
       link.download = `mockup-${selectedTemplate.id}-${selectedColor.id}-${Date.now()}.png`;
       link.href = exportCanvas.toDataURL("image/png");
@@ -437,12 +471,13 @@ export function MockupsPage() {
       link.click();
       document.body.removeChild(link);
 
+      setMockupSessionStarted(false);
       toast({ title: "Mockup exportado", description: "Se descargó la imagen con frente y espalda" });
     } catch (err) {
       toast({ title: "Error al exportar", description: "No se pudo generar la imagen", variant: "destructive" });
     }
     setExporting(false);
-  }, [canUse, increment, selectedTemplate, selectedColor, brandName, currentUser, toast]);
+  }, [isMockupSessionUnlocked, selectedTemplate, selectedColor, brandName, currentUser, toast]);
 
   const openFileInput = useCallback((side: "front" | "back") => {
     fileInputSideRef.current = side;
@@ -459,6 +494,20 @@ export function MockupsPage() {
         )}
       </AnimatePresence>
 
+      {!isMockupSessionUnlocked && (
+        <div className="mb-4">
+          <ToolSessionGate
+            title="Iniciar edición de mockup"
+            description="Cuando la inicies, se habilitan las cargas, ediciones y la exportación, y se descuenta 1 uso del plan."
+            buttonLabel="Iniciar edición de mockup"
+            remaining={remaining.mockupPngs}
+            loading={startingMockupSession}
+            onStart={() => void handleStartMockupSession()}
+          />
+        </div>
+      )}
+
+      <div className={isMockupSessionUnlocked ? "" : "pointer-events-none select-none opacity-40 blur-[1px]"}>
       <div className="mockup-header">
         <div>
           <h1 className="mockup-title">Generador de Mockups</h1>
@@ -761,6 +810,7 @@ export function MockupsPage() {
       </div>
 
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+      </div>
 
       <style>{mockupStyles}</style>
     </div>

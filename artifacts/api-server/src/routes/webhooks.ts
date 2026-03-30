@@ -1,5 +1,10 @@
 import { Router, Request, Response } from "express";
 import { syncMercadoPagoPreapprovalById } from "../lib/subscription-billing";
+import { env } from "../env";
+import {
+  getMercadoPagoResourceId,
+  verifyMercadoPagoWebhookSignature,
+} from "../lib/mercadopago-webhook";
 
 const webhooksRouter = Router();
 
@@ -38,25 +43,35 @@ function isMercadoPagoSubscriptionEvent(type?: string, topic?: string, action?: 
 
 webhooksRouter.post("/mercadopago", async (req: Request, res: Response) => {
   try {
-    const { type, data } = req.body as {
+    const { type } = req.body as {
       type?: string;
       data?: { id?: string | number };
       action?: string;
     };
     const action = String(req.query.topic || req.body.action || "");
     const eventId = getWebhookEventId(req);
-    const resourceId = data?.id !== undefined && data?.id !== null ? String(data.id) : undefined;
+    const resourceId = getMercadoPagoResourceId({
+      body: req.body,
+      query: req.query,
+    });
 
-    // TODO: En producción estricta, validar firma x-signature con MP_WEBHOOK_SECRET
-    // https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
-    const signature = req.headers["x-signature"];
-    const mpSecret = process.env.MP_WEBHOOK_SECRET;
+    if (env.mpWebhookSecret) {
+      const verification = verifyMercadoPagoWebhookSignature({
+        secret: env.mpWebhookSecret,
+        header: req.headers["x-signature"],
+        headers: req.headers,
+        query: req.query,
+      });
 
-    if (mpSecret && signature) {
-      // Implementar la validación de firma aquí
-      // const manifest = ...
-      // const expectedSignature = crypto.createHmac("sha256", mpSecret).update(manifest).digest("hex");
-      // if (signature !== expectedSignature) throw new Error("Firma inválida");
+      if (!verification.valid) {
+        console.warn("[Webhook MP] Firma invalida", {
+          eventId,
+          reason: verification.reason,
+          topic: req.query.topic,
+        });
+        res.status(401).json({ error: "Invalid webhook signature" });
+        return;
+      }
     }
 
     console.log("[Webhook MP] Evento recibido", {
@@ -79,8 +94,7 @@ webhooksRouter.post("/mercadopago", async (req: Request, res: Response) => {
     res.status(200).send("OK");
   } catch (error) {
     console.error("[Webhook MP] Error procesando evento:", error);
-    // Retornamos 200 siempre a MP a menos que haya un reintento forzoso para evitar penalizaciones
-    res.status(200).send("Internal Error Processed");
+    res.status(500).send("Internal Error");
   }
 });
 

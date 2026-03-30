@@ -1,15 +1,14 @@
-import app from "./app";
-import { seedMasterAccount } from "./routes/auth";
-import { seedPlans } from "@workspace/db/seed-plans";
-
-const rawPort = process.env.PORT || "8080";
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
+import { env, logStartupWarnings } from "./env";
 
 async function start() {
+  logStartupWarnings();
+
+  const [{ default: app }, { seedMasterAccount }, { seedPlans }] = await Promise.all([
+    import("./app"),
+    import("./routes/auth"),
+    import("@workspace/db/seed-plans"),
+  ]);
+
   try {
     await seedPlans();
     await seedMasterAccount();
@@ -19,8 +18,8 @@ async function start() {
     process.exit(1);
   }
 
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
+  app.listen(env.port, () => {
+    console.log(`Server listening on port ${env.port}`);
   });
 }
 

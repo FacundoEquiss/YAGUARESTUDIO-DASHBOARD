@@ -14,13 +14,16 @@ export interface UsageLimits {
   pdfExports: number;
 }
 
+type UsageType = "dtf_quotes" | "mockup_pngs" | "pdf_exports";
+type UsageMetadata = Record<string, unknown>;
+
 interface UsageContextValue {
   usage: UsageData;
   limits: UsageLimits;
   remaining: UsageData;
   loading: boolean;
-  canUse: (type: "dtf_quotes" | "mockup_pngs" | "pdf_exports") => boolean;
-  increment: (type: "dtf_quotes" | "mockup_pngs" | "pdf_exports") => Promise<boolean>;
+  canUse: (type: UsageType) => boolean;
+  increment: (type: UsageType, metadata?: UsageMetadata) => Promise<boolean>;
   refresh: () => Promise<void>;
 }
 
@@ -62,20 +65,22 @@ export function UsageProvider({ children }: { children: ReactNode }) {
   }, [currentUser, isGuest, isMaster, refresh]);
 
   const canUse = useCallback(
-    (type: "dtf_quotes" | "mockup_pngs" | "pdf_exports") => {
-      if (isGuest || isMaster) return true;
+    (type: UsageType) => {
+      if (isMaster) return true;
+      if (!currentUser || isGuest) return false;
       const key = type === "dtf_quotes" ? "dtfQuotes" : type === "mockup_pngs" ? "mockupPngs" : "pdfExports";
       return limits[key] === -1 || remaining[key] > 0;
     },
-    [isGuest, isMaster, limits, remaining]
+    [currentUser, isGuest, isMaster, limits, remaining]
   );
 
   const increment = useCallback(
-    async (type: "dtf_quotes" | "mockup_pngs" | "pdf_exports"): Promise<boolean> => {
-      if (isGuest || isMaster) return true;
+    async (type: UsageType, metadata?: UsageMetadata): Promise<boolean> => {
+      if (isMaster) return true;
+      if (!currentUser || isGuest) return false;
       const { data, error } = await apiFetch<{ current: number; limit: number; remaining: number }>(
         "/usage/increment",
-        { method: "POST", body: JSON.stringify({ type }) }
+        { method: "POST", body: JSON.stringify({ type, metadata }) }
       );
       if (error) return false;
       if (data) {
@@ -85,7 +90,7 @@ export function UsageProvider({ children }: { children: ReactNode }) {
       }
       return true;
     },
-    [isGuest, isMaster]
+    [currentUser, isGuest, isMaster]
   );
 
   return (

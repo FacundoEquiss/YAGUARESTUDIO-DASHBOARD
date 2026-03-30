@@ -39,6 +39,8 @@ interface NavItem {
   external?: boolean;
 }
 
+const SHOW_COMING_SOON_IN_SIDEBAR = false;
+
 const MAIN_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: true },
   { href: "/orders", label: "Pedidos", icon: ClipboardList, ready: true },
@@ -52,7 +54,7 @@ const TOOLS_NAV: NavItem[] = [
   { href: "/history", label: "Historial", icon: FileText, ready: true },
   { href: "/bg-remover", label: "Quita Fondos", icon: Scissors, ready: false },
   { href: "/blog", label: "Blog", icon: BookOpen, ready: false },
-];
+].filter((item) => item.ready || SHOW_COMING_SOON_IN_SIDEBAR);
 
 const FINANCE_NAV: NavItem[] = [
   { href: "/finance", label: "Ingresos / Gastos", icon: DollarSign, ready: true },
@@ -135,6 +137,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <span className="text-[11px] font-medium text-muted-foreground mt-1">by Yaguar Estudio</span>
         </Link>
         <button
+          type="button"
+          aria-label="Cerrar menú lateral"
           onClick={onClose}
           className="sm:hidden p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground"
         >
@@ -173,8 +177,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           {/* iPhone switch */}
           <button
+            type="button"
             role="switch"
             aria-checked={theme === "dark"}
+            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className={cn(
               "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",

@@ -52,8 +52,8 @@ function apiPlanToDisplay(p: ApiPlan): DisplayPlan {
     price: p.price,
     features: [
       formatLimit(p.limits.dtfQuotes, "cotizaciones"),
-      formatLimit(p.limits.mockupPngs, "mockups PNG"),
-      formatLimit(p.limits.pdfExports, "fichas PDF"),
+      formatLimit(p.limits.mockupPngs, "sesiones de mockup"),
+      formatLimit(p.limits.pdfExports, "exportaciones PDF"),
     ],
     color: colors[p.slug] || "from-gray-400 to-gray-500",
     popular: p.slug === "standard",
@@ -61,9 +61,9 @@ function apiPlanToDisplay(p: ApiPlan): DisplayPlan {
 }
 
 const FALLBACK_PLANS: DisplayPlan[] = [
-  { slug: "free", name: "Gratis", price: 0, features: ["10 cotizaciones/mes", "5 mockups PNG", "3 fichas PDF"], color: "from-gray-400 to-gray-500" },
-  { slug: "standard", name: "Estándar", price: 7990, features: ["40 cotizaciones/mes", "30 mockups PNG", "25 fichas PDF"], color: "from-blue-500 to-indigo-600", popular: true },
-  { slug: "premium", name: "Premium", price: 14990, features: ["Cotizaciones ilimitadas", "Mockups ilimitados", "Fichas ilimitadas"], color: "from-orange-500 to-red-500" },
+  { slug: "free", name: "Gratis", price: 0, features: ["10 cotizaciones/mes", "5 sesiones de mockup/mes", "3 exportaciones PDF/mes"], color: "from-gray-400 to-gray-500" },
+  { slug: "standard", name: "Estándar", price: 7990, features: ["40 cotizaciones/mes", "30 sesiones de mockup/mes", "25 exportaciones PDF/mes"], color: "from-blue-500 to-indigo-600", popular: true },
+  { slug: "premium", name: "Premium", price: 14990, features: ["Cotizaciones ilimitadas", "Sesiones de mockup ilimitadas", "Exportaciones PDF ilimitadas"], color: "from-orange-500 to-red-500" },
 ];
 
 export function UpgradePrompt({ open, onClose, feature, mode = "limit" }: UpgradePromptProps) {

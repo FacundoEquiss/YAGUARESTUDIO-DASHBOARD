@@ -2,6 +2,7 @@ import { db, subscriptionPlans, userSubscriptions, users } from "@workspace/db";
 import type { SubscriptionPlan } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { mpPreApproval } from "./mercadopago";
+import { env } from "../env";
 
 const EXTERNAL_REFERENCE_PREFIX = "subscription";
 
@@ -52,11 +53,14 @@ function getPlanConfig(planSlug: string) {
       ? "MP_PREMIUM_PLAN_ID"
       : null;
 
-  const configuredValue = envKey
-    ? process.env[envKey]?.trim() || DEFAULT_PREAPPROVAL_PLAN_INPUTS[planSlug]
-    : DEFAULT_PREAPPROVAL_PLAN_INPUTS[planSlug];
+  const configuredValue = envKey === "MP_STANDARD_PLAN_ID"
+    ? env.mpStandardPlanId
+    : envKey === "MP_PREMIUM_PLAN_ID"
+      ? env.mpPremiumPlanId
+      : undefined;
+  const fallbackValue = !env.isHosted ? DEFAULT_PREAPPROVAL_PLAN_INPUTS[planSlug] : undefined;
 
-  const id = extractPlanIdFromInput(configuredValue);
+  const id = extractPlanIdFromInput(configuredValue || fallbackValue);
   if (!id) return null;
 
   return {
@@ -130,7 +134,7 @@ function resolvePeriodEnd(nextPaymentDate?: string | null): Date {
 }
 
 function assertMercadoPagoConfigured() {
-  const token = process.env.MP_ACCESS_TOKEN?.trim();
+  const token = env.mpAccessToken;
 
   if (!token) {
     throw new Error("MP_ACCESS_TOKEN no está configurado");

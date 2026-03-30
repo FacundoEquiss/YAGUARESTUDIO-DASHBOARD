@@ -43,8 +43,8 @@ function getDateKey(date: Date): string {
 }
 
 const EVENT_LABELS: Record<string, string> = {
-  dtf_quotes: "Cotización DTF",
-  mockup_pngs: "Mockup PNG",
+  dtf_quotes: "Cotización iniciada",
+  mockup_pngs: "Sesión de mockup iniciada",
   pdf_exports: "Exportación PDF",
 };
 
@@ -128,7 +128,7 @@ export function DashboardPage() {
       value: usage.dtfQuotes,
       icon: Calculator,
       color: "from-orange-500 to-amber-500",
-      help: "Cantidad de cotizaciones DTF creadas en el mes actual.",
+      help: "Cantidad de cotizaciones iniciadas en el mes actual.",
     },
     {
       id: "mockups",
@@ -137,7 +137,7 @@ export function DashboardPage() {
       value: usage.mockupPngs,
       icon: Shirt,
       color: "from-blue-500 to-indigo-500",
-      help: "Cantidad de mockups PNG generados en el mes actual.",
+      help: "Cantidad de sesiones de mockup iniciadas en el mes actual.",
     },
     {
       id: "income-month",
@@ -374,7 +374,7 @@ export function DashboardPage() {
           <div className="space-y-4">
             {[
               { label: "Cotizaciones DTF", used: usage.dtfQuotes, limit: limits.dtfQuotes, color: "#f97316" },
-              { label: "Mockups PNG", used: usage.mockupPngs, limit: limits.mockupPngs, color: "#6366f1" },
+              { label: "Sesiones de mockup", used: usage.mockupPngs, limit: limits.mockupPngs, color: "#6366f1" },
               { label: "Exportaciones PDF", used: usage.pdfExports, limit: limits.pdfExports, color: "#10b981" },
             ].map((bar) => {
               const pct = bar.limit > 0 ? Math.min(100, (bar.used / bar.limit) * 100) : 0;

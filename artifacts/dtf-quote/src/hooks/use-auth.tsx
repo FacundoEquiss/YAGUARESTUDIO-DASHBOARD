@@ -23,13 +23,6 @@ export interface SubscriptionInfo {
   periodEnd: string;
 }
 
-const GUEST_USER: AuthUser = {
-  id: "guest",
-  email: "",
-  name: "Invitado",
-  role: "guest",
-};
-
 const SESSION_KEY = "dtf:session";
 
 interface ApiUser {
@@ -66,7 +59,6 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>;
   register: (email: string, password: string, name: string) => Promise<string | null>;
-  loginAsGuest: () => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => void;
@@ -82,9 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sessionType = getStorage<string | null>(SESSION_KEY, null);
     if (sessionType === "guest") {
-      setCurrentUser(GUEST_USER);
-      setLoading(false);
-      return;
+      setStorage<string | null>(SESSION_KEY, null);
     }
 
     void waitForApiReady();
@@ -109,12 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStorage<string | null>(SESSION_KEY, null);
       })
       .finally(() => setLoading(false));
-  }, []);
-
-  const loginAsGuest = useCallback(() => {
-    setStorage(SESSION_KEY, "guest");
-    setCurrentUser(GUEST_USER);
-    setSubscription(null);
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
@@ -172,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    if (currentUser?.role !== "guest") {
+    if (currentUser) {
       await apiFetch("/auth/logout", { method: "POST" });
     }
     setStorage<string | null>(SESSION_KEY, null);
@@ -181,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, loginAsGuest, logout, refreshSession, updateProfile }}>
+    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, logout, refreshSession, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

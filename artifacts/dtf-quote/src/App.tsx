@@ -23,10 +23,12 @@ import { ReportsPage } from "@/pages/reports";
 import { AccountsPage } from "@/pages/accounts";
 import { AuthPage } from "@/pages/auth";
 import { LandingPage } from "@/pages/landing";
+import { ComingSoonPage } from "@/pages/coming-soon";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UsageProvider } from "@/hooks/use-usage";
 import { PlanGuard } from "@/components/plan-guard";
 import { ThemeProvider } from "@/components/theme-provider";
+import { getProtectedRedirectTarget, sanitizeNextPath } from "@/lib/routing";
 
 const queryClient = new QueryClient();
 
@@ -38,15 +40,13 @@ function Redirect({ to }: { to: string }) {
 
 function AuthRedirect() {
   const params = new URLSearchParams(window.location.search);
-  const next = params.get("next") || "/dashboard";
+  const next = sanitizeNextPath(params.get("next"));
   return <Redirect to={next} />;
 }
 
 function ProtectedRedirect() {
   const [location] = useLocation();
-  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/support", "/profile", "/orders", "/clients", "/suppliers", "/finance", "/reports", "/accounts"];
-  const next = validPaths.includes(location) ? location : "/dashboard";
-  return <Redirect to={`/auth?next=${next}`} />;
+  return <Redirect to={getProtectedRedirectTarget(location)} />;
 }
 
 function Router() {
@@ -64,6 +64,12 @@ function Router() {
     return (
       <AppShell>
         <Switch>
+          <Route path="/blog">
+            <ComingSoonPage feature="blog" />
+          </Route>
+          <Route path="/bg-remover">
+            <ComingSoonPage feature="bg-remover" />
+          </Route>
           <Route path="/auth" component={AuthPage} />
           <Route path="/" component={LandingPage} />
           <Route><ProtectedRedirect /></Route>
@@ -81,8 +87,18 @@ function Router() {
       </Route>
       <Route path="/auth">
         <AppShell>
-          {currentUser.role === "guest" ? <AuthPage /> : <AuthRedirect />}
+          <AuthRedirect />
         </AppShell>
+      </Route>
+      <Route path="/blog">
+        <DashboardLayout>
+          <ComingSoonPage feature="blog" />
+        </DashboardLayout>
+      </Route>
+      <Route path="/bg-remover">
+        <DashboardLayout>
+          <ComingSoonPage feature="bg-remover" />
+        </DashboardLayout>
       </Route>
 
       <Route path="/dashboard">

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, LogIn, UserPlus, Users, Loader2, ArrowLeft } from "lucide-react";
+import { Mail, Lock, User, LogIn, UserPlus, Loader2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 export function AuthPage() {
-  const { login, register, loginAsGuest } = useAuth();
+  const { login, register } = useAuth();
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState<Tab>(getInitialTab);
   const [email, setEmail] = useState("");
@@ -78,11 +78,6 @@ export function AuthPage() {
     }
   };
 
-  const handleGuest = () => {
-    loginAsGuest();
-    handleSuccess();
-  };
-
   return (
       <div className="auth-card-wrapper">
         <div className="auth-card">
@@ -102,23 +97,11 @@ export function AuthPage() {
             </p>
           </div>
 
-          <button
-            onClick={handleGuest}
-            className="w-full flex items-center gap-4 p-4 rounded-2xl border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all mb-7 group text-left"
-          >
-            <div className="w-11 h-11 rounded-2xl bg-secondary flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
-              <Users className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+          <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+            <div className="font-bold text-foreground">Acceso con cuenta</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Para guardar trabajo, controlar límites y activar el plan correcto en tu perfil.
             </div>
-            <div>
-              <div className="font-bold text-foreground">Entrar como Invitado</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Sin cuenta · cotiza directamente</div>
-            </div>
-          </button>
-
-          <div className="relative flex items-center gap-3 mb-5">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground font-medium px-1">o con cuenta</span>
-            <div className="flex-1 h-px bg-border" />
           </div>
 
           <div className="flex bg-secondary rounded-2xl p-1 mb-5">

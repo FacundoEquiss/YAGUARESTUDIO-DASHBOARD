@@ -17,6 +17,7 @@ Para hacer el deploy robusto y libre de ambigüedades de Vercel (Front-end), **e
 ### Variables de Entorno (Environment Variables) obligatorias en Vercel:
 Asegúrate de agregar lo siguiente antes de darle a Deploy:
 * `VITE_API_URL` 👉 El link de tu back-end (Por ejemplo: `https://tu-backend-railway.up.railway.app`). El frontend ahora tolera ese valor con o sin `/api`.
+* `BASE_PATH` 👉 Solo si vas a servir la app bajo una subruta. Si no, dejalo sin definir.
 
 --- 
 *Con esta configuración Vite compilará transparentemente hacia el directorio `dist` nativo y Vercel lo subirá sin chocar con configuraciones ambiguas "dist/public".*
@@ -55,6 +56,10 @@ Si tu backend está expuesto en Railway, configurá en Mercado Pago la URL:
 
 `https://TU-BACKEND.up.railway.app/webhooks/mercadopago`
 
+### Validación de firma del webhook
+El backend ahora valida la firma `x-signature` cuando `MP_WEBHOOK_SECRET` está presente.
+Si la firma es inválida, responderá `401` y no procesará el evento.
+
 Esta app ya puede:
 * iniciar checkout de suscripciones desde el backend,
 * redirigir al usuario al checkout de Mercado Pago,
@@ -66,3 +71,32 @@ Esta app ya puede:
 
 ### ¿Por qué forzamos el Lockfile / pnpm@10.x.x?
 El `package.json` de la raíz ahora incluye el anclaje `"packageManager": "pnpm@10.32.1"`. Nixpacks (el compilador oficial de Railway) usa esto automáticamente para instalar exactamente esa versión de la herramienta y evitar así las disonancias en la versión o el `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Railway compilará con "frozen-lockfile" perfecto usando la misma firma que tus pruebas locales.
+
+---
+
+# Smoke Test Post-Deploy
+
+Podés correr un chequeo rápido contra staging o producción con:
+
+```bash
+SMOKE_FRONTEND_URL="https://tu-frontend.vercel.app" \
+SMOKE_API_URL="https://tu-backend.up.railway.app" \
+pnpm run smoke:deploy
+```
+
+Opcionalmente podés validar login real:
+
+```bash
+SMOKE_FRONTEND_URL="https://tu-frontend.vercel.app" \
+SMOKE_API_URL="https://tu-backend.up.railway.app" \
+SMOKE_EMAIL="usuario@test.com" \
+SMOKE_PASSWORD="tu-clave" \
+pnpm run smoke:deploy
+```
+
+El script revisa:
+* carga del frontend,
+* `GET /api/healthz`,
+* `GET /api/healthz/db`,
+* `GET /api/subscription/plans`,
+* y si pasás credenciales, `login` + `auth/me`.

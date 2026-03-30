@@ -1,8 +1,10 @@
+import crypto from "crypto";
 import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import router from "./routes";
 import webhooksRouter from "./routes/webhooks";
+import { env } from "./env";
 
 const app: Express = express();
 
@@ -19,16 +21,44 @@ function normalizeOrigin(origin: string): string | null {
   }
 }
 
-const allowedOrigins = (process.env.FRONTEND_URL || "")
+const allowedOrigins = (env.frontendUrl || "")
   .split(",")
   .map(normalizeOrigin)
   .filter((origin): origin is string => Boolean(origin));
+
+app.use((req, res, next) => {
+  const requestId = req.header("x-request-id")?.trim() || crypto.randomUUID();
+  const startedAt = Date.now();
+
+  res.setHeader("x-request-id", requestId);
+  res.locals.requestId = requestId;
+
+  res.on("finish", () => {
+    const shouldLog =
+      req.path.startsWith("/webhooks") ||
+      res.statusCode >= 400;
+
+    if (!shouldLog) {
+      return;
+    }
+
+    console.info("[http]", {
+      requestId,
+      method: req.method,
+      path: req.originalUrl,
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    });
+  });
+
+  next();
+});
 
 app.use(cors({
   credentials: true,
   optionsSuccessStatus: 204,
   origin(origin, callback) {
-    if (process.env.NODE_ENV !== "production" || allowedOrigins.length === 0) {
+    if (!env.isHosted || allowedOrigins.length === 0) {
       callback(null, true);
       return;
     }

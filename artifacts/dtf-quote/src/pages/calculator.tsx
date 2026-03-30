@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/components/theme-provider";
 import { useUsage } from "@/hooks/use-usage";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { ToolSessionGate } from "@/components/tool-session-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,8 +83,10 @@ export function CalculatorPage() {
   const isDark = theme === "dark";
   const { saveQuote } = useDTFQuotes(currentUser?.id || "guest");
   const { toast } = useToast();
-  const { canUse, increment } = useUsage();
+  const { canUse, increment, remaining } = useUsage();
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [quoteSessionStarted, setQuoteSessionStarted] = useState(false);
+  const [startingQuoteSession, setStartingQuoteSession] = useState(false);
 
   const [clientName, setClientName] = useState("");
   const [orderName, setOrderName] = useState("");
@@ -146,8 +149,50 @@ export function CalculatorPage() {
   const totalOrder = pricePerGarment * garments;
   const pricePerGarmentWholesale = Math.ceil((dtfCostPerGarment + settings.wholesaleMargin + pressPassExtra + talleSurchargeAmount) / 100) * 100;
   const totalOrderWholesale = pricePerGarmentWholesale * garments;
+  const isMaster = currentUser?.role === "master";
+  const isQuoteSessionUnlocked = isMaster || quoteSessionStarted;
+
+  const handleStartQuoteSession = async () => {
+    if (isQuoteSessionUnlocked) {
+      return;
+    }
+
+    if (!canUse("dtf_quotes")) {
+      setShowUpgrade(true);
+      return;
+    }
+
+    setStartingQuoteSession(true);
+    const sessionId = `quote-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ok = await increment("dtf_quotes", {
+      source: "calculator",
+      stage: "tool_unlock",
+      sessionId,
+    });
+    setStartingQuoteSession(false);
+
+    if (!ok) {
+      setShowUpgrade(true);
+      return;
+    }
+
+    setQuoteSessionStarted(true);
+    toast({
+      title: "Cotización iniciada",
+      description: "Ya podés usar todas las funciones de esta cotización.",
+    });
+  };
 
   const handleSave = async () => {
+    if (!isQuoteSessionUnlocked) {
+      toast({
+        title: "Primero iniciá la cotización",
+        description: "Así registramos el uso y desbloqueamos la herramienta.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!clientName.trim()) {
       toast({
         title: "Falta información",
@@ -170,17 +215,6 @@ export function CalculatorPage() {
         description: packedResult.errors[0],
         variant: "destructive"
       });
-      return;
-    }
-
-    if (!canUse("dtf_quotes")) {
-      setShowUpgrade(true);
-      return;
-    }
-
-    const ok = await increment("dtf_quotes");
-    if (!ok) {
-      setShowUpgrade(true);
       return;
     }
 
@@ -212,6 +246,7 @@ export function CalculatorPage() {
     setPressPassesRaw(String(settings.pressPassThreshold));
     setTalleActive(settings.talleEnabled);
     setStamps([{ id: uuidv4(), w: 28, h: 32, qty: 1, title: "" }]);
+    setQuoteSessionStarted(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -241,9 +276,22 @@ export function CalculatorPage() {
   const validStampsCount = stamps.filter(s => s.w > 0 && s.h > 0).length;
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-6 pb-12 md:flex md:gap-8 md:items-start">
+    <div className="px-4 py-6 pb-12 sm:px-6 sm:py-6">
+      {!isQuoteSessionUnlocked && (
+        <div className="mb-6 md:max-w-3xl">
+          <ToolSessionGate
+            title="Iniciar cotización"
+            description="Cuando la inicies, se habilitan todos los campos y se descuenta 1 uso de tu plan."
+            buttonLabel="Iniciar cotización"
+            remaining={remaining.dtfQuotes}
+            loading={startingQuoteSession}
+            onStart={() => void handleStartQuoteSession()}
+          />
+        </div>
+      )}
 
-      <div className="flex flex-col gap-8 md:gap-4 md:flex-1 md:min-w-0">
+      <div className={`md:flex md:items-start md:gap-8 ${isQuoteSessionUnlocked ? "" : "pointer-events-none select-none opacity-40 blur-[1px]"}`}>
+      <div className="flex flex-col gap-8 md:min-w-0 md:flex-1 md:gap-4">
 
       <div className="md:hidden">
         <h1 className="text-3xl font-display font-bold text-primary">
@@ -889,6 +937,7 @@ export function CalculatorPage() {
         </button>
       </div>
 
+      </div>
       </div>
 
       <UpgradePrompt

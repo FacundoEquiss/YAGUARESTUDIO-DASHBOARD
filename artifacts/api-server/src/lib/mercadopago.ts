@@ -1,10 +1,11 @@
 import { MercadoPagoConfig, PreApproval, Payment } from 'mercadopago';
+import { env } from "../env";
 
 // El token debe configurarse en Vercel/Railway según corresponda
-const accessToken = process.env.MP_ACCESS_TOKEN || '';
+const accessToken = env.mpAccessToken || '';
 
-if (!accessToken && process.env.NODE_ENV === "production") {
-  console.warn("⚠️ MP_ACCESS_TOKEN no está configurado. La integración con Mercado Pago fallará.");
+if (!accessToken && env.isHosted) {
+  console.warn("[config warning] MP_ACCESS_TOKEN is not configured. Mercado Pago integration will fail.");
 }
 
 export const mpClient = new MercadoPagoConfig({ 
