@@ -11,6 +11,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { CalculatorPage } from "@/pages/calculator";
 import { HistoryPage } from "@/pages/history";
 import { SettingsPage } from "@/pages/settings";
+import { SupportPage } from "@/pages/support";
 import { MockupsPage } from "@/pages/mockups";
 import { ProfilePage } from "@/pages/profile";
 import { DashboardPage } from "@/pages/dashboard";
@@ -25,7 +26,7 @@ import { LandingPage } from "@/pages/landing";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UsageProvider } from "@/hooks/use-usage";
 import { PlanGuard } from "@/components/plan-guard";
-import { useTheme } from "@/hooks/use-theme";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const queryClient = new QueryClient();
 
@@ -43,14 +44,13 @@ function AuthRedirect() {
 
 function ProtectedRedirect() {
   const [location] = useLocation();
-  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/profile", "/orders", "/clients", "/suppliers", "/finance", "/reports", "/accounts"];
+  const validPaths = ["/dashboard", "/app", "/mockups", "/history", "/settings", "/support", "/profile", "/orders", "/clients", "/suppliers", "/finance", "/reports", "/accounts"];
   const next = validPaths.includes(location) ? location : "/dashboard";
   return <Redirect to={`/auth?next=${next}`} />;
 }
 
 function Router() {
   const { currentUser, loading } = useAuth();
-  useTheme();
 
   if (loading) {
     return (
@@ -144,6 +144,11 @@ function Router() {
           <SettingsPage />
         </DashboardLayout>
       </Route>
+      <Route path="/support">
+        <DashboardLayout>
+          <SupportPage />
+        </DashboardLayout>
+      </Route>
       <Route path="/profile">
         <DashboardLayout>
           <ProfilePage />
@@ -164,9 +169,11 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <UsageProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
-            </WouterRouter>
+            <ThemeProvider defaultTheme="dark" storageKey="app-theme">
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <Router />
+              </WouterRouter>
+            </ThemeProvider>
           </UsageProvider>
         </AuthProvider>
         <Toaster />

@@ -20,7 +20,11 @@ import {
   X,
   Send,
   FileText,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
+import { SidebarActions } from "./sidebar-actions";
 
 interface SidebarProps {
   open: boolean;
@@ -107,6 +111,8 @@ function NavSection({ title, items, location, onNavigate }: {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { currentUser, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+
   const handleLogout = async () => {
     onClose();
     await logout();
@@ -158,42 +164,20 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-white/5 px-2.5 py-2.5 space-y-0.5">
-        <Link
-          href="/settings"
-          onClick={handleNavigate}
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all",
-            location === "/settings"
-              ? "bg-primary/12 text-primary font-bold"
-              : "text-foreground/80 hover:bg-white/8 hover:text-foreground"
-          )}
-        >
-          <Settings className="w-[18px] h-[18px] shrink-0" />
-          <span>Configuración</span>
-        </Link>
-        <Link
-          href="/profile"
-          onClick={handleNavigate}
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all",
-            location === "/profile"
-              ? "bg-primary/12 text-primary font-bold"
-              : "text-foreground/80 hover:bg-white/8 hover:text-foreground"
-          )}
-        >
-          <UserCircle className="w-[18px] h-[18px] shrink-0" />
-          <span className="flex-1 truncate">
-            {currentUser?.name || currentUser?.email?.split("@")[0] || "Mi Perfil"}
-          </span>
-        </Link>
+      <div className="shrink-0 border-t border-black/5 dark:border-white/5 px-2.5 py-4 mt-auto">
         <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-destructive/80 hover:bg-destructive/8 hover:text-destructive transition-all"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-foreground/80 hover:bg-black/5 dark:hover:bg-white/8 hover:text-foreground transition-all mb-2"
         >
-          <LogOut className="w-[18px] h-[18px] shrink-0" />
-          <span>Cerrar Sesión</span>
+          <div className="flex items-center gap-3">
+            {theme === "dark" ? <Moon className="w-[18px] h-[18px] shrink-0" /> : <Sun className="w-[18px] h-[18px] shrink-0" />}
+            <span>Apariencia</span>
+          </div>
+          <span className="text-[10px] uppercase font-bold text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-md">
+            {theme === "dark" ? "Oscuro" : "Claro"}
+          </span>
         </button>
+        <SidebarActions />
       </div>
     </div>
   );

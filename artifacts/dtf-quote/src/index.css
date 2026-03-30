@@ -28,30 +28,30 @@
 }
 
 :root {
-  --background: 45 30% 98%;
-  --foreground: 30 15% 15%;
+  --background: 0 0% 100%;
+  --foreground: 240 10% 4%;
   
-  --primary: 24 95% 53%;
+  --primary: 240 5% 26%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 35 25% 92%;
-  --secondary-foreground: 30 15% 25%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
   
-  --muted: 40 20% 94%;
-  --muted-foreground: 30 10% 45%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
   
-  --accent: 28 90% 94%;
-  --accent-foreground: 24 95% 45%;
+  --accent: 240 5% 96%;
+  --accent-foreground: 240 6% 10%;
   
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
   
-  --border: 35 20% 88%;
-  --input: 35 20% 88%;
-  --ring: 24 95% 53%;
+  --border: 240 6% 90%;
+  --input: 240 6% 90%;
+  --ring: 240 5% 26%;
   
   --card: 0 0% 100%;
-  --card-foreground: 30 15% 15%;
+  --card-foreground: 240 10% 4%;
   
   --radius: 0.75rem;
 }
@@ -133,7 +133,7 @@
   position: relative;
   min-height: 100dvh;
   overflow: hidden;
-  background: #fff7ed;
+  background: #f8f9fa;
 }
 .dark .glass-app-root {
   background: #080808;
@@ -141,7 +141,7 @@
 
 /* Mobile shell */
 .glass-app-shell {
-  background: rgba(255, 252, 248, 0.54);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
@@ -153,11 +153,11 @@
 
 /* Desktop sidebar */
 .desktop-sidebar {
-  background: rgba(255, 250, 244, 0.72);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border-right: 1px solid rgba(255, 200, 140, 0.25);
-  box-shadow: 2px 0 24px rgba(249, 115, 22, 0.06);
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 2px 0 24px rgba(0, 0, 0, 0.02);
 }
 .dark .desktop-sidebar {
   background: rgba(14, 10, 20, 0.78);
@@ -169,7 +169,7 @@
 
 /* Desktop main content area */
 .glass-app-shell-desktop {
-  background: rgba(255, 250, 244, 0.50);
+  background: rgba(250, 250, 250, 0.60);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
@@ -187,17 +187,17 @@
   background:
     linear-gradient(
       160deg,
-      rgba(255, 252, 246, 0.72) 0%,
-      rgba(255, 237, 210, 0.50) 60%,
-      rgba(252, 220, 180, 0.38) 100%
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(244, 244, 245, 0.8) 60%,
+      rgba(228, 228, 231, 0.5) 100%
     );
-  backdrop-filter: blur(22px) saturate(190%) brightness(1.04);
-  -webkit-backdrop-filter: blur(22px) saturate(190%) brightness(1.04);
-  border-top: 1.5px solid rgba(255, 255, 255, 0.80);
-  border-bottom: 1px solid rgba(230, 160, 80, 0.20);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border-top: 1px solid rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    inset 0 -1px 0 rgba(200, 130, 60, 0.12);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.02);
 }
 
 .dark .roll-canvas-bg {
@@ -226,7 +226,7 @@
   position: relative;
   min-height: 100dvh;
   overflow: hidden;
-  background: #fff7ed;
+  background: #f8f9fa;
 }
 .dark .auth-root {
   background: #080808;
@@ -255,7 +255,7 @@
   height: 520px;
   top: -130px;
   left: -140px;
-  background: radial-gradient(circle at center, #f97316 0%, #ff9e4d 60%, transparent 100%);
+  background: radial-gradient(circle at center, #d4d4d8 0%, #e4e4e7 60%, transparent 100%);
   animation: blob-drift-1 26s ease-in-out infinite alternate;
 }
 .auth-blob-2 {
@@ -263,8 +263,8 @@
   height: 420px;
   top: 20%;
   right: -140px;
-  background: radial-gradient(circle at center, #ffe0b2 0%, #ffccaa 55%, transparent 100%);
-  opacity: 0.55;
+  background: radial-gradient(circle at center, #f4f4f5 0%, #ffffff 55%, transparent 100%);
+  opacity: 0.8;
   animation: blob-drift-2 31s ease-in-out infinite alternate;
 }
 .auth-blob-3 {
@@ -272,8 +272,8 @@
   height: 480px;
   bottom: -120px;
   left: 5%;
-  background: radial-gradient(circle at center, #fb923c 0%, #fdba74 55%, transparent 100%);
-  opacity: 0.6;
+  background: radial-gradient(circle at center, #e4e4e7 0%, #f4f4f5 55%, transparent 100%);
+  opacity: 0.9;
   animation: blob-drift-3 22s ease-in-out infinite alternate;
 }
 .auth-blob-4 {
@@ -281,8 +281,8 @@
   height: 360px;
   top: 40%;
   left: 20%;
-  background: radial-gradient(circle at center, #fff5e8 0%, #fde8cc 60%, transparent 100%);
-  opacity: 0.45;
+  background: radial-gradient(circle at center, #f4f4f5 0%, #ffffff 60%, transparent 100%);
+  opacity: 0.7;
   animation: blob-drift-4 37s ease-in-out infinite alternate;
 }
 
@@ -358,15 +358,15 @@
 .auth-card {
   width: 100%;
   max-width: 420px;
-  background: rgba(255, 252, 248, 0.72);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 1.75rem;
   padding: 2rem 1.75rem;
   box-shadow:
-    0 4px 32px rgba(249, 115, 22, 0.08),
-    0 1px 0 rgba(255,255,255,0.9) inset;
+    0 12px 32px rgba(0, 0, 0, 0.06),
+    0 1px 0 rgba(255,255,255,1) inset;
 }
 .dark .auth-card {
   background: rgba(10, 10, 12, 0.78);

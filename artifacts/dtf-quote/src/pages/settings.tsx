@@ -4,7 +4,7 @@ import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFSettings } from "@/hooks/use-dtf-store";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { useTheme } from "@/hooks/use-theme";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,8 @@ export function SettingsPage() {
   const { settings, setSettings } = useDTFSettings();
   const { currentUser, logout } = useAuth();
   const { toast } = useToast();
-  const { isDark } = useTheme();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const [price, setPrice] = useState(settings.pricePerMeter.toString());
   const [width, setWidth] = useState(settings.rollWidth.toString());

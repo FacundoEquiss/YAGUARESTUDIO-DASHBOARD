@@ -9,7 +9,7 @@ import { StampItem, packStamps, STAMP_COLORS } from "@/lib/skyline";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useTheme } from "@/hooks/use-theme";
+import { useTheme } from "@/components/theme-provider";
 import { useUsage } from "@/hooks/use-usage";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,8 @@ function buildWhatsAppFromCalc(params: {
 export function CalculatorPage() {
   const { settings } = useDTFSettings();
   const { currentUser } = useAuth();
-  const { isDark } = useTheme();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const { saveQuote } = useDTFQuotes(currentUser?.id || "guest");
   const { toast } = useToast();
   const { canUse, increment } = useUsage();
