@@ -47,6 +47,8 @@ Para hacer el deploy robusto en Railway del Backend (`@workspace/api-server`), d
 * `MP_ACCESS_TOKEN` 👉 Access token real de Mercado Pago para crear suscripciones.
 * `MP_WEBHOOK_SECRET` 👉 Recomendado para validar la firma del webhook cuando cierres la integración.
 * `MP_CURRENCY_ID=ARS` 👉 Opcional, pero deja explícita la moneda de cobro.
+* `MP_STANDARD_PLAN_ID` 👉 Opcional, pero recomendado. Puede ser el `preapproval_plan_id` o el link completo del plan estándar.
+* `MP_PREMIUM_PLAN_ID` 👉 Opcional, pero recomendado. Puede ser el `preapproval_plan_id` o el link completo del plan premium.
 
 ### URL pública de Webhook para Mercado Pago:
 Si tu backend está expuesto en Railway, configurá en Mercado Pago la URL:
@@ -57,6 +59,10 @@ Esta app ya puede:
 * iniciar checkout de suscripciones desde el backend,
 * redirigir al usuario al checkout de Mercado Pago,
 * y sincronizar el plan local al volver del checkout o al recibir el webhook.
+
+### Notas para pruebas de suscripciones con Mercado Pago:
+* No mezcles ambientes. Si el `MP_ACCESS_TOKEN` es de prueba, usá también planes creados por la cuenta vendedora de prueba y comprá con la cuenta compradora de prueba.
+* Los `preapproval_plan_id` pueden configurarse directo en Railway con `MP_STANDARD_PLAN_ID` y `MP_PREMIUM_PLAN_ID`, sin tocar código.
 
 ### ¿Por qué forzamos el Lockfile / pnpm@10.x.x?
 El `package.json` de la raíz ahora incluye el anclaje `"packageManager": "pnpm@10.32.1"`. Nixpacks (el compilador oficial de Railway) usa esto automáticamente para instalar exactamente esa versión de la herramienta y evitar así las disonancias en la versión o el `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Railway compilará con "frozen-lockfile" perfecto usando la misma firma que tus pruebas locales.

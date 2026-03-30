@@ -5,15 +5,9 @@ import { mpPreApproval } from "./mercadopago";
 
 const EXTERNAL_REFERENCE_PREFIX = "subscription";
 
-const PREAPPROVAL_PLANS: Record<string, { id: string; initPoint: string }> = {
-  standard: {
-    id: "8b039046a1c04525ae701638863d2217",
-    initPoint: "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=8b039046a1c04525ae701638863d2217",
-  },
-  premium: {
-    id: "334e828403a245d89b4dc0f24bd6e458",
-    initPoint: "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=334e828403a245d89b4dc0f24bd6e458",
-  },
+const DEFAULT_PREAPPROVAL_PLAN_INPUTS: Record<string, string> = {
+  standard: "60aec72878fc43a5bf6ddecd696b86ce",
+  premium: "9f8924a625164247a86365d6dcf8a904",
 };
 
 export interface MercadoPagoCheckoutResult {
@@ -31,15 +25,58 @@ export interface SubscriptionSyncResult {
   skipped?: boolean;
 }
 
+function extractPlanIdFromInput(value?: string | null): string | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+
+  if (!normalized.includes("://")) {
+    return normalized;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    return parsed.searchParams.get("preapproval_plan_id")?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildHostedPlanUrl(planId: string): string {
+  return `https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=${planId}`;
+}
+
 function getPlanConfig(planSlug: string) {
-  return PREAPPROVAL_PLANS[planSlug];
+  const envKey = planSlug === "standard"
+    ? "MP_STANDARD_PLAN_ID"
+    : planSlug === "premium"
+      ? "MP_PREMIUM_PLAN_ID"
+      : null;
+
+  const configuredValue = envKey
+    ? process.env[envKey]?.trim() || DEFAULT_PREAPPROVAL_PLAN_INPUTS[planSlug]
+    : DEFAULT_PREAPPROVAL_PLAN_INPUTS[planSlug];
+
+  const id = extractPlanIdFromInput(configuredValue);
+  if (!id) return null;
+
+  return {
+    id,
+    initPoint: buildHostedPlanUrl(id),
+  };
 }
 
 function resolvePlanSlugFromPlanId(preapprovalPlanId?: string | null): string | null {
   if (!preapprovalPlanId) return null;
 
-  const found = Object.entries(PREAPPROVAL_PLANS).find(([, value]) => value.id === preapprovalPlanId);
-  return found?.[0] ?? null;
+  const supportedSlugs = ["standard", "premium"];
+  for (const slug of supportedSlugs) {
+    const config = getPlanConfig(slug);
+    if (config?.id === preapprovalPlanId) {
+      return slug;
+    }
+  }
+
+  return null;
 }
 
 export function buildSubscriptionExternalReference(userId: number, planSlug: string): string {
