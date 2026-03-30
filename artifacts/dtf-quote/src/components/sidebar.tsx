@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Users,
   Truck,
+  Package2,
   Calculator,
   Shirt,
   Scissors,
@@ -46,6 +47,7 @@ const MAIN_NAV: NavItem[] = [
   { href: "/orders", label: "Pedidos", icon: ClipboardList, ready: true },
   { href: "/clients", label: "Clientes", icon: Users, ready: true },
   { href: "/suppliers", label: "Proveedores", icon: Truck, ready: true },
+  { href: "/products", label: "Productos / Stock", icon: Package2, ready: true },
 ];
 
 const TOOLS_NAV: NavItem[] = [

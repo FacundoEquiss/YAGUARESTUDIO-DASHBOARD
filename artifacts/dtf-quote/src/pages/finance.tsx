@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   useTransactions,
@@ -12,7 +12,9 @@ import {
 import { useAllClients } from "@/hooks/use-clients";
 import { useAllSuppliers } from "@/hooks/use-suppliers";
 import { useAllOrders } from "@/hooks/use-orders";
+import { useAllFinancialAccounts } from "@/hooks/use-financial-accounts";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { clearFinanceDraft, loadFinanceDraft } from "@/lib/drafts";
 import {
   Plus,
   Search,
@@ -55,23 +57,30 @@ function formatDate(dateStr: string | null): string {
 
 interface TxFormProps {
   tx?: TransactionItem | null;
+  draft?: Partial<CreateTransactionData> | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-function TransactionFormModal({ tx, onClose, onSaved }: TxFormProps) {
+function TransactionFormModal({ tx, draft, onClose, onSaved }: TxFormProps) {
   const isEdit = !!tx;
   const { clients: allClients } = useAllClients();
   const { suppliers: allSuppliers } = useAllSuppliers();
   const { orders: allOrders } = useAllOrders();
-  const [type, setType] = useState<"income" | "expense">(tx?.type ?? "income");
-  const [amount, setAmount] = useState(tx ? Number(tx.amount) : 0);
-  const [description, setDescription] = useState(tx?.description ?? "");
-  const [category, setCategory] = useState(tx?.category ?? "venta");
-  const [clientId, setClientId] = useState<number | null>(tx?.clientId ?? null);
-  const [supplierId, setSupplierId] = useState<number | null>(tx?.supplierId ?? null);
-  const [orderId, setOrderId] = useState<number | null>(tx?.orderId ?? null);
-  const [date, setDate] = useState(tx?.date ? new Date(tx.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const { accounts: allFinancialAccounts } = useAllFinancialAccounts();
+  const [type, setType] = useState<"income" | "expense">(tx?.type ?? draft?.type ?? "income");
+  const [amount, setAmount] = useState(tx ? Number(tx.amount) : Number(draft?.amount ?? 0));
+  const [description, setDescription] = useState(tx?.description ?? draft?.description ?? "");
+  const [category, setCategory] = useState(tx?.category ?? draft?.category ?? "venta");
+  const [clientId, setClientId] = useState<number | null>(tx?.clientId ?? draft?.clientId ?? null);
+  const [supplierId, setSupplierId] = useState<number | null>(tx?.supplierId ?? draft?.supplierId ?? null);
+  const [orderId, setOrderId] = useState<number | null>(tx?.orderId ?? draft?.orderId ?? null);
+  const [financialAccountId, setFinancialAccountId] = useState<number | null>(tx?.financialAccountId ?? draft?.financialAccountId ?? null);
+  const [date, setDate] = useState(
+    tx?.date
+      ? new Date(tx.date).toISOString().slice(0, 10)
+      : draft?.date || new Date().toISOString().slice(0, 10),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -100,6 +109,7 @@ function TransactionFormModal({ tx, onClose, onSaved }: TxFormProps) {
       clientId: clientId || undefined,
       supplierId: supplierId || undefined,
       orderId: orderId || undefined,
+      financialAccountId: financialAccountId || undefined,
       date: date || undefined,
     };
 
@@ -183,6 +193,16 @@ function TransactionFormModal({ tx, onClose, onSaved }: TxFormProps) {
             </div>
           )}
 
+          {allFinancialAccounts.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Cuenta financiera</label>
+              <select value={financialAccountId ?? ""} onChange={(e) => setFinancialAccountId(e.target.value ? Number(e.target.value) : null)} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                <option value="">Sin cuenta</option>
+                {allFinancialAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+              </select>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Cancelar</button>
             <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar" : "Crear"}</button>
@@ -203,6 +223,7 @@ export function FinancePage() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editTx, setEditTx] = useState<TransactionItem | null>(null);
+  const [draftTx, setDraftTx] = useState<Partial<CreateTransactionData> | null>(null);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const handleSearchChange = (val: string) => {
@@ -224,10 +245,24 @@ export function FinancePage() {
     sortDir: "desc",
   });
 
-  const { summary } = useTransactionSummary();
+  const { summary, refresh: refreshSummary } = useTransactionSummary();
+
+  useEffect(() => {
+    const draft = loadFinanceDraft();
+    if (!draft) {
+      return;
+    }
+
+    setDraftTx(draft);
+    setEditTx(null);
+    setShowForm(true);
+    clearFinanceDraft();
+  }, []);
 
   const handleSaved = () => {
     refresh();
+    refreshSummary();
+    setDraftTx(null);
   };
 
   const handleDelete = async (id: number) => {
@@ -341,6 +376,7 @@ export function FinancePage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Descripción</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Categoría</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Vinculado</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Cuenta</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Monto</th>
                     <th className="w-20"></th>
                   </tr>
@@ -359,6 +395,9 @@ export function FinancePage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell truncate max-w-[150px]">
                         {tx.clientName || tx.supplierName || (tx.orderId ? `Pedido #${tx.orderId}` : "—")}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">
+                        {tx.financialAccountName || "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
                         <span className={tx.type === "income" ? "text-emerald-400" : "text-red-400"}>
@@ -384,6 +423,7 @@ export function FinancePage() {
                       {hasFilters ? "Totales filtrados" : "Totales de página"}
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell"></td>
+                    <td className="px-4 py-3 hidden lg:table-cell"></td>
                     <td className="px-4 py-3 text-right text-xs font-semibold">
                       {filteredIncome > 0 && <span className="text-emerald-400 block">+{formatCurrency(filteredIncome)}</span>}
                       {filteredExpenses > 0 && <span className="text-red-400 block">-{formatCurrency(filteredExpenses)}</span>}
@@ -411,7 +451,8 @@ export function FinancePage() {
       {showForm && (
         <TransactionFormModal
           tx={editTx}
-          onClose={() => { setShowForm(false); setEditTx(null); }}
+          draft={draftTx}
+          onClose={() => { setShowForm(false); setEditTx(null); setDraftTx(null); }}
           onSaved={handleSaved}
         />
       )}

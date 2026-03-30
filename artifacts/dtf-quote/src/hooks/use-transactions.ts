@@ -11,11 +11,13 @@ export interface TransactionItem {
   clientId: number | null;
   supplierId: number | null;
   orderId: number | null;
+  financialAccountId: number | null;
   date: string;
   createdAt: string;
   updatedAt: string;
   clientName: string | null;
   supplierName: string | null;
+  financialAccountName: string | null;
 }
 
 export interface TransactionsListResult {
@@ -50,6 +52,15 @@ export interface BalancesResult {
     totalIncome: string;
     transactionCount: number;
   }[];
+  financialAccountBalances: {
+    financialAccountId: number;
+    accountName: string;
+    accountType: string;
+    openingBalance: string;
+    totalIncome: string;
+    totalExpense: string;
+    transactionCount: number;
+  }[];
 }
 
 interface TransactionsFilters {
@@ -72,6 +83,7 @@ export interface CreateTransactionData {
   clientId?: number | null;
   supplierId?: number | null;
   orderId?: number | null;
+  financialAccountId?: number | null;
   date?: string;
 }
 

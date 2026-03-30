@@ -6,6 +6,9 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "smoke:deploy": "tsx ./src/post-deploy-smoke.ts",
+    "db:reset-users": "tsx ./src/reset-and-seed-demo.ts reset-users",
+    "db:seed-demo": "tsx ./src/reset-and-seed-demo.ts seed-demo",
+    "db:reset-and-seed-demo": "tsx ./src/reset-and-seed-demo.ts reset-and-seed-demo",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

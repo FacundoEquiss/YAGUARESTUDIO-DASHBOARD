@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useLocation } from "wouter";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   useOrders,
@@ -10,8 +11,9 @@ import {
   type CreateOrderData,
   type CostItemInput,
 } from "@/hooks/use-orders";
-import { useAllClients } from "@/hooks/use-clients";
+import { useAllClients, createClient } from "@/hooks/use-clients";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { clearOrderDraft, loadOrderDraft, saveFinanceDraft } from "@/lib/drafts";
 import {
   Plus,
   Search,
@@ -25,6 +27,7 @@ import {
   Calendar,
   Package,
   AlertCircle,
+  DollarSign,
 } from "lucide-react";
 
 const STATUS_OPTIONS = [
@@ -66,20 +69,22 @@ function nextCostKey() {
 
 interface OrderFormProps {
   order?: OrderItem | null;
+  draft?: Partial<CreateOrderData> | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
+function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
   const isEdit = !!order;
   const { clients: allClients } = useAllClients();
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(order?.clientId ?? null);
-  const [clientName, setClientName] = useState(order?.clientName ?? "");
-  const [title, setTitle] = useState(order?.title ?? "");
-  const [description, setDescription] = useState(order?.description ?? "");
-  const [status, setStatus] = useState(order?.status ?? "nuevo");
-  const [dueDate, setDueDate] = useState(order?.dueDate ? order.dueDate.slice(0, 10) : "");
-  const [notes, setNotes] = useState(order?.notes ?? "");
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(order?.clientId ?? draft?.clientId ?? null);
+  const [clientName, setClientName] = useState(order?.clientName ?? draft?.clientName ?? "");
+  const [title, setTitle] = useState(order?.title ?? draft?.title ?? "");
+  const [description, setDescription] = useState(order?.description ?? draft?.description ?? "");
+  const [status, setStatus] = useState(order?.status ?? draft?.status ?? "nuevo");
+  const [dueDate, setDueDate] = useState(order?.dueDate ? order.dueDate.slice(0, 10) : draft?.dueDate ?? "");
+  const [notes, setNotes] = useState(order?.notes ?? draft?.notes ?? "");
+  const [createClientProfile, setCreateClientProfile] = useState(Boolean(draft?.clientName && !draft?.clientId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -90,6 +95,12 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
           title: ci.title,
           amount: String(Number(ci.amount)),
         }))
+      : draft?.costItems && draft.costItems.length > 0
+        ? draft.costItems.map((ci) => ({
+            key: nextCostKey(),
+            title: ci.title,
+            amount: String(Number(ci.amount)),
+          }))
       : [{ key: nextCostKey(), title: "", amount: "" }];
 
   const [costItems, setCostItems] = useState<FormCostItem[]>(initialCosts);
@@ -142,9 +153,28 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
     setSaving(true);
     setError("");
 
+    let finalClientId = selectedClientId;
+    if (!finalClientId && createClientProfile) {
+      const existingClient = allClients.find(
+        (client) => client.name.trim().toLowerCase() === clientName.trim().toLowerCase(),
+      );
+
+      if (existingClient) {
+        finalClientId = existingClient.id;
+      } else {
+        const created = await createClient({ name: clientName.trim() });
+        if (created.error || !created.client) {
+          setSaving(false);
+          setError(created.error || "No se pudo crear el cliente");
+          return;
+        }
+        finalClientId = created.client.id;
+      }
+    }
+
     const data: CreateOrderData = {
       clientName: clientName.trim(),
-      clientId: selectedClientId,
+      clientId: finalClientId,
       title: title.trim() || undefined,
       description: description.trim() || undefined,
       quantity: 1,
@@ -238,8 +268,8 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
 
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block flex items-center gap-1.5">
-              Costos del pedido *
-              <HelpTooltip text="Agregá todos los costos del pedido: materiales, mano de obra, envío, etc. El total se calcula automáticamente." iconSize={12} />
+              Ítems del pedido *
+              <HelpTooltip text="Cargá el detalle económico que va a quedar dentro del pedido. Puede ser DTF, prendas, envío u otros conceptos." iconSize={12} />
             </label>
             <div className="space-y-2">
               {costItems.map((ci, idx) => (
@@ -284,8 +314,22 @@ function OrderFormModal({ order, onClose, onSaved }: OrderFormProps) {
             </button>
           </div>
 
+          {!selectedClientId && clientName.trim().length > 0 && (
+            <label className="flex items-start gap-2 rounded-xl border border-border bg-white/5 px-3 py-2.5 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={createClientProfile}
+                onChange={(e) => setCreateClientProfile(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Guardar también este cliente en la base de clientes.
+              </span>
+            </label>
+          )}
+
           <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
-            <span className="text-sm font-medium text-muted-foreground">Total</span>
+            <span className="text-sm font-medium text-muted-foreground">Total del pedido</span>
             <span className="text-base font-display font-bold text-primary">{formatCurrency(totalPrice)}</span>
           </div>
 
@@ -351,11 +395,15 @@ interface OrderDetailProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onRegisterPayment: () => void;
+  onMarkDelivered: () => void;
 }
 
-function OrderDetailModal({ order, onClose, onEdit, onDelete }: OrderDetailProps) {
+function OrderDetailModal({ order, onClose, onEdit, onDelete, onRegisterPayment, onMarkDelivered }: OrderDetailProps) {
   const badge = getStatusBadge(order.status);
   const [deleting, setDeleting] = useState(false);
+  const paidAmount = Number(order.paidAmount || 0);
+  const balanceDue = Number(order.balanceDue || order.totalPrice || 0);
 
   const handleDelete = async () => {
     if (!confirm("¿Estás seguro de eliminar este pedido?")) return;
@@ -402,6 +450,17 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete }: OrderDetailProps
                 <p className="text-sm text-foreground">{order.description}</p>
               </div>
             )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Cobrado</p>
+                <p className="mt-1 text-base font-display font-bold text-foreground">{formatCurrency(paidAmount)}</p>
+              </div>
+              <div className="rounded-xl border border-orange-500/15 bg-orange-500/5 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-orange-400">Pendiente</p>
+                <p className="mt-1 text-base font-display font-bold text-foreground">{formatCurrency(balanceDue)}</p>
+              </div>
+            </div>
 
             {hasCostItems ? (
               <div>
@@ -454,6 +513,24 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete }: OrderDetailProps
 
           <div className="flex gap-3 pt-2 border-t border-border">
             <button
+              onClick={onRegisterPayment}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-sm font-bold hover:bg-emerald-500/15 transition-colors"
+            >
+              <DollarSign className="w-4 h-4" />
+              Registrar pago
+            </button>
+            {order.status !== "entregado" && (
+              <button
+                onClick={onMarkDelivered}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-white/5 transition-colors"
+              >
+                Marcar entregado
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
               onClick={onEdit}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors"
             >
@@ -475,6 +552,7 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete }: OrderDetailProps
 }
 
 export function OrdersPage() {
+  const [, setLocation] = useLocation();
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -495,6 +573,7 @@ export function OrdersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editOrder, setEditOrder] = useState<OrderItem | null>(null);
   const [detailOrder, setDetailOrder] = useState<OrderItem | null>(null);
+  const [draftOrder, setDraftOrder] = useState<Partial<CreateOrderData> | null>(null);
 
   const handleSearch = useCallback(() => {
     setSearch(searchInput);
@@ -505,9 +584,22 @@ export function OrdersPage() {
     setShowForm(false);
     setEditOrder(null);
     setDetailOrder(null);
+    setDraftOrder(null);
     refresh();
     stats.refresh();
   }, [refresh, stats]);
+
+  useEffect(() => {
+    const storedDraft = loadOrderDraft();
+    if (!storedDraft) {
+      return;
+    }
+
+    setDraftOrder(storedDraft);
+    setEditOrder(null);
+    setShowForm(true);
+    clearOrderDraft();
+  }, []);
 
   const handleDeleteFromDetail = useCallback(async () => {
     if (detailOrder) {
@@ -516,6 +608,31 @@ export function OrdersPage() {
       refresh();
       stats.refresh();
     }
+  }, [detailOrder, refresh, stats]);
+
+  const handleRegisterPayment = useCallback((order: OrderItem) => {
+    const pendingAmount = Math.max(0, Number(order.balanceDue || order.totalPrice || 0));
+    saveFinanceDraft({
+      type: "income",
+      category: "venta",
+      amount: pendingAmount > 0 ? pendingAmount : Number(order.totalPrice),
+      clientId: order.clientId ?? undefined,
+      orderId: order.id,
+      description: `Pago pedido #${order.id}${order.title ? ` - ${order.title}` : ""}`,
+    });
+    setDetailOrder(null);
+    setLocation("/finance");
+  }, [setLocation]);
+
+  const handleMarkDelivered = useCallback(async () => {
+    if (!detailOrder) {
+      return;
+    }
+
+    await updateOrder(detailOrder.id, { status: "entregado" });
+    setDetailOrder(null);
+    refresh();
+    stats.refresh();
   }, [detailOrder, refresh, stats]);
 
   const handleSort = (col: string) => {
@@ -542,7 +659,7 @@ export function OrdersPage() {
           </p>
         </div>
         <button
-          onClick={() => { setEditOrder(null); setShowForm(true); }}
+          onClick={() => { setDraftOrder(null); setEditOrder(null); setShowForm(true); }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -726,6 +843,7 @@ export function OrdersPage() {
       {(showForm || editOrder) && (
         <OrderFormModal
           order={editOrder}
+          draft={draftOrder}
           onClose={() => { setShowForm(false); setEditOrder(null); }}
           onSaved={handleSaved}
         />
@@ -736,11 +854,14 @@ export function OrdersPage() {
           order={detailOrder}
           onClose={() => setDetailOrder(null)}
           onEdit={() => {
+            setDraftOrder(null);
             setEditOrder(detailOrder);
             setDetailOrder(null);
             setShowForm(true);
           }}
           onDelete={handleDeleteFromDetail}
+          onRegisterPayment={() => handleRegisterPayment(detailOrder)}
+          onMarkDelivered={handleMarkDelivered}
         />
       )}
     </div>

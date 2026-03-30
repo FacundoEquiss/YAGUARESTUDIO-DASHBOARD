@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, transactions, clients, suppliers, orders } from "@workspace/db";
+import { db, transactions, clients, suppliers, orders, financialAccounts } from "@workspace/db";
 import { eq, and, isNull, desc, asc, ilike, sql, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -76,15 +76,18 @@ transactionsRouter.get("/transactions", requireAuth, async (req, res) => {
           clientId: transactions.clientId,
           supplierId: transactions.supplierId,
           orderId: transactions.orderId,
+          financialAccountId: transactions.financialAccountId,
           date: transactions.date,
           createdAt: transactions.createdAt,
           updatedAt: transactions.updatedAt,
           clientName: clients.name,
           supplierName: suppliers.name,
+          financialAccountName: financialAccounts.name,
         })
         .from(transactions)
         .leftJoin(clients, eq(transactions.clientId, clients.id))
         .leftJoin(suppliers, eq(transactions.supplierId, suppliers.id))
+        .leftJoin(financialAccounts, eq(transactions.financialAccountId, financialAccounts.id))
         .where(where)
         .orderBy(getSortOrder())
         .limit(limit)
@@ -200,7 +203,28 @@ transactionsRouter.get("/transactions/balances", requireAuth, async (req, res) =
       .where(and(baseCond, sql`${transactions.supplierId} IS NOT NULL`))
       .groupBy(transactions.supplierId, suppliers.name);
 
-    res.json({ clientBalances, supplierBalances });
+    const financialAccountBalances = await db
+      .select({
+        financialAccountId: financialAccounts.id,
+        accountName: financialAccounts.name,
+        accountType: financialAccounts.accountType,
+        openingBalance: financialAccounts.openingBalance,
+        totalIncome: sql<string>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} else 0 end), 0)`,
+        totalExpense: sql<string>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} else 0 end), 0)`,
+        transactionCount: sql<number>`count(${transactions.id})::int`,
+      })
+      .from(financialAccounts)
+      .leftJoin(
+        transactions,
+        and(
+          eq(transactions.financialAccountId, financialAccounts.id),
+          isNull(transactions.deletedAt),
+        ),
+      )
+      .where(and(eq(financialAccounts.userId, userId), isNull(financialAccounts.deletedAt)))
+      .groupBy(financialAccounts.id, financialAccounts.name, financialAccounts.accountType, financialAccounts.openingBalance);
+
+    res.json({ clientBalances, supplierBalances, financialAccountBalances });
   } catch (err) {
     console.error("GET /transactions/balances error:", err);
     res.status(500).json({ error: "Error al obtener saldos" });
@@ -210,7 +234,7 @@ transactionsRouter.get("/transactions/balances", requireAuth, async (req, res) =
 transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { type, amount, description, category, clientId, supplierId, orderId, date } = req.body;
+    const { type, amount, description, category, clientId, supplierId, orderId, financialAccountId, date } = req.body;
 
     if (!type || !isValidType(type)) {
       res.status(400).json({ error: "Tipo inválido (income o expense)" });
@@ -261,6 +285,17 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
       }
     }
 
+    let validFinancialAccountId: number | null = null;
+    if (financialAccountId) {
+      const parsed = Number(financialAccountId);
+      if (!isNaN(parsed) && parsed > 0) {
+        const [account] = await db.select({ id: financialAccounts.id }).from(financialAccounts)
+          .where(and(eq(financialAccounts.id, parsed), eq(financialAccounts.userId, userId), isNull(financialAccounts.deletedAt)));
+        if (!account) { res.status(400).json({ error: "Cuenta financiera no encontrada" }); return; }
+        validFinancialAccountId = parsed;
+      }
+    }
+
     const [tx] = await db
       .insert(transactions)
       .values({
@@ -272,6 +307,7 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
         clientId: validClientId,
         supplierId: validSupplierId,
         orderId: validOrderId,
+        financialAccountId: validFinancialAccountId,
         date: date ? new Date(date) : new Date(),
       })
       .returning();
@@ -294,7 +330,7 @@ transactionsRouter.put("/transactions/:id", requireAuth, async (req, res) => {
 
     if (!existing) { res.status(404).json({ error: "Transacción no encontrada" }); return; }
 
-    const { type, amount, description, category, clientId, supplierId, orderId, date } = req.body;
+    const { type, amount, description, category, clientId, supplierId, orderId, financialAccountId, date } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (type !== undefined) {
@@ -349,6 +385,19 @@ transactionsRouter.put("/transactions/:id", requireAuth, async (req, res) => {
         }
       } else {
         updates.orderId = null;
+      }
+    }
+    if (financialAccountId !== undefined) {
+      if (financialAccountId) {
+        const parsed = Number(financialAccountId);
+        if (!isNaN(parsed) && parsed > 0) {
+          const [account] = await db.select({ id: financialAccounts.id }).from(financialAccounts)
+            .where(and(eq(financialAccounts.id, parsed), eq(financialAccounts.userId, userId), isNull(financialAccounts.deletedAt)));
+          if (!account) { res.status(400).json({ error: "Cuenta financiera no encontrada" }); return; }
+          updates.financialAccountId = parsed;
+        }
+      } else {
+        updates.financialAccountId = null;
       }
     }
     if (date !== undefined) updates.date = date ? new Date(date) : new Date();

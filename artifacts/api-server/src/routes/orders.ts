@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, orders, orderCosts, clients } from "@workspace/db";
+import { db, orders, orderCosts, clients, transactions } from "@workspace/db";
 import { eq, and, isNull, desc, asc, ilike, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -14,6 +14,61 @@ async function validateClientOwnership(clientId: number, userId: number): Promis
 interface CostItemInput {
   title: string;
   amount: number;
+}
+
+interface RawOrderFinancialSummary {
+  incomeTotal: string;
+  expenseTotal: string;
+}
+
+function buildOrderFinancialSummary(orderTotal: string, financials?: RawOrderFinancialSummary) {
+  const total = Number(orderTotal || 0);
+  const paidAmount = Number(financials?.incomeTotal || 0);
+  const expenseAmount = Number(financials?.expenseTotal || 0);
+  const balanceDue = Math.max(0, total - paidAmount);
+  const netResult = paidAmount - expenseAmount;
+
+  return {
+    paidAmount: paidAmount.toFixed(2),
+    expenseAmount: expenseAmount.toFixed(2),
+    balanceDue: balanceDue.toFixed(2),
+    netResult: netResult.toFixed(2),
+  };
+}
+
+async function fetchOrderFinancialSummaries(userId: number, orderIds: number[]) {
+  const summaries: Record<number, RawOrderFinancialSummary> = {};
+
+  if (orderIds.length === 0) {
+    return summaries;
+  }
+
+  const rows = await db
+    .select({
+      orderId: transactions.orderId,
+      incomeTotal: sql<string>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} else 0 end), 0)`,
+      expenseTotal: sql<string>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} else 0 end), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        isNull(transactions.deletedAt),
+        sql`${transactions.orderId} IN (${sql.join(orderIds.map((id) => sql`${id}`), sql`, `)})`,
+      ),
+    )
+    .groupBy(transactions.orderId);
+
+  for (const row of rows) {
+    if (row.orderId != null) {
+      summaries[row.orderId] = {
+        incomeTotal: row.incomeTotal,
+        expenseTotal: row.expenseTotal,
+      };
+    }
+  }
+
+  return summaries;
 }
 
 const ordersRouter = Router();
@@ -88,9 +143,12 @@ ordersRouter.get("/orders", requireAuth, async (req, res) => {
       }
     }
 
+    const financialsMap = await fetchOrderFinancialSummaries(userId, orderIds);
+
     const ordersWithCosts = items.map((o) => ({
       ...o,
       costItems: costsMap[o.id] || [],
+      ...buildOrderFinancialSummary(o.totalPrice, financialsMap[o.id]),
     }));
 
     res.json({
@@ -177,10 +235,13 @@ ordersRouter.get("/orders/:id", requireAuth, async (req, res) => {
       .from(orderCosts)
       .where(eq(orderCosts.orderId, orderId));
 
+    const financialsMap = await fetchOrderFinancialSummaries(userId, [orderId]);
+
     res.json({
       order: {
         ...order,
         costItems: costs.map((c) => ({ id: c.id, title: c.title, amount: c.amount })),
+        ...buildOrderFinancialSummary(order.totalPrice, financialsMap[order.id]),
       },
     });
   } catch (err) {
@@ -268,7 +329,13 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
       insertedCosts = rows.map((r) => ({ id: r.id, title: r.title, amount: r.amount }));
     }
 
-    res.status(201).json({ order: { ...order, costItems: insertedCosts } });
+    res.status(201).json({
+      order: {
+        ...order,
+        costItems: insertedCosts,
+        ...buildOrderFinancialSummary(order.totalPrice),
+      },
+    });
   } catch (err) {
     console.error("POST /orders error:", err);
     res.status(500).json({ error: "Error al crear pedido" });
@@ -386,7 +453,13 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       updatedCosts = existingCosts.map((r) => ({ id: r.id, title: r.title, amount: r.amount }));
     }
 
-    res.json({ order: { ...order, costItems: updatedCosts } });
+    res.json({
+      order: {
+        ...order,
+        costItems: updatedCosts,
+        ...buildOrderFinancialSummary(String(order.totalPrice ?? existing.totalPrice)),
+      },
+    });
   } catch (err) {
     console.error("PUT /orders/:id error:", err);
     res.status(500).json({ error: "Error al actualizar pedido" });

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { v4 as uuidv4 } from "uuid";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Trash2, Save, Users, MessageCircle, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Plus, Trash2, Save, Users, MessageCircle, ChevronDown, ChevronUp, Info, ClipboardList } from "lucide-react";
 import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
 import { StampItem, packStamps, STAMP_COLORS } from "@/lib/skyline";
@@ -13,6 +14,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useUsage } from "@/hooks/use-usage";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { ToolSessionGate } from "@/components/tool-session-gate";
+import { saveOrderDraft } from "@/lib/drafts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,7 +78,36 @@ function buildWhatsAppFromCalc(params: {
   return msg;
 }
 
+function buildOrderDraftDescription(params: {
+  garments: number;
+  linearMeters: number;
+  stamps: StampItem[];
+  pressPasses: number;
+  talleActive: boolean;
+}) {
+  const stampSummary = params.stamps
+    .filter((stamp) => stamp.w > 0 && stamp.h > 0 && stamp.qty > 0)
+    .map((stamp, index) => `${stamp.title || `Estampa ${index + 1}`}: ${stamp.w}x${stamp.h} cm x ${stamp.qty}`)
+    .join(" | ");
+
+  const extras = [
+    `${params.garments} prenda${params.garments !== 1 ? "s" : ""}`,
+    `${params.linearMeters.toFixed(2)} m de DTF`,
+  ];
+
+  if (params.pressPasses > 0) {
+    extras.push(`${params.pressPasses} bajada${params.pressPasses !== 1 ? "s" : ""} de plancha`);
+  }
+
+  if (params.talleActive) {
+    extras.push("lleva talle");
+  }
+
+  return `${extras.join(" · ")}${stampSummary ? `\n${stampSummary}` : ""}`;
+}
+
 export function CalculatorPage() {
+  const [, setLocation] = useLocation();
   const { settings } = useDTFSettings();
   const { currentUser } = useAuth();
   const { theme } = useTheme();
@@ -271,6 +302,65 @@ export function CalculatorPage() {
       talleActive,
     });
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
+  const handleCreateOrderDraft = () => {
+    if (!isQuoteSessionUnlocked) {
+      toast({
+        title: "Primero iniciá la cotización",
+        description: "Así registramos el uso antes de crear el pedido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!clientName.trim()) {
+      toast({
+        title: "Falta el cliente",
+        description: "Ingresá el nombre del cliente antes de crear el pedido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (packedResult.placements.length === 0 || packedResult.errors.length > 0) {
+      toast({
+        title: "La cotización todavía no está lista",
+        description: "Revisá las estampas antes de crear el pedido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    saveOrderDraft({
+      clientName: clientName.trim(),
+      title: orderName.trim() || `Pedido de ${clientName.trim()}`,
+      description: buildOrderDraftDescription({
+        garments,
+        linearMeters,
+        stamps,
+        pressPasses,
+        talleActive,
+      }),
+      quantity: garments,
+      unitPrice: pricePerGarment,
+      totalPrice: totalOrder,
+      status: "nuevo",
+      notes: notes.trim() || undefined,
+      costItems: [
+        {
+          title: `Cotización DTF (${linearMeters.toFixed(2)} m)`,
+          amount: totalOrder,
+        },
+      ],
+    });
+
+    toast({
+      title: "Pedido prearmado",
+      description: "Te llevé a Pedidos con la cotización cargada.",
+    });
+
+    setLocation("/orders");
   };
 
   const validStampsCount = stamps.filter(s => s.w > 0 && s.h > 0).length;
@@ -826,7 +916,7 @@ export function CalculatorPage() {
         </AnimatePresence>
       </div>
 
-      <div className="hidden md:flex gap-2">
+      <div className="hidden md:grid grid-cols-3 gap-2">
         <button
           onClick={handleSave}
           disabled={packedResult.errors.length > 0}
@@ -841,6 +931,21 @@ export function CalculatorPage() {
         >
           <Save className="w-4 h-4 text-white shrink-0" />
           <span className="text-white font-bold text-sm">Guardar Cotización</span>
+        </button>
+        <button
+          onClick={handleCreateOrderDraft}
+          disabled={packedResult.errors.length > 0}
+          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "linear-gradient(135deg, rgba(59,130,246,0.92) 0%, rgba(37,99,235,0.95) 100%)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: "0 4px 12px rgba(59,130,246,0.28), 0 1px 0 rgba(255,255,255,0.25) inset",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
+        >
+          <ClipboardList className="w-4 h-4 text-white shrink-0" />
+          <span className="text-white font-bold text-sm">Crear Pedido</span>
         </button>
         <button
           onClick={handleShareWhatsApp}
@@ -889,7 +994,7 @@ export function CalculatorPage() {
         </div>
       )}
 
-      <div className="flex gap-3 mt-4 md:hidden">
+      <div className="grid grid-cols-3 gap-3 mt-4 md:hidden">
         <button
           onClick={handleSave}
           disabled={packedResult.errors.length > 0}
@@ -910,6 +1015,29 @@ export function CalculatorPage() {
           </div>
           <span className="text-white font-bold text-sm leading-tight text-center">
             Guardar<br />Cotización
+          </span>
+        </button>
+
+        <button
+          onClick={handleCreateOrderDraft}
+          disabled={packedResult.errors.length > 0}
+          className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "linear-gradient(135deg, rgba(59,130,246,0.92) 0%, rgba(37,99,235,0.95) 100%)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: "0 8px 24px rgba(59,130,246,0.28), 0 1px 0 rgba(255,255,255,0.25) inset",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
+            <ClipboardList className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-white font-bold text-sm leading-tight text-center">
+            Crear<br />Pedido
           </span>
         </button>
 

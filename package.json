@@ -7,6 +7,10 @@
     "build": "pnpm run typecheck && pnpm -r --workspace-concurrency=1 --filter \"!./artifacts/mockup-sandbox\" --if-present run build",
     "test": "pnpm -r --workspace-concurrency=1 --if-present run test",
     "smoke:deploy": "pnpm --filter @workspace/scripts run smoke:deploy",
+    "db:push": "pnpm --filter @workspace/db run push",
+    "db:reset-users": "pnpm --filter @workspace/scripts run db:reset-users",
+    "db:seed-demo": "pnpm --filter @workspace/scripts run db:seed-demo",
+    "db:reset-and-seed-demo": "pnpm --filter @workspace/scripts run db:reset-and-seed-demo",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --workspace-concurrency=1 --filter \"./artifacts/**\" --filter \"!./artifacts/mockup-sandbox\" --filter \"./scripts\" --if-present run typecheck"
   },

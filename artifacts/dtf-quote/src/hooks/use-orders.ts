@@ -26,6 +26,10 @@ export interface OrderItem {
   dueDate: string | null;
   notes: string | null;
   costItems: CostItem[];
+  paidAmount?: string;
+  expenseAmount?: string;
+  balanceDue?: string;
+  netResult?: string;
   createdAt: string;
   updatedAt: string;
 }
