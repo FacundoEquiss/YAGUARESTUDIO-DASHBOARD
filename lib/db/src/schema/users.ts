@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
+  username: varchar("username", { length: 50 }).unique(),
   supabaseAuthId: text("supabase_auth_id").unique(),
   name: varchar("name", { length: 255 }).notNull(),
   lastName: varchar("last_name", { length: 255 }),

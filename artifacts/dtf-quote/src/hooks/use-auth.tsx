@@ -6,6 +6,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 export interface AuthUser {
   id: string;
   email: string;
+  username?: string | null;
   name: string;
   lastName?: string | null;
   role: "master" | "user" | "guest";
@@ -29,6 +30,7 @@ const SESSION_KEY = "dtf:session";
 interface ApiUser {
   id: number;
   email: string;
+  username?: string | null;
   name: string;
   lastName?: string | null;
   role: string;
@@ -43,6 +45,7 @@ function mapUser(u: ApiUser): AuthUser {
   return {
     id: String(u.id),
     email: u.email,
+    username: u.username,
     name: u.name,
     lastName: u.lastName,
     role: u.role as "master" | "user",
@@ -59,7 +62,16 @@ interface AuthContextValue {
   subscription: SubscriptionInfo | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>;
-  register: (email: string, password: string, name: string) => Promise<string | null>;
+  register: (payload: {
+    email: string;
+    password: string;
+    name: string;
+    lastName: string;
+    username: string;
+    birthDate: string;
+    phone: string;
+    businessName: string;
+  }) => Promise<string | null>;
   signInWithGoogle: (nextPath?: string) => Promise<string | null>;
   syncSupabaseSession: (accessToken: string) => Promise<string | null>;
   logout: () => Promise<void>;
@@ -125,7 +137,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
-  const register = useCallback(async (email: string, password: string, name: string): Promise<string | null> => {
+  const register = useCallback(async (payload: {
+    email: string;
+    password: string;
+    name: string;
+    lastName: string;
+    username: string;
+    birthDate: string;
+    phone: string;
+    businessName: string;
+  }): Promise<string | null> => {
     const apiReady = await waitForApiReady();
     if (!apiReady) {
       return "El servidor está despertando. Probá de nuevo en unos segundos.";
@@ -133,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data, error } = await apiFetch<{ user: ApiUser }>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify(payload),
     });
     if (error) return error;
     if (data?.user) {
@@ -183,7 +204,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data, error } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/supabase/sync", {
       method: "POST",
-      body: JSON.stringify({ accessToken }),
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
 
     if (error) {

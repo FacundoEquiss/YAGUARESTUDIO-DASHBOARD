@@ -17,7 +17,7 @@ export function AuthCallbackPage() {
   const [processing, setProcessing] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const nextPath = useMemo(() => getNextPath(), []);
-  const hardUiTimeoutMs = 10000;
+  const hardUiTimeoutMs = 30000;
 
   const describeError = (code: string, detail?: string): string => {
     if (detail && detail.trim().length > 0) {
@@ -52,20 +52,32 @@ export function AuthCallbackPage() {
       setErrorMessage(describeError(code, detail));
     };
 
-    const complete = async (accessToken?: string) => {
+    const complete = async (session: { access_token?: string } | null) => {
+      const accessToken = session?.access_token;
       if (!accessToken || cancelled || handled) {
         return;
       }
 
-      const syncError = await syncSupabaseSession(accessToken);
-      if (syncError) {
-        fail("oauth_sync", syncError);
-        return;
-      }
+      const retryDelaysMs = [0, 500, 1200];
 
-      handled = true;
-      setProcessing(false);
-      setLocation(nextPath);
+      for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
+        if (retryDelaysMs[attempt] > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, retryDelaysMs[attempt]));
+        }
+
+        const syncError = await syncSupabaseSession(accessToken);
+        if (!syncError) {
+          handled = true;
+          setProcessing(false);
+          setLocation(nextPath);
+          return;
+        }
+
+        if (attempt === retryDelaysMs.length - 1) {
+          fail("oauth_sync", syncError);
+          return;
+        }
+      }
     };
 
     const hardTimeout = window.setTimeout(() => {
@@ -85,7 +97,13 @@ export function AuthCallbackPage() {
         return;
       }
 
-      void complete(session?.access_token);
+      void complete(session);
+    });
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data?.session) {
+        void complete(data.session);
+      }
     });
 
     return () => {

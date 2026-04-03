@@ -100,11 +100,11 @@ export function buildRuntimeEnv(source: NodeJS.ProcessEnv = process.env): Runtim
   }
 
   if (isHosted && !runtimeEnv.supabaseUrl) {
-    warnings.push("SUPABASE_URL is missing. Supabase Auth sync endpoint will be unavailable.");
+    errors.push("SUPABASE_URL is required in production when using Google Auth.");
   }
 
   if (isHosted && !runtimeEnv.supabaseAnonKey) {
-    warnings.push("SUPABASE_ANON_KEY is missing. Supabase Auth sync endpoint will be unavailable.");
+    errors.push("SUPABASE_ANON_KEY is required in production when using Google Auth.");
   }
 
   if (errors.length > 0) {

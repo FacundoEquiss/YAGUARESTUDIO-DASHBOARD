@@ -7,13 +7,14 @@ import webhooksRouter from "./routes/webhooks";
 import { env } from "./env";
 
 const app: Express = express();
+app.set("trust proxy", 1);
 
 const hostedDefaultOrigins = [
   "https://yaguarestudio.xyz",
   "https://www.yaguarestudio.xyz",
 ];
 
-const vercelPreviewPattern = /(^|-)yaguarestudio([-.].*)?\.vercel\.app$/i;
+const vercelPreviewPattern = /^[a-z0-9-]+\.vercel\.app$/i;
 
 function normalizeOrigin(origin: string): string | null {
   const trimmed = origin.trim().replace(/^["']|["']$/g, "");
@@ -73,7 +74,19 @@ function isAllowedOrigin(origin: unknown): boolean {
     return true;
   }
 
-  return vercelPreviewPattern.test(hostname);
+  const isYaguarPrefix = hostname.startsWith("yaguarestudio");
+  if (isYaguarPrefix) {
+    if (hostname.endsWith(".yaguarestudio.xyz")) {
+      return true;
+    }
+
+    if (hostname.endsWith(".vercel.app")) {
+      return true;
+    }
+  }
+
+  // Restrict previews to yaguarestudio-* Vercel subdomains only.
+  return vercelPreviewPattern.test(hostname) && hostname.startsWith("yaguarestudio-");
 }
 
 app.use((req, res, next) => {
@@ -104,6 +117,16 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((_, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (env.isHosted) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
+
 const corsOptions: cors.CorsOptions = {
   credentials: true,
   optionsSuccessStatus: 204,
@@ -122,7 +145,7 @@ const corsOptions: cors.CorsOptions = {
     }
 
     if (typeof origin !== "string") {
-      callback(null, true);
+      callback(null, false);
       return;
     }
 
@@ -142,7 +165,7 @@ const corsOptions: cors.CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 app.use(cookieParser());
 app.use(express.json());

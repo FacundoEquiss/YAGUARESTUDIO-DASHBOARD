@@ -36,7 +36,13 @@ export function AuthPage() {
   const [tab, setTab] = useState<Tab>(getInitialTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [phone, setPhone] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const oauthError = getSearchParams().get("error");
   const [error, setError] = useState<string | null>(
     oauthError ? "No se pudo completar el acceso con Google" : null
@@ -46,6 +52,9 @@ export function AuthPage() {
 
   const nextRoute = getNextRoute();
   const pageLabel = PAGE_LABELS[nextRoute] || "TRAZO";
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const usernameRegex = /^[a-z0-9._-]{3,30}$/;
 
   const handleSuccess = () => {
     setLocation(nextRoute);
@@ -57,8 +66,18 @@ export function AuthPage() {
     setLoading(true);
     try {
       if (tab === "register") {
-        if (!name.trim()) {
-          setError("El nombre es requerido");
+        if (!name.trim() || !lastName.trim() || !username.trim() || !birthDate || !phone.trim() || !businessName.trim()) {
+          setError("Completá todos los campos del registro");
+          setLoading(false);
+          return;
+        }
+        if (!emailRegex.test(email.trim().toLowerCase())) {
+          setError("Ingresá un correo válido");
+          setLoading(false);
+          return;
+        }
+        if (!usernameRegex.test(username.trim().toLowerCase())) {
+          setError("El nombre de usuario debe tener 3-30 caracteres y usar solo letras minúsculas, números, punto, guion o guion bajo");
           setLoading(false);
           return;
         }
@@ -67,7 +86,21 @@ export function AuthPage() {
           setLoading(false);
           return;
         }
-        const err = await register(email, password, name);
+        if (password !== confirmPassword) {
+          setError("Las contraseñas no coinciden");
+          setLoading(false);
+          return;
+        }
+        const err = await register({
+          email: email.trim().toLowerCase(),
+          password,
+          name: name.trim(),
+          lastName: lastName.trim(),
+          username: username.trim().toLowerCase(),
+          birthDate,
+          phone: phone.trim(),
+          businessName: businessName.trim(),
+        });
         if (err) setError(err);
         else handleSuccess();
       } else {
@@ -161,15 +194,66 @@ export function AuthPage() {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="space-y-1.5 pb-1">
+                  <div className="space-y-3 pb-1">
                     <Label htmlFor="auth-name" className="font-bold flex items-center gap-1.5">
                       <User className="w-4 h-4" /> Nombre
                     </Label>
                     <Input
                       id="auth-name"
-                      placeholder="Tu nombre o empresa"
+                      placeholder="Tu nombre"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      required={tab === "register"}
+                    />
+
+                    <Label htmlFor="auth-last-name" className="font-bold flex items-center gap-1.5">
+                      <User className="w-4 h-4" /> Apellido
+                    </Label>
+                    <Input
+                      id="auth-last-name"
+                      placeholder="Tu apellido"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required={tab === "register"}
+                    />
+
+                    <Label htmlFor="auth-username" className="font-bold flex items-center gap-1.5">
+                      <User className="w-4 h-4" /> Nombre de usuario
+                    </Label>
+                    <Input
+                      id="auth-username"
+                      placeholder="ej: yaguar.estudio"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                      required={tab === "register"}
+                    />
+
+                    <Label htmlFor="auth-birth-date" className="font-bold">Fecha de nacimiento</Label>
+                    <Input
+                      id="auth-birth-date"
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      required={tab === "register"}
+                    />
+
+                    <Label htmlFor="auth-phone" className="font-bold">Teléfono</Label>
+                    <Input
+                      id="auth-phone"
+                      type="tel"
+                      placeholder="+54 11 1234 5678"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required={tab === "register"}
+                    />
+
+                    <Label htmlFor="auth-business-name" className="font-bold">Nombre de negocio o marca</Label>
+                    <Input
+                      id="auth-business-name"
+                      placeholder="Yaguar Studio"
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      required={tab === "register"}
                     />
                   </div>
                 </motion.div>
@@ -203,6 +287,32 @@ export function AuthPage() {
                 required
               />
             </div>
+
+            <AnimatePresence mode="wait">
+              {tab === "register" && (
+                <motion.div
+                  key="confirm-password-field"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-1.5 pb-1">
+                    <Label htmlFor="auth-confirm-password" className="font-bold flex items-center gap-1.5">
+                      <Lock className="w-4 h-4" /> Confirmar contraseña
+                    </Label>
+                    <Input
+                      id="auth-confirm-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required={tab === "register"}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {error && (

@@ -61,6 +61,7 @@ export function ProfilePage() {
   const { toast } = useToast();
 
   const [name, setName] = useState(currentUser?.name || "");
+  const [username, setUsername] = useState(currentUser?.username || "");
   const [lastName, setLastName] = useState(currentUser?.lastName || "");
   const [phone, setPhone] = useState(currentUser?.phone || "");
   const [businessName, setBusinessName] = useState(currentUser?.businessName || "");
@@ -80,6 +81,7 @@ export function ProfilePage() {
   useEffect(() => {
     if (currentUser) {
       setName(currentUser.name || "");
+      setUsername(currentUser.username || "");
       setLastName(currentUser.lastName || "");
       setPhone(currentUser.phone || "");
       setBusinessName(currentUser.businessName || "");
@@ -221,7 +223,7 @@ export function ProfilePage() {
     try {
       const { data, error } = await apiFetch<{ user: Partial<AuthUser> }>("/auth/profile", {
         method: "PUT",
-        body: JSON.stringify({ name, lastName, phone, businessName, birthDate }),
+        body: JSON.stringify({ name, username, lastName, phone, businessName, birthDate }),
       });
       if (error) {
         toast({ title: "Error", description: error, variant: "destructive" });
@@ -430,6 +432,15 @@ export function ProfilePage() {
             </Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" />
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" /> Nombre de usuario
+            </Label>
+            <Input value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} placeholder="yaguar.estudio" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
               <User className="w-3.5 h-3.5" /> Apellido
