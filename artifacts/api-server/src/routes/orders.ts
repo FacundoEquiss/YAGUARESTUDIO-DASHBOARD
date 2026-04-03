@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, orders, orderCosts, clients, transactions } from "@workspace/db";
 import { eq, and, isNull, desc, asc, ilike, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { calculateDtfPricingForUser, DtfPricingError, type DtfPricingInput } from "../lib/dtf-pricing";
 
 async function validateClientOwnership(clientId: number, userId: number): Promise<boolean> {
   const [client] = await db
@@ -253,7 +254,20 @@ ordersRouter.get("/orders/:id", requireAuth, async (req, res) => {
 ordersRouter.post("/orders", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { clientName, clientId, title, description, quantity, unitPrice, totalPrice, status, dueDate, notes, costItems } = req.body;
+    const { clientName, clientId, title, description, quantity, unitPrice, totalPrice, status, dueDate, notes, costItems, pricingInput } = req.body as {
+      clientName?: string;
+      clientId?: number | string | null;
+      title?: string;
+      description?: string;
+      quantity?: number | string;
+      unitPrice?: number | string;
+      totalPrice?: number | string;
+      status?: string;
+      dueDate?: string | null;
+      notes?: string;
+      costItems?: Array<{ title?: string; amount?: number | string }>;
+      pricingInput?: DtfPricingInput;
+    };
 
     if (!clientName || typeof clientName !== "string" || clientName.trim().length === 0) {
       res.status(400).json({ error: "Nombre de cliente es requerido" });
@@ -287,10 +301,22 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
       }
     }
 
-    const qty = Math.max(1, Number(quantity) || 1);
-    const uPrice = Math.max(0, Number(unitPrice) || 0);
+    let qty = Math.max(1, Number(quantity) || 1);
+    let uPrice = Math.max(0, Number(unitPrice) || 0);
     let tPrice: number;
-    if (parsedCostItems.length > 0) {
+
+    if (pricingInput) {
+      const pricing = await calculateDtfPricingForUser(userId, pricingInput);
+      qty = pricing.garments;
+      uPrice = pricing.pricePerGarment;
+      tPrice = pricing.totalOrder;
+
+      parsedCostItems.length = 0;
+      parsedCostItems.push({
+        title: `Cotización DTF (${pricing.linearMeters.toFixed(2)} m)` ,
+        amount: pricing.totalOrder,
+      });
+    } else if (parsedCostItems.length > 0) {
       tPrice = parsedCostItems.reduce((sum, ci) => sum + ci.amount, 0);
     } else {
       tPrice = totalPrice != null ? Math.max(0, Number(totalPrice)) : qty * uPrice;
@@ -337,6 +363,10 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    if (err instanceof DtfPricingError) {
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
     console.error("POST /orders error:", err);
     res.status(500).json({ error: "Error al crear pedido" });
   }
@@ -368,7 +398,20 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       return;
     }
 
-    const { clientName, clientId, title, description, quantity, unitPrice, totalPrice, status, dueDate, notes, costItems } = req.body;
+    const { clientName, clientId, title, description, quantity, unitPrice, totalPrice, status, dueDate, notes, costItems, pricingInput } = req.body as {
+      clientName?: string;
+      clientId?: number | string | null;
+      title?: string;
+      description?: string;
+      quantity?: number | string;
+      unitPrice?: number | string;
+      totalPrice?: number | string;
+      status?: string;
+      dueDate?: string | null;
+      notes?: string;
+      costItems?: Array<{ title?: string; amount?: number | string }>;
+      pricingInput?: DtfPricingInput;
+    };
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
@@ -406,7 +449,25 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
     if (notes !== undefined) updates.notes = notes?.trim() || null;
 
     let updatedCosts: Array<{ id: number; title: string; amount: string }> = [];
-    if (Array.isArray(costItems)) {
+    if (pricingInput) {
+      const pricing = await calculateDtfPricingForUser(userId, pricingInput);
+      updates.quantity = pricing.garments;
+      updates.unitPrice = pricing.pricePerGarment.toFixed(2);
+      updates.totalPrice = pricing.totalOrder.toFixed(2);
+
+      await db.delete(orderCosts).where(eq(orderCosts.orderId, orderId));
+      const rows = await db
+        .insert(orderCosts)
+        .values([
+          {
+            orderId,
+            title: `Cotización DTF (${pricing.linearMeters.toFixed(2)} m)`,
+            amount: pricing.totalOrder.toFixed(2),
+          },
+        ])
+        .returning();
+      updatedCosts = rows.map((r) => ({ id: r.id, title: r.title, amount: r.amount }));
+    } else if (Array.isArray(costItems)) {
       const parsedCostItems: CostItemInput[] = [];
       for (const ci of costItems) {
         if (ci.title && typeof ci.title === "string" && ci.title.trim().length > 0) {
@@ -461,6 +522,10 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    if (err instanceof DtfPricingError) {
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
     console.error("PUT /orders/:id error:", err);
     res.status(500).json({ error: "Error al actualizar pedido" });
   }

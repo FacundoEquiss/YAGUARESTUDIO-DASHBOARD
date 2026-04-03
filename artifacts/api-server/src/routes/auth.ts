@@ -1,9 +1,11 @@
 import { Router } from "express";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { db, users, subscriptionPlans, userSubscriptions } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { signToken, requireAuth } from "../middleware/auth";
 import { env } from "../env";
+import { supabase } from "../lib/supabase";
 
 const authRouter = Router();
 
@@ -53,6 +55,7 @@ function userProfile(user: typeof users.$inferSelect) {
   return {
     id: user.id,
     email: user.email,
+    supabaseAuthId: user.supabaseAuthId,
     name: user.name,
     lastName: user.lastName,
     role: user.role,
@@ -62,6 +65,20 @@ function userProfile(user: typeof users.$inferSelect) {
     profilePhotoUrl: user.profilePhotoUrl,
     createdAt: user.createdAt,
   };
+}
+
+function normalizeSupabaseEmail(rawEmail: string | null | undefined): string {
+  return (rawEmail || "").trim().toLowerCase();
+}
+
+function buildDefaultName(rawName: string | null | undefined, email: string): string {
+  const candidate = (rawName || "").trim();
+  if (candidate.length > 0) {
+    return candidate;
+  }
+
+  const localPart = email.split("@")[0]?.trim();
+  return localPart && localPart.length > 0 ? localPart : "Usuario";
 }
 
 authRouter.post("/auth/register", async (req, res) => {
@@ -182,6 +199,134 @@ authRouter.post("/auth/login", async (req, res) => {
       error: err,
     });
     res.status(500).json({ error: "Error al iniciar sesión" });
+  }
+});
+
+authRouter.post("/auth/supabase/sync", async (req, res) => {
+  try {
+    const { accessToken } = req.body as { accessToken?: string };
+
+    if (!accessToken) {
+      res.status(400).json({ error: "accessToken es requerido" });
+      return;
+    }
+
+    if (!supabase) {
+      res.status(500).json({ error: "Supabase Auth no está configurado en el servidor" });
+      return;
+    }
+
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    if (error || !data.user) {
+      res.status(401).json({ error: "Token de Supabase inválido o expirado" });
+      return;
+    }
+
+    const supabaseUser = data.user;
+    const supabaseAuthId = supabaseUser.id;
+    const normalizedEmail = normalizeSupabaseEmail(supabaseUser.email);
+
+    if (!normalizedEmail) {
+      res.status(400).json({ error: "La cuenta de Supabase no tiene email válido" });
+      return;
+    }
+
+    let [localUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.supabaseAuthId, supabaseAuthId));
+
+    if (!localUser) {
+      const [byEmail] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, normalizedEmail));
+
+      if (byEmail) {
+        if (byEmail.supabaseAuthId && byEmail.supabaseAuthId !== supabaseAuthId) {
+          res.status(409).json({ error: "El correo ya está vinculado a otra cuenta de Supabase" });
+          return;
+        }
+
+        const [linkedUser] = await db
+          .update(users)
+          .set({ supabaseAuthId })
+          .where(eq(users.id, byEmail.id))
+          .returning();
+
+        localUser = linkedUser;
+      }
+    }
+
+    if (!localUser) {
+      const metadataName = typeof supabaseUser.user_metadata?.name === "string"
+        ? supabaseUser.user_metadata.name
+        : typeof supabaseUser.user_metadata?.full_name === "string"
+          ? supabaseUser.user_metadata.full_name
+          : null;
+
+      const generatedPasswordHash = await bcrypt.hash(crypto.randomUUID(), 10);
+
+      const [createdUser] = await db
+        .insert(users)
+        .values({
+          email: normalizedEmail,
+          supabaseAuthId,
+          name: buildDefaultName(metadataName, normalizedEmail),
+          passwordHash: generatedPasswordHash,
+          role: "user",
+        })
+        .returning();
+
+      localUser = createdUser;
+
+      const [freePlan] = await db
+        .select()
+        .from(subscriptionPlans)
+        .where(eq(subscriptionPlans.slug, "free"));
+
+      if (freePlan) {
+        const now = new Date();
+        const periodEnd = new Date(now);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+        await db.insert(userSubscriptions).values({
+          userId: localUser.id,
+          planId: freePlan.id,
+          status: "active",
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        });
+      }
+    }
+
+    const token = signToken({
+      userId: localUser.id,
+      email: localUser.email,
+      role: localUser.role,
+    });
+
+    res.cookie("token", token, getAuthCookieOptions());
+
+    const [subscription] = await db
+      .select({
+        planName: subscriptionPlans.name,
+        planSlug: subscriptionPlans.slug,
+        limits: subscriptionPlans.limits,
+        status: userSubscriptions.status,
+        periodEnd: userSubscriptions.currentPeriodEnd,
+      })
+      .from(userSubscriptions)
+      .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
+      .where(eq(userSubscriptions.userId, localUser.id));
+
+    res.json({
+      user: userProfile(localUser),
+      subscription: subscription || null,
+    });
+  } catch (err) {
+    console.error("POST /auth/supabase/sync error:", err);
+    res.status(500).json({ error: "Error al sincronizar sesión con Supabase" });
   }
 });
 

@@ -31,6 +31,8 @@ export interface RuntimeEnv {
   port: number;
   databaseUrl?: string;
   jwtSecret?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
   frontendUrl?: string;
   masterEmail?: string;
   masterPassword?: string;
@@ -52,6 +54,8 @@ export function buildRuntimeEnv(source: NodeJS.ProcessEnv = process.env): Runtim
     port: parsePort(readEnv(source, "PORT")),
     databaseUrl: readEnv(source, "DATABASE_URL"),
     jwtSecret: readEnv(source, "JWT_SECRET"),
+    supabaseUrl: readEnv(source, "SUPABASE_URL"),
+    supabaseAnonKey: readEnv(source, "SUPABASE_ANON_KEY"),
     frontendUrl: readEnv(source, "FRONTEND_URL"),
     masterEmail: readEnv(source, "MASTER_EMAIL"),
     masterPassword: readEnv(source, "MASTER_PASSWORD"),
@@ -93,6 +97,14 @@ export function buildRuntimeEnv(source: NodeJS.ProcessEnv = process.env): Runtim
 
   if (isHosted && !runtimeEnv.mpPremiumPlanId) {
     warnings.push("MP_PREMIUM_PLAN_ID is missing. Premium paid checkout will be unavailable.");
+  }
+
+  if (isHosted && !runtimeEnv.supabaseUrl) {
+    warnings.push("SUPABASE_URL is missing. Supabase Auth sync endpoint will be unavailable.");
+  }
+
+  if (isHosted && !runtimeEnv.supabaseAnonKey) {
+    warnings.push("SUPABASE_ANON_KEY is missing. Supabase Auth sync endpoint will be unavailable.");
   }
 
   if (errors.length > 0) {

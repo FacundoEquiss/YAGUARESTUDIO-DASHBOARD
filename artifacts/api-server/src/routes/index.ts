@@ -10,6 +10,7 @@ import transactionsRouter from "./transactions";
 import feedbackRouter from "./feedback";
 import financialAccountsRouter from "./financial-accounts";
 import productsRouter from "./products";
+import pricingRouter from "./pricing";
 
 const router: IRouter = Router();
 
@@ -23,6 +24,7 @@ router.use(suppliersRouter);
 router.use(transactionsRouter);
 router.use(financialAccountsRouter);
 router.use(productsRouter);
+router.use(pricingRouter);
 router.use(feedbackRouter);
 
 export default router;

@@ -15,6 +15,8 @@ import { useUsage } from "@/hooks/use-usage";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { ToolSessionGate } from "@/components/tool-session-gate";
 import { saveOrderDraft } from "@/lib/drafts";
+import { fetchAuthoritativeDtfPricing } from "@/lib/dtf-pricing-api";
+import type { DtfPricingInput } from "@/hooks/use-orders";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,6 +134,7 @@ export function CalculatorPage() {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showMathExplanation, setShowMathExplanation] = useState(false);
   const [settingsSynced, setSettingsSynced] = useState(false);
+  const [pricingBusy, setPricingBusy] = useState(false);
 
   useEffect(() => {
     if (!settingsSynced && settings.pressPassThreshold > 0) {
@@ -180,8 +183,54 @@ export function CalculatorPage() {
   const totalOrder = pricePerGarment * garments;
   const pricePerGarmentWholesale = Math.ceil((dtfCostPerGarment + settings.wholesaleMargin + pressPassExtra + talleSurchargeAmount) / 100) * 100;
   const totalOrderWholesale = pricePerGarmentWholesale * garments;
+  const estimatedPricePerGarment = pricePerGarment;
+  const estimatedTotalOrder = totalOrder;
+  const estimatedPricePerGarmentWholesale = pricePerGarmentWholesale;
+  const estimatedTotalOrderWholesale = totalOrderWholesale;
   const isMaster = currentUser?.role === "master";
   const isQuoteSessionUnlocked = isMaster || quoteSessionStarted;
+
+  const buildPricingInput = (): DtfPricingInput => ({
+    garments,
+    pressPasses,
+    talleActive,
+    stamps: stamps
+      .filter((s) => s.w > 0 && s.h > 0 && s.qty > 0)
+      .map((s) => ({
+        id: s.id,
+        w: s.w,
+        h: s.h,
+        qty: s.qty,
+        title: s.title,
+      })),
+  });
+
+  const requestAuthoritativePricing = async () => {
+    const pricingInput = buildPricingInput();
+    if (pricingInput.stamps.length === 0) {
+      toast({
+        title: "Cotización vacía",
+        description: "Agrega al menos una estampa válida para cotizar.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    setPricingBusy(true);
+    const { pricing, error } = await fetchAuthoritativeDtfPricing(pricingInput);
+    setPricingBusy(false);
+
+    if (error || !pricing) {
+      toast({
+        title: "No se pudo validar el precio",
+        description: error || "Error al calcular precio en backend.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    return { pricingInput, pricing };
+  };
 
   const handleStartQuoteSession = async () => {
     if (isQuoteSessionUnlocked) {
@@ -249,18 +298,31 @@ export function CalculatorPage() {
       return;
     }
 
+    const authoritative = await requestAuthoritativePricing();
+    if (!authoritative) {
+      return;
+    }
+
     saveQuote({
       clientName,
       orderName,
       notes,
       stamps: stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0),
-      placements: packedResult.placements,
-      totalHeight: packedResult.totalHeight,
-      linearMeters,
-      totalPrice: totalOrder,
+      placements: authoritative.pricing.placements.map((p) => ({
+        id: `${p.itemIndex}-${p.x}-${p.y}`,
+        itemIndex: p.itemIndex,
+        x: p.x,
+        y: p.y,
+        w: p.w,
+        h: p.h,
+        color: STAMP_COLORS[p.itemIndex % STAMP_COLORS.length],
+      })),
+      totalHeight: authoritative.pricing.totalHeight,
+      linearMeters: authoritative.pricing.linearMeters,
+      totalPrice: authoritative.pricing.totalOrder,
       rollWidth: settings.rollWidth,
-      garmentsCount: garments,
-      pricePerGarment,
+      garmentsCount: authoritative.pricing.garments,
+      pricePerGarment: authoritative.pricing.pricePerGarment,
       pressPasses,
       talleEnabled: talleActive,
     });
@@ -304,7 +366,7 @@ export function CalculatorPage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
-  const handleCreateOrderDraft = () => {
+  const handleCreateOrderDraft = async () => {
     if (!isQuoteSessionUnlocked) {
       toast({
         title: "Primero iniciá la cotización",
@@ -332,27 +394,33 @@ export function CalculatorPage() {
       return;
     }
 
+    const authoritative = await requestAuthoritativePricing();
+    if (!authoritative) {
+      return;
+    }
+
     saveOrderDraft({
       clientName: clientName.trim(),
       title: orderName.trim() || `Pedido de ${clientName.trim()}`,
       description: buildOrderDraftDescription({
-        garments,
-        linearMeters,
+        garments: authoritative.pricing.garments,
+        linearMeters: authoritative.pricing.linearMeters,
         stamps,
         pressPasses,
         talleActive,
       }),
-      quantity: garments,
-      unitPrice: pricePerGarment,
-      totalPrice: totalOrder,
+      quantity: authoritative.pricing.garments,
+      unitPrice: authoritative.pricing.pricePerGarment,
+      totalPrice: authoritative.pricing.totalOrder,
       status: "nuevo",
       notes: notes.trim() || undefined,
       costItems: [
         {
-          title: `Cotización DTF (${linearMeters.toFixed(2)} m)`,
-          amount: totalOrder,
+          title: `Cotización DTF (${authoritative.pricing.linearMeters.toFixed(2)} m)`,
+          amount: authoritative.pricing.totalOrder,
         },
       ],
+      pricingInput: authoritative.pricingInput,
     });
 
     toast({
@@ -751,14 +819,14 @@ export function CalculatorPage() {
               className="w-full flex justify-between items-center px-3 py-2.5 hover:bg-white/5 transition-colors"
             >
               <span className="text-white/90 text-sm flex items-center gap-1">
-                Precio por prenda
+                Precio por prenda estimado
                 {showBreakdown ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </span>
               <div className="text-right">
-                <div className="font-bold text-white text-base">{formatCurrency(pricePerGarment)}</div>
+                <div className="font-bold text-white text-base">{formatCurrency(estimatedPricePerGarment)}</div>
                 {showWholesale && (
                   <div className="text-white text-sm font-semibold bg-white/20 rounded-md px-2 py-0.5 mt-0.5">
-                    Mayorista: {formatCurrency(pricePerGarmentWholesale)}
+                    Mayorista: {formatCurrency(estimatedPricePerGarmentWholesale)}
                   </div>
                 )}
               </div>
@@ -822,13 +890,13 @@ export function CalculatorPage() {
             <div className="bg-white/15 rounded-xl p-4 flex justify-between items-end">
               <span className="text-xs font-bold text-white/70 tracking-widest uppercase">TOTAL COMÚN</span>
               <span className="text-2xl font-display font-black text-white">
-                {formatCurrency(totalOrder)}
+                {formatCurrency(estimatedTotalOrder)}
               </span>
             </div>
             <div className="bg-white text-foreground rounded-xl p-4 flex justify-between items-end shadow-inner">
               <span className="text-xs font-bold text-muted-foreground tracking-widest uppercase">TOTAL MAYORISTA</span>
               <span className="text-2xl font-display font-black text-primary">
-                {formatCurrency(totalOrderWholesale)}
+                {formatCurrency(estimatedTotalOrderWholesale)}
               </span>
             </div>
           </div>
@@ -836,7 +904,7 @@ export function CalculatorPage() {
           <div className="bg-white text-foreground rounded-xl p-4 flex justify-between items-end shadow-inner">
             <span className="text-sm font-bold text-muted-foreground tracking-widest uppercase">TOTAL PEDIDO</span>
             <span className="text-3xl font-display font-black text-primary">
-              {formatCurrency(totalOrder)}
+              {formatCurrency(estimatedTotalOrder)}
             </span>
           </div>
         )}
@@ -919,7 +987,7 @@ export function CalculatorPage() {
       <div className="hidden md:grid grid-cols-3 gap-2">
         <button
           onClick={handleSave}
-          disabled={packedResult.errors.length > 0}
+          disabled={packedResult.errors.length > 0 || pricingBusy}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, rgba(249,115,22,0.92) 0%, rgba(234,88,12,0.95) 100%)",
@@ -933,8 +1001,8 @@ export function CalculatorPage() {
           <span className="text-white font-bold text-sm">Guardar Cotización</span>
         </button>
         <button
-          onClick={handleCreateOrderDraft}
-          disabled={packedResult.errors.length > 0}
+          onClick={() => void handleCreateOrderDraft()}
+          disabled={packedResult.errors.length > 0 || pricingBusy}
           className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, rgba(59,130,246,0.92) 0%, rgba(37,99,235,0.95) 100%)",
@@ -949,7 +1017,7 @@ export function CalculatorPage() {
         </button>
         <button
           onClick={handleShareWhatsApp}
-          disabled={packedResult.errors.length > 0}
+          disabled={packedResult.errors.length > 0 || pricingBusy}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, rgba(37,211,102,0.92) 0%, rgba(18,183,80,0.95) 100%)",
@@ -997,7 +1065,7 @@ export function CalculatorPage() {
       <div className="grid grid-cols-3 gap-3 mt-4 md:hidden">
         <button
           onClick={handleSave}
-          disabled={packedResult.errors.length > 0}
+          disabled={packedResult.errors.length > 0 || pricingBusy}
           className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, rgba(249,115,22,0.92) 0%, rgba(234,88,12,0.95) 100%)",
@@ -1019,8 +1087,8 @@ export function CalculatorPage() {
         </button>
 
         <button
-          onClick={handleCreateOrderDraft}
-          disabled={packedResult.errors.length > 0}
+          onClick={() => void handleCreateOrderDraft()}
+          disabled={packedResult.errors.length > 0 || pricingBusy}
           className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, rgba(59,130,246,0.92) 0%, rgba(37,99,235,0.95) 100%)",
@@ -1043,7 +1111,7 @@ export function CalculatorPage() {
 
         <button
           onClick={handleShareWhatsApp}
-          disabled={packedResult.errors.length > 0}
+          disabled={packedResult.errors.length > 0 || pricingBusy}
           className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, rgba(37,211,102,0.92) 0%, rgba(18,183,80,0.95) 100%)",

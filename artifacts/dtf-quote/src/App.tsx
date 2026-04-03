@@ -23,6 +23,7 @@ import { FinancePage } from "@/pages/finance";
 import { ReportsPage } from "@/pages/reports";
 import { AccountsPage } from "@/pages/accounts";
 import { AuthPage } from "@/pages/auth";
+import { AuthCallbackPage } from "@/pages/auth-callback";
 import { LandingPage } from "@/pages/landing";
 import { ComingSoonPage } from "@/pages/coming-soon";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -72,6 +73,7 @@ function Router() {
             <ComingSoonPage feature="bg-remover" />
           </Route>
           <Route path="/auth" component={AuthPage} />
+          <Route path="/auth/callback" component={AuthCallbackPage} />
           <Route path="/" component={LandingPage} />
           <Route><ProtectedRedirect /></Route>
         </Switch>
@@ -89,6 +91,11 @@ function Router() {
       <Route path="/auth">
         <AppShell>
           <AuthRedirect />
+        </AppShell>
+      </Route>
+      <Route path="/auth/callback">
+        <AppShell>
+          <AuthCallbackPage />
         </AppShell>
       </Route>
       <Route path="/blog">

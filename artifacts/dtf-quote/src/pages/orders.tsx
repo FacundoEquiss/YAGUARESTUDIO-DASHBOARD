@@ -184,6 +184,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
       dueDate: dueDate || null,
       notes: notes.trim() || undefined,
       costItems: validCosts,
+      pricingInput: draft?.pricingInput,
     };
 
     const result = isEdit ? await updateOrder(order!.id, data) : await createOrder(data);

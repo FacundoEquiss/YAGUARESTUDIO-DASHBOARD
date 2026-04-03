@@ -1,5 +1,8 @@
 import { Router, Request, Response } from "express";
-import { syncMercadoPagoPreapprovalById } from "../lib/subscription-billing";
+import {
+  syncMercadoPagoPaymentById,
+  syncMercadoPagoPreapprovalById,
+} from "../lib/subscription-billing";
 import { env } from "../env";
 import {
   getMercadoPagoResourceId,
@@ -38,6 +41,16 @@ function isMercadoPagoSubscriptionEvent(type?: string, topic?: string, action?: 
     value === "preapproval" ||
     value.includes("subscription_preapproval") ||
     value.includes("preapproval"),
+  );
+}
+
+function isMercadoPagoPaymentEvent(type?: string, topic?: string, action?: string): boolean {
+  const candidates = [type, topic, action]
+    .filter(Boolean)
+    .map(value => String(value).toLowerCase());
+
+  return candidates.some(value =>
+    value === "payment" || value.includes("payment"),
   );
 }
 
@@ -87,8 +100,12 @@ webhooksRouter.post("/mercadopago", async (req: Request, res: Response) => {
       });
 
       console.log("[Webhook MP] Suscripción sincronizada", syncResult);
-    } else if (type === "payment" && resourceId) {
-      console.log(`[Webhook MP] Pago recibido ${resourceId}. Aún no se procesa billing puntual.`);
+    } else if (isMercadoPagoPaymentEvent(type, String(req.query.topic || ""), action) && resourceId) {
+      const syncResult = await syncMercadoPagoPaymentById(resourceId, {
+        notificationId: eventId,
+      });
+
+      console.log("[Webhook MP] Pago sincronizado", syncResult);
     }
 
     res.status(200).send("OK");

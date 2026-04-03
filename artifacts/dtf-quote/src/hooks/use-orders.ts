@@ -12,6 +12,21 @@ export interface CostItemInput {
   amount: number;
 }
 
+export interface DtfPricingStampInput {
+  id?: string;
+  w: number;
+  h: number;
+  qty: number;
+  title?: string;
+}
+
+export interface DtfPricingInput {
+  garments: number;
+  pressPasses: number;
+  talleActive: boolean;
+  stamps: DtfPricingStampInput[];
+}
+
 export interface OrderItem {
   id: number;
   userId: number;
@@ -68,6 +83,7 @@ export interface CreateOrderData {
   dueDate?: string | null;
   notes?: string;
   costItems?: CostItemInput[];
+  pricingInput?: DtfPricingInput;
 }
 
 export function useOrders(filters: OrdersFilters = {}) {

@@ -1,7 +1,7 @@
-import { db, subscriptionPlans, userSubscriptions, users } from "@workspace/db";
+import { db, subscriptionPlans, userSubscriptions } from "@workspace/db";
 import type { SubscriptionPlan } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
-import { mpPreApproval } from "./mercadopago";
+import { mpPayment, mpPreApproval } from "./mercadopago";
 import { env } from "../env";
 
 const EXTERNAL_REFERENCE_PREFIX = "subscription";
@@ -24,6 +24,11 @@ export interface SubscriptionSyncResult {
   mpStatus: string;
   localStatus: string;
   skipped?: boolean;
+}
+
+interface SubscriptionIdentity {
+  userId: number;
+  planSlug: string;
 }
 
 function normalizeOrigin(origin?: string | null): string | null {
@@ -146,6 +151,73 @@ function mapMpStatusToLocalStatus(mpStatus?: string | null): string {
   return "pending";
 }
 
+function mapMpPaymentStatusToLocalStatus(mpStatus?: string | null): string {
+  const normalized = (mpStatus || "").toLowerCase();
+
+  if (
+    normalized === "approved" ||
+    normalized === "accredited" ||
+    normalized === "authorized"
+  ) {
+    return "active";
+  }
+
+  if (
+    normalized === "cancelled" ||
+    normalized === "rejected" ||
+    normalized === "refunded" ||
+    normalized === "charged_back"
+  ) {
+    return "cancelled";
+  }
+
+  if (normalized === "paused") {
+    return "paused";
+  }
+
+  return "pending";
+}
+
+function normalizeString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeUserId(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isInteger(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function extractSubscriptionIdentityFromMetadata(metadata: unknown): SubscriptionIdentity | null {
+  if (!metadata || typeof metadata !== "object") return null;
+
+  const record = metadata as Record<string, unknown>;
+  const userId =
+    normalizeUserId(record.user_id) ??
+    normalizeUserId(record.userId) ??
+    normalizeUserId(record.user);
+  const planSlug =
+    normalizeString(record.plan_slug) ??
+    normalizeString(record.planSlug);
+
+  if (!userId || !planSlug) {
+    return null;
+  }
+
+  return { userId, planSlug };
+}
+
 function resolvePeriodEnd(nextPaymentDate?: string | null): Date {
   if (nextPaymentDate) {
     const parsed = new Date(nextPaymentDate);
@@ -215,55 +287,41 @@ export async function createMercadoPagoSubscriptionCheckout(args: {
     throw new Error("FRONTEND_URL no permite construir el retorno desde Mercado Pago.");
   }
 
-  const response = await mpPreApproval.create({
-    body: {
-      preapproval_plan_id: planConfig.id,
-      payer_email: args.email.trim().toLowerCase(),
-      external_reference: buildSubscriptionExternalReference(args.userId, plan.slug),
-      back_url: backUrl,
-      status: "pending",
-    },
-  });
-
-  const initPoint = response.init_point?.trim();
-  const id = response.id?.trim();
-
-  if (!initPoint || !id) {
-    throw new Error("Mercado Pago no devolvió una suscripción válida para continuar el checkout.");
-  }
-
   return {
-    id,
-    initPoint,
-    mode: "preapproval",
+    initPoint: planConfig.initPoint,
+    mode: "hosted_plan",
   };
 }
 
 export async function syncMercadoPagoPreapprovalById(
   preapprovalId: string,
-  options?: { notificationId?: string },
+  options?: {
+    notificationId?: string;
+    expectedUserId?: number | null;
+    expectedPlanSlug?: string | null;
+  },
 ): Promise<SubscriptionSyncResult> {
   assertMercadoPagoConfigured();
 
   const response = await mpPreApproval.get({ id: preapprovalId }) as Awaited<ReturnType<typeof mpPreApproval.get>> & {
     preapproval_plan_id?: string | null;
-    payer_email?: string | null;
+    metadata?: unknown;
   };
   const parsedReference = parseSubscriptionExternalReference(response.external_reference);
-  const payerEmail = response.payer_email?.trim().toLowerCase() || null;
+  const metadataIdentity = extractSubscriptionIdentityFromMetadata(response.metadata);
   const fallbackPlanSlug = resolvePlanSlugFromPlanId(response.preapproval_plan_id);
 
-  let userId = parsedReference?.userId ?? null;
-  let planSlug = parsedReference?.planSlug ?? fallbackPlanSlug ?? null;
-
-  if (!userId && payerEmail) {
-    const [matchedUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, payerEmail));
-
-    userId = matchedUser?.id ?? null;
-  }
+  const userId =
+    parsedReference?.userId ??
+    metadataIdentity?.userId ??
+    options?.expectedUserId ??
+    null;
+  const planSlug =
+    parsedReference?.planSlug ??
+    metadataIdentity?.planSlug ??
+    options?.expectedPlanSlug ??
+    fallbackPlanSlug ??
+    null;
 
   if (!userId || !planSlug) {
     throw new Error(`No se pudo vincular la suscripción ${preapprovalId} con un usuario o plan local`);
@@ -345,6 +403,93 @@ export async function syncMercadoPagoPreapprovalById(
       currentPeriodStart,
       currentPeriodEnd,
       ...baseUpdate,
+    });
+  }
+
+  return {
+    userId,
+    planSlug,
+    mpSubscriptionId,
+    mpStatus,
+    localStatus,
+  };
+}
+
+export async function syncMercadoPagoPaymentById(
+  paymentId: string,
+  options?: { notificationId?: string },
+): Promise<SubscriptionSyncResult> {
+  assertMercadoPagoConfigured();
+
+  const response = await mpPayment.get({ id: paymentId }) as Awaited<ReturnType<typeof mpPayment.get>> & {
+    preapproval_id?: string | number | null;
+    metadata?: unknown;
+  };
+
+  const parsedReference = parseSubscriptionExternalReference(response.external_reference);
+  const metadataIdentity = extractSubscriptionIdentityFromMetadata(response.metadata);
+  const userId = parsedReference?.userId ?? metadataIdentity?.userId ?? null;
+  const planSlug = parsedReference?.planSlug ?? metadataIdentity?.planSlug ?? null;
+  const preapprovalId = normalizeString(response.preapproval_id);
+
+  if (preapprovalId) {
+    return syncMercadoPagoPreapprovalById(preapprovalId, {
+      notificationId: options?.notificationId,
+      expectedUserId: userId,
+      expectedPlanSlug: planSlug,
+    });
+  }
+
+  if (!userId || !planSlug) {
+    throw new Error(`No se pudo vincular el pago ${paymentId} con un usuario o plan local`);
+  }
+
+  const [plan] = await db
+    .select()
+    .from(subscriptionPlans)
+    .where(eq(subscriptionPlans.slug, planSlug));
+
+  if (!plan) {
+    throw new Error(`Plan no encontrado para slug ${planSlug}`);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(userSubscriptions)
+    .where(eq(userSubscriptions.userId, userId));
+
+  const mpStatus = (response.status || "pending").toLowerCase();
+  const localStatus = mapMpPaymentStatusToLocalStatus(mpStatus);
+  const now = new Date();
+  const periodEnd = resolvePeriodEnd(undefined);
+  const notificationId = options?.notificationId;
+  const mpSubscriptionId = String(response.id || paymentId);
+  const baseUpdate = {
+    mpSubscriptionId,
+    mpLastEventId: notificationId || existing?.mpLastEventId || mpSubscriptionId,
+    planId: plan.id,
+    status: localStatus,
+  };
+
+  if (existing) {
+    await db
+      .update(userSubscriptions)
+      .set(
+        localStatus === "active"
+          ? {
+              ...baseUpdate,
+              currentPeriodStart: now,
+              currentPeriodEnd: periodEnd,
+            }
+          : baseUpdate,
+      )
+      .where(eq(userSubscriptions.id, existing.id));
+  } else {
+    await db.insert(userSubscriptions).values({
+      userId,
+      ...baseUpdate,
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
     });
   }
 

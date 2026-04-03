@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { getStorage, setStorage } from "@/lib/storage";
 import { apiFetch, waitForApiReady } from "@/lib/api";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export interface AuthUser {
   id: string;
@@ -59,6 +60,8 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>;
   register: (email: string, password: string, name: string) => Promise<string | null>;
+  signInWithGoogle: (nextPath?: string) => Promise<string | null>;
+  syncSupabaseSession: (accessToken: string) => Promise<string | null>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => void;
@@ -143,6 +146,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
+  const signInWithGoogle = useCallback(async (nextPath = "/dashboard"): Promise<string | null> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return "Supabase Auth no está configurado en el frontend";
+    }
+
+    const redirectTo = new URL("/auth/callback", window.location.origin);
+    redirectTo.searchParams.set("next", nextPath);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectTo.toString(),
+      },
+    });
+
+    if (error) {
+      return error.message || "No se pudo iniciar sesión con Google";
+    }
+
+    return null;
+  }, []);
+
+  const syncSupabaseSession = useCallback(async (accessToken: string): Promise<string | null> => {
+    if (!accessToken) {
+      return "No se recibió un token válido de Supabase";
+    }
+
+    const apiReady = await waitForApiReady();
+    if (!apiReady) {
+      return "El servidor está despertando. Probá de nuevo en unos segundos.";
+    }
+
+    const { data, error } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/supabase/sync", {
+      method: "POST",
+      body: JSON.stringify({ accessToken }),
+    });
+
+    if (error) {
+      return error;
+    }
+
+    if (!data?.user) {
+      return "No se pudo sincronizar el usuario local";
+    }
+
+    setCurrentUser(mapUser(data.user));
+    setSubscription(data.subscription || null);
+    setStorage(SESSION_KEY, "api");
+
+    return null;
+  }, []);
+
   const refreshSession = useCallback(async () => {
     const { data } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/me");
     if (data?.user) {
@@ -159,13 +214,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentUser) {
       await apiFetch("/auth/logout", { method: "POST" });
     }
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     setStorage<string | null>(SESSION_KEY, null);
     setCurrentUser(null);
     setSubscription(null);
   }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, logout, refreshSession, updateProfile }}>
+    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, signInWithGoogle, syncSupabaseSession, logout, refreshSession, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

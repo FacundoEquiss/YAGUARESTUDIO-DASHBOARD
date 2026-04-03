@@ -31,14 +31,18 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 export function AuthPage() {
-  const { login, register } = useAuth();
+  const { login, register, signInWithGoogle } = useAuth();
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState<Tab>(getInitialTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const oauthError = getSearchParams().get("error");
+  const [error, setError] = useState<string | null>(
+    oauthError ? "No se pudo completar el acceso con Google" : null
+  );
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const nextRoute = getNextRoute();
   const pageLabel = PAGE_LABELS[nextRoute] || "TRAZO";
@@ -78,6 +82,22 @@ export function AuthPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setGoogleLoading(true);
+
+    try {
+      const err = await signInWithGoogle(nextRoute);
+      if (err) {
+        setError(err);
+      }
+    } catch {
+      setError("No se pudo iniciar sesión con Google");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
       <div className="auth-card-wrapper">
         <div className="auth-card">
@@ -103,6 +123,17 @@ export function AuthPage() {
               Para guardar trabajo, controlar límites y activar el plan correcto en tu perfil.
             </div>
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full rounded-2xl mb-5"
+            disabled={googleLoading}
+            onClick={handleGoogleLogin}
+          >
+            {googleLoading ? "Redirigiendo a Google..." : "Continuar con Google"}
+          </Button>
 
           <div className="flex bg-secondary rounded-2xl p-1 mb-5">
             {(["login", "register"] as Tab[]).map((t) => (
