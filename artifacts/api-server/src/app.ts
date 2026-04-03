@@ -44,7 +44,11 @@ const allowedOrigins = Array.from(
   )
 );
 
-function isAllowedOrigin(origin: string): boolean {
+function isAllowedOrigin(origin: unknown): boolean {
+  if (typeof origin !== "string") {
+    return false;
+  }
+
   const normalized = normalizeOrigin(origin);
   if (!normalized) {
     return false;
@@ -111,7 +115,13 @@ const corsOptions: cors.CorsOptions = {
       return;
     }
 
+    // Allow requests without Origin header (health checks, server-to-server calls, Postman).
     if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (typeof origin !== "string") {
       callback(null, true);
       return;
     }
