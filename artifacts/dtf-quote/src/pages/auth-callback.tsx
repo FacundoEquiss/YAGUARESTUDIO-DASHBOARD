@@ -1,9 +1,10 @@
-import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { sanitizeNextPath } from "@/lib/routing";
 import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
 
 function getNextPath() {
   const params = new URLSearchParams(window.location.search);
@@ -13,21 +14,44 @@ function getNextPath() {
 export function AuthCallbackPage() {
   const [, setLocation] = useLocation();
   const { syncSupabaseSession } = useAuth();
+  const [processing, setProcessing] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const nextPath = useMemo(() => getNextPath(), []);
+
+  const syncTimeoutMs = 12000;
+
+  const describeError = (code: string, detail?: string): string => {
+    if (detail && detail.trim().length > 0) {
+      return detail;
+    }
+
+    switch (code) {
+      case "supabase_not_configured":
+        return "La integración con Google no está configurada correctamente. Contactá al soporte.";
+      case "oauth_session":
+        return "No pudimos validar tu sesión de Google. Intentá nuevamente.";
+      case "oauth_sync_timeout":
+        return "La sincronización tardó demasiado. Revisá tu conexión e intentá de nuevo.";
+      case "oauth_sync":
+        return "No se pudo sincronizar tu usuario con la plataforma.";
+      default:
+        return "Ocurrió un error inesperado al iniciar sesión con Google.";
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
     let settled = false;
     let syncing = false;
 
-    const nextPath = getNextPath();
-
-    const fail = (code: string) => {
+    const fail = (code: string, detail?: string) => {
       if (cancelled || settled) {
         return;
       }
 
       settled = true;
-      setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=${code}`);
+      setProcessing(false);
+      setErrorMessage(describeError(code, detail));
     };
 
     const finishWithSession = async (accessToken?: string) => {
@@ -36,20 +60,37 @@ export function AuthCallbackPage() {
       }
 
       syncing = true;
-      const syncError = await syncSupabaseSession(accessToken);
-      syncing = false;
+      let syncError: string | null = null;
+
+      try {
+        syncError = await Promise.race<string | null>([
+          syncSupabaseSession(accessToken),
+          new Promise<string>((resolve) => {
+            window.setTimeout(() => resolve("oauth_sync_timeout"), syncTimeoutMs);
+          }),
+        ]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Error de sincronización";
+        fail("oauth_sync", message);
+      } finally {
+        syncing = false;
+      }
 
       if (cancelled || settled) {
         return;
       }
 
-      settled = true;
-
       if (syncError) {
-        setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=oauth_sync`);
+        if (syncError === "oauth_sync_timeout") {
+          fail("oauth_sync_timeout");
+          return;
+        }
+
+        fail("oauth_sync", syncError);
         return;
       }
 
+      settled = true;
       setLocation(nextPath);
     };
 
@@ -97,20 +138,38 @@ export function AuthCallbackPage() {
       }
     };
 
-    run().catch(() => {
-      fail("oauth_unknown");
+    run().catch((error) => {
+      const message = error instanceof Error ? error.message : undefined;
+      fail("oauth_unknown", message);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [setLocation, syncSupabaseSession]);
+  }, [nextPath, setLocation, syncSupabaseSession]);
 
   return (
     <div className="auth-card-wrapper">
       <div className="auth-card flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Procesando inicio de sesión con Google...</p>
+        {processing ? (
+          <>
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Procesando inicio de sesión con Google...</p>
+          </>
+        ) : (
+          <>
+            <AlertCircle className="w-8 h-8 text-destructive" />
+            <p className="text-sm text-center text-destructive">{errorMessage || "No se pudo completar el acceso"}</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2"
+              onClick={() => setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=oauth_sync`)}
+            >
+              Volver a intentar
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

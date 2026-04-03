@@ -8,6 +8,11 @@ import { env } from "./env";
 
 const app: Express = express();
 
+const hostedDefaultOrigins = [
+  "https://yaguarestudio.xyz",
+  "https://www.yaguarestudio.xyz",
+];
+
 function normalizeOrigin(origin: string): string | null {
   const trimmed = origin.trim().replace(/^["']|["']$/g, "");
   if (!trimmed) return null;
@@ -21,10 +26,21 @@ function normalizeOrigin(origin: string): string | null {
   }
 }
 
-const allowedOrigins = (env.frontendUrl || "")
+const configuredOrigins = (env.frontendUrl || "")
   .split(",")
   .map(normalizeOrigin)
   .filter((origin): origin is string => Boolean(origin));
+
+const allowedOrigins = Array.from(
+  new Set(
+    [
+      ...configuredOrigins,
+      ...(env.isHosted ? hostedDefaultOrigins : []),
+    ]
+      .map(normalizeOrigin)
+      .filter((origin): origin is string => Boolean(origin))
+  )
+);
 
 app.use((req, res, next) => {
   const requestId = req.header("x-request-id")?.trim() || crypto.randomUUID();
@@ -57,6 +73,8 @@ app.use((req, res, next) => {
 app.use(cors({
   credentials: true,
   optionsSuccessStatus: 204,
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "x-request-id"],
   origin(origin, callback) {
     if (!env.isHosted || allowedOrigins.length === 0) {
       callback(null, true);

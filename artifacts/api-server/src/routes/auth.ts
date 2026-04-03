@@ -81,6 +81,47 @@ function buildDefaultName(rawName: string | null | undefined, email: string): st
   return localPart && localPart.length > 0 ? localPart : "Usuario";
 }
 
+function dbErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const maybeCode = (error as { code?: unknown }).code;
+  return typeof maybeCode === "string" ? maybeCode : null;
+}
+
+function dbErrorMessage(error: unknown): string {
+  const code = dbErrorCode(error);
+
+  if (code === "23505") {
+    return "Conflicto de datos al sincronizar la cuenta. Probá iniciar sesión nuevamente.";
+  }
+
+  if (code === "23503") {
+    return "No se pudo crear la suscripción inicial del usuario.";
+  }
+
+  return "Error de base de datos al sincronizar sesión";
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+
+      promise
+        .then(resolve)
+        .catch(reject);
+    });
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 authRouter.post("/auth/register", async (req, res) => {
   let trimmedEmail = "";
 
@@ -216,7 +257,11 @@ authRouter.post("/auth/supabase/sync", async (req, res) => {
       return;
     }
 
-    const { data, error } = await supabase.auth.getUser(accessToken);
+    const { data, error } = await withTimeout(
+      supabase.auth.getUser(accessToken),
+      10000,
+      "Timeout al validar el token de Supabase"
+    );
     if (error || !data.user) {
       res.status(401).json({ error: "Token de Supabase inválido o expirado" });
       return;
@@ -231,73 +276,98 @@ authRouter.post("/auth/supabase/sync", async (req, res) => {
       return;
     }
 
-    let [localUser] = await db
-      .select()
-      .from(users)
-      .where(eq(users.supabaseAuthId, supabaseAuthId));
+    let localUser: typeof users.$inferSelect | undefined;
 
-    if (!localUser) {
-      const [byEmail] = await db
+    try {
+      [localUser] = await db
         .select()
         .from(users)
-        .where(eq(users.email, normalizedEmail));
+        .where(eq(users.supabaseAuthId, supabaseAuthId));
 
-      if (byEmail) {
-        if (byEmail.supabaseAuthId && byEmail.supabaseAuthId !== supabaseAuthId) {
-          res.status(409).json({ error: "El correo ya está vinculado a otra cuenta de Supabase" });
-          return;
+      if (!localUser) {
+        const [byEmail] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, normalizedEmail));
+
+        if (byEmail) {
+          if (byEmail.supabaseAuthId && byEmail.supabaseAuthId !== supabaseAuthId) {
+            res.status(409).json({ error: "El correo ya está vinculado a otra cuenta de Supabase" });
+            return;
+          }
+
+          const [linkedUser] = await db
+            .update(users)
+            .set({ supabaseAuthId })
+            .where(eq(users.id, byEmail.id))
+            .returning();
+
+          localUser = linkedUser;
         }
+      }
 
-        const [linkedUser] = await db
-          .update(users)
-          .set({ supabaseAuthId })
-          .where(eq(users.id, byEmail.id))
+      if (!localUser) {
+        const metadataName = typeof supabaseUser.user_metadata?.name === "string"
+          ? supabaseUser.user_metadata.name
+          : typeof supabaseUser.user_metadata?.full_name === "string"
+            ? supabaseUser.user_metadata.full_name
+            : null;
+
+        const generatedPasswordHash = await bcrypt.hash(crypto.randomUUID(), 10);
+
+        const [createdUser] = await db
+          .insert(users)
+          .values({
+            email: normalizedEmail,
+            supabaseAuthId,
+            name: buildDefaultName(metadataName, normalizedEmail),
+            passwordHash: generatedPasswordHash,
+            role: "user",
+          })
           .returning();
 
-        localUser = linkedUser;
+        localUser = createdUser;
+
+        const [freePlan] = await db
+          .select()
+          .from(subscriptionPlans)
+          .where(eq(subscriptionPlans.slug, "free"));
+
+        if (freePlan) {
+          const now = new Date();
+          const periodEnd = new Date(now);
+          periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+          await db.insert(userSubscriptions).values({
+            userId: localUser.id,
+            planId: freePlan.id,
+            status: "active",
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+          });
+        }
       }
+    } catch (dbError) {
+      const code = dbErrorCode(dbError);
+      console.error("POST /auth/supabase/sync database error:", {
+        code,
+        supabaseAuthId,
+        email: normalizedEmail,
+        error: dbError,
+      });
+
+      if (code === "23505") {
+        res.status(409).json({ error: dbErrorMessage(dbError) });
+        return;
+      }
+
+      res.status(500).json({ error: dbErrorMessage(dbError) });
+      return;
     }
 
     if (!localUser) {
-      const metadataName = typeof supabaseUser.user_metadata?.name === "string"
-        ? supabaseUser.user_metadata.name
-        : typeof supabaseUser.user_metadata?.full_name === "string"
-          ? supabaseUser.user_metadata.full_name
-          : null;
-
-      const generatedPasswordHash = await bcrypt.hash(crypto.randomUUID(), 10);
-
-      const [createdUser] = await db
-        .insert(users)
-        .values({
-          email: normalizedEmail,
-          supabaseAuthId,
-          name: buildDefaultName(metadataName, normalizedEmail),
-          passwordHash: generatedPasswordHash,
-          role: "user",
-        })
-        .returning();
-
-      localUser = createdUser;
-
-      const [freePlan] = await db
-        .select()
-        .from(subscriptionPlans)
-        .where(eq(subscriptionPlans.slug, "free"));
-
-      if (freePlan) {
-        const now = new Date();
-        const periodEnd = new Date(now);
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-        await db.insert(userSubscriptions).values({
-          userId: localUser.id,
-          planId: freePlan.id,
-          status: "active",
-          currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
-        });
-      }
+      res.status(500).json({ error: "No se pudo resolver el usuario local" });
+      return;
     }
 
     const token = signToken({
@@ -325,8 +395,11 @@ authRouter.post("/auth/supabase/sync", async (req, res) => {
       subscription: subscription || null,
     });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al sincronizar sesión con Supabase";
+    const status = message.toLowerCase().includes("timeout") ? 504 : 500;
+
     console.error("POST /auth/supabase/sync error:", err);
-    res.status(500).json({ error: "Error al sincronizar sesión con Supabase" });
+    res.status(status).json({ error: message });
   }
 });
 
