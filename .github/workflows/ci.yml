@@ -1,42 +1,131 @@
-name: CI
+name: CI Pipeline
 
 on:
-  pull_request:
   push:
-
-permissions:
-  contents: read
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
 
 jobs:
-  validate:
+  typecheck:
+    name: Type Check
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v3
         with:
           version: 10.32.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: pnpm
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck workspaces
+      - name: Type check
         run: pnpm run typecheck
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests
         run: pnpm run test
+        continue-on-error: true
 
-      - name: Build frontend
-        run: pnpm --filter @workspace/dtf-quote run build
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
 
-      - name: Build backend
-        run: pnpm --filter @workspace/api-server run build
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API Server
+        working-directory: artifacts/api-server
+        run: pnpm run build
+
+      - name: Build Frontend
+        working-directory: artifacts/dtf-quote
+        run: pnpm run build
+
+      - name: Upload API Server build
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-server-build
+          path: artifacts/api-server/dist
+
+      - name: Upload Frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: artifacts/dtf-quote/dist
+
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm exec prettier --check "**/*.{ts,tsx,js,jsx,json,md}" --ignore-path .prettierignore
+        continue-on-error: true

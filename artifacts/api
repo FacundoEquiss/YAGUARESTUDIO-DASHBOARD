@@ -1,0 +1,120 @@
+import { Request, Response, NextFunction } from 'express';
+
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+function getIpFromRequest(req: Request): string {
+  const xForwardedFor = req.headers['x-forwarded-for'];
+  if (typeof xForwardedFor === 'string') {
+    return xForwardedFor.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
+
+export function rateLimit(options: {
+  windowMs?: number;
+  maxRequests?: number;
+  message?: string;
+  skipFailedRequests?: boolean;
+} = {}) {
+  const {
+    windowMs = 60 * 1000,
+    maxRequests = 100,
+    message = 'Demasiadas peticiones, intenta de nuevo en unos minutos',
+  } = options;
+
+  const hits: Map<string, RateLimitEntry> = new Map();
+
+  function cleanupExpiredEntries() {
+    const now = Date.now();
+    for (const [key, entry] of hits.entries()) {
+      if (entry.resetAt <= now) {
+        hits.delete(key);
+      }
+    }
+  }
+
+  return function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
+    const clientIp = getIpFromRequest(req);
+    const now = Date.now();
+
+    cleanupExpiredEntries();
+
+    const entry = hits.get(clientIp);
+
+    if (!entry || entry.resetAt <= now) {
+      hits.set(clientIp, {
+        count: 1,
+        resetAt: now + windowMs,
+      });
+      next();
+      return;
+    }
+
+    entry.count += 1;
+
+    const retryAfterMs = (entry.resetAt - now) / 1000;
+    res.setHeader('X-RateLimit-Limit', maxRequests);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - entry.count));
+    res.setHeader('X-RateLimit-Reset', Math.ceil(entry.resetAt / 1000));
+
+    if (entry.count > maxRequests) {
+      res.setHeader('Retry-After', Math.ceil(retryAfterMs));
+      res.status(429).json({
+        error: message,
+        retryAfter: Math.ceil(retryAfterMs),
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+export function authRateLimit(options: {
+  windowMs?: number;
+  maxRequests?: number;
+} = {}) {
+  const {
+    windowMs = 10 * 60 * 1000, // 10 minutes
+    maxRequests = 10,
+  } = options;
+
+  const hits: Map<string, RateLimitEntry> = new Map();
+
+  return function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
+    const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : 'unknown';
+    const clientIp = getIpFromRequest(req);
+    const key = `${clientIp}:${email}`;
+
+    const now = Date.now();
+
+    const entry = hits.get(key);
+
+    if (!entry || entry.resetAt <= now) {
+      hits.set(key, {
+        count: 1,
+        resetAt: now + windowMs,
+      });
+      next();
+      return;
+    }
+
+    entry.count += 1;
+
+    const retryAfterMs = Math.ceil((entry.resetAt - now) / 1000);
+    res.setHeader('Retry-After', retryAfterMs);
+
+    if (entry.count > maxRequests) {
+      res.status(429).json({
+        error: 'Demasiados intentos. Intenta de nuevo en unos minutos.',
+        retryAfter: retryAfterMs,
+      });
+      return;
+    }
+
+    next();
+  };
+}
