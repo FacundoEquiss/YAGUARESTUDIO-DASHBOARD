@@ -13,6 +13,8 @@ const hostedDefaultOrigins = [
   "https://www.yaguarestudio.xyz",
 ];
 
+const vercelPreviewPattern = /(^|-)yaguarestudio([-.].*)?\.vercel\.app$/i;
+
 function normalizeOrigin(origin: string): string | null {
   const trimmed = origin.trim().replace(/^["']|["']$/g, "");
   if (!trimmed) return null;
@@ -42,6 +44,34 @@ const allowedOrigins = Array.from(
   )
 );
 
+function isAllowedOrigin(origin: string): boolean {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) {
+    return false;
+  }
+
+  if (allowedOrigins.includes(normalized)) {
+    return true;
+  }
+
+  let hostname = "";
+  try {
+    hostname = new URL(normalized).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return true;
+  }
+
+  if (hostname === "yaguarestudio.xyz" || hostname === "www.yaguarestudio.xyz") {
+    return true;
+  }
+
+  return vercelPreviewPattern.test(hostname);
+}
+
 app.use((req, res, next) => {
   const requestId = req.header("x-request-id")?.trim() || crypto.randomUUID();
   const startedAt = Date.now();
@@ -70,13 +100,13 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors({
+const corsOptions: cors.CorsOptions = {
   credentials: true,
   optionsSuccessStatus: 204,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "x-request-id"],
   origin(origin, callback) {
-    if (!env.isHosted || allowedOrigins.length === 0) {
+    if (!env.isHosted) {
       callback(null, true);
       return;
     }
@@ -86,25 +116,23 @@ app.use(cors({
       return;
     }
 
-    const normalizedOrigin = normalizeOrigin(origin);
-
-    if (!normalizedOrigin) {
-      callback(new Error("Invalid origin"));
-      return;
-    }
-
-    if (allowedOrigins.includes(normalizedOrigin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }
+
+    const normalizedOrigin = normalizeOrigin(origin) || origin;
 
     console.warn("Blocked CORS origin", {
       origin: normalizedOrigin,
       allowedOrigins,
     });
-    callback(new Error("Not allowed by CORS"));
+    callback(null, false);
   },
-}));
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.use(cookieParser());
 app.use(express.json());
