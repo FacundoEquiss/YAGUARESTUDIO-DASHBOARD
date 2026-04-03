@@ -16,45 +16,89 @@ export function AuthCallbackPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let settled = false;
+    let syncing = false;
+
+    const nextPath = getNextPath();
+
+    const fail = (code: string) => {
+      if (cancelled || settled) {
+        return;
+      }
+
+      settled = true;
+      setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=${code}`);
+    };
+
+    const finishWithSession = async (accessToken?: string) => {
+      if (!accessToken || cancelled || settled || syncing) {
+        return;
+      }
+
+      syncing = true;
+      const syncError = await syncSupabaseSession(accessToken);
+      syncing = false;
+
+      if (cancelled || settled) {
+        return;
+      }
+
+      settled = true;
+
+      if (syncError) {
+        setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=oauth_sync`);
+        return;
+      }
+
+      setLocation(nextPath);
+    };
 
     const run = async () => {
-      const nextPath = getNextPath();
-
       if (!supabase) {
-        if (!cancelled) {
-          setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=supabase_not_configured`);
-        }
+        fail("supabase_not_configured");
         return;
       }
 
-      const { data, error } = await supabase.auth.getSession();
-      const accessToken = data.session?.access_token;
-
-      if (error || !accessToken) {
-        if (!cancelled) {
-          setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=oauth_session`);
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+          void finishWithSession(session?.access_token);
+          return;
         }
-        return;
-      }
 
-      const syncError = await syncSupabaseSession(accessToken);
-      if (syncError) {
-        if (!cancelled) {
-          setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=oauth_sync`);
+        if (event === "SIGNED_OUT") {
+          fail("oauth_session");
         }
-        return;
-      }
+      });
 
-      if (!cancelled) {
-        setLocation(nextPath);
+      const timeout = window.setTimeout(() => {
+        fail("oauth_session");
+      }, 8000);
+
+      try {
+        // Force Supabase to process PKCE callback state before routing changes.
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn("Supabase getSession() error during callback", error);
+        }
+
+        await finishWithSession(data.session?.access_token);
+
+        if (!settled) {
+          // Retry briefly in case URL parsing/session persistence is still in-flight.
+          for (let i = 0; i < 2 && !settled; i += 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, 500));
+            const retry = await supabase.auth.getSession();
+            await finishWithSession(retry.data.session?.access_token);
+          }
+        }
+      } finally {
+        window.clearTimeout(timeout);
+        authListener.subscription.unsubscribe();
       }
     };
 
     run().catch(() => {
-      const nextPath = getNextPath();
-      if (!cancelled) {
-        setLocation(`/auth?next=${encodeURIComponent(nextPath)}&error=oauth_unknown`);
-      }
+      fail("oauth_unknown");
     });
 
     return () => {
