@@ -3,7 +3,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { db, users, subscriptionPlans, userSubscriptions } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { signToken, requireAuth } from "../middleware/auth";
+import { signToken, requireAuth, verifyToken } from "../middleware/auth";
 import { env } from "../env";
 import { supabase } from "../lib/supabase";
 
@@ -120,6 +120,74 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMes
       clearTimeout(timeoutId);
     }
   }
+}
+
+type SupabaseTokenUser = {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+};
+
+function getBearerToken(authHeader?: string): string | null {
+  if (!authHeader) {
+    return null;
+  }
+
+  const trimmed = authHeader.trim();
+  if (!trimmed.toLowerCase().startsWith("bearer ")) {
+    return null;
+  }
+
+  const token = trimmed.slice(7).trim();
+  return token.length > 0 ? token : null;
+}
+
+async function validateSupabaseAccessToken(accessToken: string) {
+  if (!supabase) {
+    return { user: null as SupabaseTokenUser | null, error: "Supabase Auth no está configurado en el servidor" };
+  }
+
+  const result = await withTimeout(
+    supabase.auth.getUser(accessToken),
+    10000,
+    "Timeout al validar el token de Supabase"
+  );
+
+  if (result.error || !result.data.user) {
+    return { user: null, error: "Token de Supabase inválido o expirado" };
+  }
+
+  return { user: result.data.user as SupabaseTokenUser, error: null };
+}
+
+async function resolveLocalUserFromSupabase(accessToken: string) {
+  const validated = await validateSupabaseAccessToken(accessToken);
+  if (!validated.user) {
+    return { user: null as typeof users.$inferSelect | null, error: validated.error ?? "Token inválido", status: 401 };
+  }
+
+  const supabaseAuthId = validated.user.id;
+  const normalizedEmail = normalizeSupabaseEmail(validated.user.email);
+
+  let [localUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.supabaseAuthId, supabaseAuthId));
+
+  if (!localUser && normalizedEmail) {
+    const [byEmail] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, normalizedEmail));
+
+    localUser = byEmail ?? null;
+  }
+
+  if (!localUser) {
+    return { user: null, error: "Usuario local no vinculado para la cuenta de Supabase", status: 404 };
+  }
+
+  return { user: localUser, error: null, status: 200 };
 }
 
 authRouter.post("/auth/register", async (req, res) => {
@@ -245,29 +313,22 @@ authRouter.post("/auth/login", async (req, res) => {
 
 authRouter.post("/auth/supabase/sync", async (req, res) => {
   try {
-    const { accessToken } = req.body as { accessToken?: string };
+    const bearerToken = getBearerToken(req.headers.authorization);
+    const { accessToken: bodyAccessToken } = req.body as { accessToken?: string };
+    const accessToken = bearerToken || bodyAccessToken;
 
     if (!accessToken) {
       res.status(400).json({ error: "accessToken es requerido" });
       return;
     }
 
-    if (!supabase) {
-      res.status(500).json({ error: "Supabase Auth no está configurado en el servidor" });
+    const validated = await validateSupabaseAccessToken(accessToken);
+    if (!validated.user) {
+      res.status(401).json({ error: validated.error || "Token de Supabase inválido o expirado" });
       return;
     }
 
-    const { data, error } = await withTimeout(
-      supabase.auth.getUser(accessToken),
-      10000,
-      "Timeout al validar el token de Supabase"
-    );
-    if (error || !data.user) {
-      res.status(401).json({ error: "Token de Supabase inválido o expirado" });
-      return;
-    }
-
-    const supabaseUser = data.user;
+    const supabaseUser = validated.user;
     const supabaseAuthId = supabaseUser.id;
     const normalizedEmail = normalizeSupabaseEmail(supabaseUser.email);
 
@@ -403,12 +464,42 @@ authRouter.post("/auth/supabase/sync", async (req, res) => {
   }
 });
 
-authRouter.get("/auth/me", requireAuth, async (req, res) => {
+authRouter.get("/auth/me", async (req, res) => {
   try {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, req.user!.userId));
+    const bearerToken = getBearerToken(req.headers.authorization);
+    const cookieToken = typeof req.cookies?.token === "string" ? req.cookies.token : null;
+
+    let user: typeof users.$inferSelect | null = null;
+
+    if (cookieToken) {
+      const payload = verifyToken(cookieToken);
+
+      if (payload) {
+        const [localByJwt] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, payload.userId));
+
+        user = localByJwt ?? null;
+      }
+    }
+
+    // Fallback path: valid Supabase bearer token can resolve /auth/me before local cookie is established.
+    if (!user && bearerToken) {
+      const resolved = await resolveLocalUserFromSupabase(bearerToken);
+
+      if (!resolved.user) {
+        res.status(resolved.status).json({ error: resolved.error });
+        return;
+      }
+
+      user = resolved.user;
+    }
+
+    if (!user) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
 
     if (!user) {
       res.status(404).json({ error: "Usuario no encontrado" });

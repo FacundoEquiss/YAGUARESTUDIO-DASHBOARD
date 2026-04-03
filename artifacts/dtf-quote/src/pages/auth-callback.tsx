@@ -18,7 +18,61 @@ export function AuthCallbackPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const nextPath = useMemo(() => getNextPath(), []);
 
-  const syncTimeoutMs = 12000;
+  const hardUiTimeoutMs = 10000;
+  const syncTimeoutMs = 8000;
+
+  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutCode: string): Promise<T> => {
+    return await Promise.race<T>([
+      promise,
+      new Promise<T>((_, reject) => {
+        window.setTimeout(() => reject(new Error(timeoutCode)), timeoutMs);
+      }),
+    ]);
+  };
+
+  const getTokensFromHash = (): { accessToken: string; refreshToken: string } | null => {
+    const hash = window.location.hash;
+    if (!hash || !hash.startsWith("#")) {
+      return null;
+    }
+
+    const params = new URLSearchParams(hash.slice(1));
+    const accessToken = params.get("access_token")?.trim() || "";
+    const refreshToken = params.get("refresh_token")?.trim() || "";
+
+    if (!accessToken || !refreshToken) {
+      return null;
+    }
+
+    return { accessToken, refreshToken };
+  };
+
+  const clearHash = () => {
+    if (!window.location.hash) {
+      return;
+    }
+
+    const newUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, document.title, newUrl);
+  };
+
+  const getCodeFromQuery = (): string | null => {
+    const code = new URLSearchParams(window.location.search).get("code");
+    const trimmed = code?.trim();
+    return trimmed ? trimmed : null;
+  };
+
+  const clearCodeFromQuery = () => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("code")) {
+      return;
+    }
+
+    params.delete("code");
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
+    window.history.replaceState(null, document.title, nextUrl);
+  };
 
   const describeError = (code: string, detail?: string): string => {
     if (detail && detail.trim().length > 0) {
@@ -43,6 +97,7 @@ export function AuthCallbackPage() {
     let cancelled = false;
     let settled = false;
     let syncing = false;
+    let hardUiTimeout: number | undefined;
 
     const fail = (code: string, detail?: string) => {
       if (cancelled || settled) {
@@ -52,6 +107,9 @@ export function AuthCallbackPage() {
       settled = true;
       setProcessing(false);
       setErrorMessage(describeError(code, detail));
+      if (hardUiTimeout) {
+        window.clearTimeout(hardUiTimeout);
+      }
     };
 
     const finishWithSession = async (accessToken?: string) => {
@@ -63,12 +121,7 @@ export function AuthCallbackPage() {
       let syncError: string | null = null;
 
       try {
-        syncError = await Promise.race<string | null>([
-          syncSupabaseSession(accessToken),
-          new Promise<string>((resolve) => {
-            window.setTimeout(() => resolve("oauth_sync_timeout"), syncTimeoutMs);
-          }),
-        ]);
+        syncError = await withTimeout(syncSupabaseSession(accessToken), syncTimeoutMs, "oauth_sync_timeout");
       } catch (error) {
         const message = error instanceof Error ? error.message : "Error de sincronización";
         fail("oauth_sync", message);
@@ -91,8 +144,17 @@ export function AuthCallbackPage() {
       }
 
       settled = true;
+      if (hardUiTimeout) {
+        window.clearTimeout(hardUiTimeout);
+      }
+
       setLocation(nextPath);
     };
+
+    hardUiTimeout = window.setTimeout(() => {
+      // This timer is independent from Supabase promises and guarantees loader shutdown.
+      fail("oauth_sync_timeout");
+    }, hardUiTimeoutMs);
 
     const run = async () => {
       if (!supabase) {
@@ -100,41 +162,66 @@ export function AuthCallbackPage() {
         return;
       }
 
-      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
-          void finishWithSession(session?.access_token);
-          return;
-        }
-
-        if (event === "SIGNED_OUT") {
-          fail("oauth_session");
-        }
-      });
-
-      const timeout = window.setTimeout(() => {
-        fail("oauth_session");
-      }, 8000);
-
       try {
-        // Force Supabase to process PKCE callback state before routing changes.
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.warn("Supabase getSession() error during callback", error);
-        }
+        const code = getCodeFromQuery();
 
-        await finishWithSession(data.session?.access_token);
+        if (code) {
+          const exchange = await withTimeout(
+            supabase.auth.exchangeCodeForSession(code),
+            6000,
+            "oauth_exchange_timeout"
+          );
+
+          clearCodeFromQuery();
+
+          if (exchange.error) {
+            fail("oauth_session", exchange.error.message);
+            return;
+          }
+
+          await finishWithSession(exchange.data.session?.access_token);
+        }
 
         if (!settled) {
-          // Retry briefly in case URL parsing/session persistence is still in-flight.
-          for (let i = 0; i < 2 && !settled; i += 1) {
-            await new Promise((resolve) => window.setTimeout(resolve, 500));
-            const retry = await supabase.auth.getSession();
-            await finishWithSession(retry.data.session?.access_token);
+          const hashTokens = getTokensFromHash();
+
+          if (hashTokens) {
+            const setSessionResult = await withTimeout(
+              supabase.auth.setSession({
+                access_token: hashTokens.accessToken,
+                refresh_token: hashTokens.refreshToken,
+              }),
+              4000,
+              "oauth_set_session_timeout"
+            );
+
+            if (setSessionResult.error) {
+              fail("oauth_session", setSessionResult.error.message);
+              return;
+            }
+
+            clearHash();
+            await finishWithSession(setSessionResult.data.session?.access_token);
           }
         }
-      } finally {
-        window.clearTimeout(timeout);
-        authListener.subscription.unsubscribe();
+
+        if (!settled) {
+          const currentSession = await withTimeout(
+            supabase.auth.getSession(),
+            3000,
+            "oauth_get_session_timeout"
+          );
+
+          if (currentSession.error) {
+            fail("oauth_session", currentSession.error.message);
+            return;
+          }
+
+          await finishWithSession(currentSession.data.session?.access_token);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "oauth_unknown";
+        fail("oauth_session", message);
       }
     };
 
@@ -145,8 +232,11 @@ export function AuthCallbackPage() {
 
     return () => {
       cancelled = true;
+      if (hardUiTimeout) {
+        window.clearTimeout(hardUiTimeout);
+      }
     };
-  }, [nextPath, setLocation, syncSupabaseSession]);
+  }, [hardUiTimeoutMs, nextPath, setLocation, syncSupabaseSession]);
 
   return (
     <div className="auth-card-wrapper">
