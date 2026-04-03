@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,89 +17,7 @@ export function AuthCallbackPage() {
   const [processing, setProcessing] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const nextPath = useMemo(() => getNextPath(), []);
-  const runGuardRef = useRef(false);
-
   const hardUiTimeoutMs = 10000;
-  const syncTimeoutMs = 8000;
-
-  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutCode: string): Promise<T> => {
-    return await Promise.race<T>([
-      promise,
-      new Promise<T>((_, reject) => {
-        window.setTimeout(() => reject(new Error(timeoutCode)), timeoutMs);
-      }),
-    ]);
-  };
-
-  const getTokensFromHash = (): { accessToken: string; refreshToken: string } | null => {
-    const hash = window.location.hash;
-    if (!hash || !hash.startsWith("#")) {
-      return null;
-    }
-
-    const params = new URLSearchParams(hash.slice(1));
-    const accessToken = params.get("access_token")?.trim() || "";
-    const refreshToken = params.get("refresh_token")?.trim() || "";
-
-    if (!accessToken || !refreshToken) {
-      return null;
-    }
-
-    return { accessToken, refreshToken };
-  };
-
-  const clearHash = () => {
-    if (!window.location.hash) {
-      return;
-    }
-
-    const newUrl = `${window.location.pathname}${window.location.search}`;
-    window.history.replaceState(null, document.title, newUrl);
-  };
-
-  const getCodeFromQuery = (): string | null => {
-    const code = new URLSearchParams(window.location.search).get("code");
-    const trimmed = code?.trim();
-    return trimmed ? trimmed : null;
-  };
-
-  const clearCodeFromQuery = () => {
-    const params = new URLSearchParams(window.location.search);
-    if (!params.has("code")) {
-      return;
-    }
-
-    params.delete("code");
-    const nextSearch = params.toString();
-    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
-    window.history.replaceState(null, document.title, nextUrl);
-  };
-
-  const exchangeLockKey = (code: string) => `oauth:pkce:exchange-lock:${code}`;
-
-  const hasExchangeLock = (code: string): boolean => {
-    try {
-      return window.sessionStorage.getItem(exchangeLockKey(code)) === "1";
-    } catch {
-      return false;
-    }
-  };
-
-  const setExchangeLock = (code: string) => {
-    try {
-      window.sessionStorage.setItem(exchangeLockKey(code), "1");
-    } catch {
-      // Ignore storage errors and keep flow running.
-    }
-  };
-
-  const clearExchangeLock = (code: string) => {
-    try {
-      window.sessionStorage.removeItem(exchangeLockKey(code));
-    } catch {
-      // Ignore storage errors and keep flow running.
-    }
-  };
 
   const describeError = (code: string, detail?: string): string => {
     if (detail && detail.trim().length > 0) {
@@ -121,168 +39,59 @@ export function AuthCallbackPage() {
   };
 
   useEffect(() => {
-    if (runGuardRef.current) {
-      return;
-    }
-    runGuardRef.current = true;
-
     let cancelled = false;
-    let settled = false;
-    let syncing = false;
-    let hardUiTimeout: number | undefined;
+    let handled = false;
 
     const fail = (code: string, detail?: string) => {
-      if (cancelled || settled) {
+      if (cancelled || handled) {
         return;
       }
 
-      settled = true;
+      handled = true;
       setProcessing(false);
       setErrorMessage(describeError(code, detail));
-      if (hardUiTimeout) {
-        window.clearTimeout(hardUiTimeout);
-      }
     };
 
-    const finishWithSession = async (accessToken?: string) => {
-      if (!accessToken || cancelled || settled || syncing) {
+    const complete = async (accessToken?: string) => {
+      if (!accessToken || cancelled || handled) {
         return;
       }
 
-      syncing = true;
-      let syncError: string | null = null;
-
-      try {
-        syncError = await withTimeout(syncSupabaseSession(accessToken), syncTimeoutMs, "oauth_sync_timeout");
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Error de sincronización";
-        fail("oauth_sync", message);
-      } finally {
-        syncing = false;
-      }
-
-      if (cancelled || settled) {
-        return;
-      }
-
+      const syncError = await syncSupabaseSession(accessToken);
       if (syncError) {
-        if (syncError === "oauth_sync_timeout") {
-          fail("oauth_sync_timeout");
-          return;
-        }
-
         fail("oauth_sync", syncError);
         return;
       }
 
-      settled = true;
-      if (hardUiTimeout) {
-        window.clearTimeout(hardUiTimeout);
-      }
-
+      handled = true;
+      setProcessing(false);
       setLocation(nextPath);
     };
 
-    hardUiTimeout = window.setTimeout(() => {
-      // This timer is independent from Supabase promises and guarantees loader shutdown.
+    const hardTimeout = window.setTimeout(() => {
       fail("oauth_sync_timeout");
     }, hardUiTimeoutMs);
 
-    const run = async () => {
-      if (!supabase) {
-        fail("supabase_not_configured");
+    if (!supabase) {
+      fail("supabase_not_configured");
+      return () => {
+        cancelled = true;
+        window.clearTimeout(hardTimeout);
+      };
+    }
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event: string, session: { access_token?: string } | null) => {
+      if (event !== "SIGNED_IN") {
         return;
       }
 
-      try {
-        const code = getCodeFromQuery();
-
-        if (code) {
-          if (hasExchangeLock(code)) {
-            const resumed = await withTimeout(
-              supabase.auth.getSession(),
-              3000,
-              "oauth_get_session_timeout"
-            );
-
-            await finishWithSession(resumed.data.session?.access_token);
-            if (!settled) {
-              fail("oauth_session", "El callback de autenticación se ejecutó más de una vez. Reintentá el login.");
-            }
-            return;
-          }
-
-          setExchangeLock(code);
-          const exchange = await withTimeout(
-            supabase.auth.exchangeCodeForSession(code),
-            6000,
-            "oauth_exchange_timeout"
-          );
-
-          clearCodeFromQuery();
-
-          if (exchange.error) {
-            clearExchangeLock(code);
-            fail("oauth_session", exchange.error.message);
-            return;
-          }
-
-          await finishWithSession(exchange.data.session?.access_token);
-        }
-
-        if (!settled) {
-          const hashTokens = getTokensFromHash();
-
-          if (hashTokens) {
-            const setSessionResult = await withTimeout(
-              supabase.auth.setSession({
-                access_token: hashTokens.accessToken,
-                refresh_token: hashTokens.refreshToken,
-              }),
-              4000,
-              "oauth_set_session_timeout"
-            );
-
-            if (setSessionResult.error) {
-              fail("oauth_session", setSessionResult.error.message);
-              return;
-            }
-
-            clearHash();
-            await finishWithSession(setSessionResult.data.session?.access_token);
-          }
-        }
-
-        if (!settled) {
-          const currentSession = await withTimeout(
-            supabase.auth.getSession(),
-            3000,
-            "oauth_get_session_timeout"
-          );
-
-          if (currentSession.error) {
-            fail("oauth_session", currentSession.error.message);
-            return;
-          }
-
-          await finishWithSession(currentSession.data.session?.access_token);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "oauth_unknown";
-        fail("oauth_session", message);
-      }
-    };
-
-    run().catch((error) => {
-      const message = error instanceof Error ? error.message : undefined;
-      fail("oauth_unknown", message);
+      void complete(session?.access_token);
     });
 
     return () => {
       cancelled = true;
-      if (hardUiTimeout) {
-        window.clearTimeout(hardUiTimeout);
-      }
+      window.clearTimeout(hardTimeout);
+      listener.subscription.unsubscribe();
     };
   }, [hardUiTimeoutMs, nextPath, setLocation, syncSupabaseSession]);
 
