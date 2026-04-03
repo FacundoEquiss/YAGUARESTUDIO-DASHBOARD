@@ -13,7 +13,7 @@ const hostedDefaultOrigins = [
   "https://www.yaguarestudio.xyz",
 ];
 
-const vercelPreviewPattern = /(^|-)yaguarestudio([-.].*)?\.vercel\.app$/i;
+const vercelPreviewPattern = /yaguarestudio.*\.vercel\.app$/i;
 
 function normalizeOrigin(origin: string): string | null {
   const trimmed = origin.trim().replace(/^["']|["']$/g, "");
