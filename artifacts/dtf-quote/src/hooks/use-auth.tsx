@@ -151,8 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return "Supabase Auth no está configurado en el frontend";
     }
 
-    const redirectTo = new URL("/auth/callback", window.location.origin);
-    redirectTo.searchParams.set("next", nextPath);
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",

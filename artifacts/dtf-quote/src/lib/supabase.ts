@@ -5,14 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 const storageKey = "yaguar-auth";
-
-function getStorage() {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-
-  return window.localStorage;
-}
+const authStorage = typeof window !== "undefined" ? window.localStorage : undefined;
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
@@ -22,7 +15,7 @@ export const supabase = isSupabaseConfigured
         autoRefreshToken: true,
         detectSessionInUrl: true,
         storageKey,
-        storage: getStorage(),
+        storage: authStorage,
       },
     })
   : null;

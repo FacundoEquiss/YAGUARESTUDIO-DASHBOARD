@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,6 +17,7 @@ export function AuthCallbackPage() {
   const [processing, setProcessing] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const nextPath = useMemo(() => getNextPath(), []);
+  const runGuardRef = useRef(false);
 
   const hardUiTimeoutMs = 10000;
   const syncTimeoutMs = 8000;
@@ -74,6 +75,32 @@ export function AuthCallbackPage() {
     window.history.replaceState(null, document.title, nextUrl);
   };
 
+  const exchangeLockKey = (code: string) => `oauth:pkce:exchange-lock:${code}`;
+
+  const hasExchangeLock = (code: string): boolean => {
+    try {
+      return window.sessionStorage.getItem(exchangeLockKey(code)) === "1";
+    } catch {
+      return false;
+    }
+  };
+
+  const setExchangeLock = (code: string) => {
+    try {
+      window.sessionStorage.setItem(exchangeLockKey(code), "1");
+    } catch {
+      // Ignore storage errors and keep flow running.
+    }
+  };
+
+  const clearExchangeLock = (code: string) => {
+    try {
+      window.sessionStorage.removeItem(exchangeLockKey(code));
+    } catch {
+      // Ignore storage errors and keep flow running.
+    }
+  };
+
   const describeError = (code: string, detail?: string): string => {
     if (detail && detail.trim().length > 0) {
       return detail;
@@ -94,6 +121,11 @@ export function AuthCallbackPage() {
   };
 
   useEffect(() => {
+    if (runGuardRef.current) {
+      return;
+    }
+    runGuardRef.current = true;
+
     let cancelled = false;
     let settled = false;
     let syncing = false;
@@ -166,6 +198,21 @@ export function AuthCallbackPage() {
         const code = getCodeFromQuery();
 
         if (code) {
+          if (hasExchangeLock(code)) {
+            const resumed = await withTimeout(
+              supabase.auth.getSession(),
+              3000,
+              "oauth_get_session_timeout"
+            );
+
+            await finishWithSession(resumed.data.session?.access_token);
+            if (!settled) {
+              fail("oauth_session", "El callback de autenticación se ejecutó más de una vez. Reintentá el login.");
+            }
+            return;
+          }
+
+          setExchangeLock(code);
           const exchange = await withTimeout(
             supabase.auth.exchangeCodeForSession(code),
             6000,
@@ -175,6 +222,7 @@ export function AuthCallbackPage() {
           clearCodeFromQuery();
 
           if (exchange.error) {
+            clearExchangeLock(code);
             fail("oauth_session", exchange.error.message);
             return;
           }
