@@ -75,7 +75,7 @@ interface AuthContextValue {
     businessName?: string;
   }) => Promise<string | null>;
   logout: () => Promise<void>;
-  refreshSession: () => Promise<void>;
+  refreshSession: () => Promise<boolean>;
   retrySessionRestore: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => void;
 }
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshSession = useCallback(async () => {
+  const refreshSession = useCallback(async (): Promise<boolean> => {
     const { data } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/me", {
       suppressAuthExpired: true,
       timeoutMs: 10000,
@@ -98,7 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSubscription(data.subscription || null);
       setStorage(SESSION_KEY, "api");
       setError(null);
+      return true;
     }
+
+    return false;
   }, []);
 
   const restoreSession = useCallback(async (retries = 2) => {
@@ -195,19 +198,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (data?.user) {
       setAccessToken(data.accessToken || null);
-      setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
       setStorage(POST_AUTH_WELCOME_KEY, { kind: "login", ts: Date.now() });
+
+      const sessionValid = await refreshSession();
       setLoading(false);
 
-      const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me", {
-        suppressAuthExpired: true,
-        timeoutMs: 10000,
-      });
-      setSubscription(meRes.data?.subscription || null);
+      if (!sessionValid) {
+        setAccessToken(null);
+        setStorage<string | null>(SESSION_KEY, null);
+        setCurrentUser(null);
+        setSubscription(null);
+        return "No pudimos validar la sesión después del login. Volvé a iniciar sesión.";
+      }
     }
     return null;
-  }, []);
+  }, [refreshSession]);
 
   const register = useCallback(async (payload: {
     email: string;
@@ -234,19 +240,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (data?.user) {
       setAccessToken(data.accessToken || null);
-      setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
       setStorage(POST_AUTH_WELCOME_KEY, { kind: "register", ts: Date.now() });
+
+      const sessionValid = await refreshSession();
       setLoading(false);
 
-      const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me", {
-        suppressAuthExpired: true,
-        timeoutMs: 10000,
-      });
-      setSubscription(meRes.data?.subscription || null);
+      if (!sessionValid) {
+        setAccessToken(null);
+        setStorage<string | null>(SESSION_KEY, null);
+        setCurrentUser(null);
+        setSubscription(null);
+        return "No pudimos validar la sesión después del registro. Volvé a intentarlo.";
+      }
     }
     return null;
-  }, []);
+  }, [refreshSession]);
 
   const retrySessionRestore = useCallback(async () => {
     setLoading(true);
