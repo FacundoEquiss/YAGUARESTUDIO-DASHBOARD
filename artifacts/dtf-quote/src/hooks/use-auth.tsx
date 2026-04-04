@@ -97,11 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
-    const { data } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/me", {
+    const { data } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null; accessToken?: string | null }>("/auth/me", {
       suppressAuthExpired: true,
       timeoutMs: 10000,
     });
     if (data?.user) {
+      setAccessToken(data.accessToken || null);
       setCurrentUser(mapUser(data.user));
       setSubscription(data.subscription || null);
       setStorage(SESSION_KEY, "api");
@@ -180,7 +181,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleAuthRecovery = () => {
       if (currentUser) {
-        void refreshSession();
+        void refreshSession().then((ok) => {
+          if (!ok) {
+            setAccessToken(null);
+            setCurrentUser(null);
+            setSubscription(null);
+            setStorage<string | null>(SESSION_KEY, null);
+            setError("Sesion expirada. Inicia sesion nuevamente.");
+          }
+        });
       }
     };
 

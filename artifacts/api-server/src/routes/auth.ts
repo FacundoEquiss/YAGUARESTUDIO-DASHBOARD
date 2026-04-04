@@ -641,6 +641,28 @@ authRouter.post("/auth/login", async (req, res) => {
       return;
     }
 
+    // Some migration paths can produce a Supabase user without an active session.
+    // Force sign-in to guarantee a valid access token before returning success.
+    if (!accessToken) {
+      const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      });
+
+      if (sessionError || !sessionData?.session?.access_token) {
+        if (isSupabaseEmailNotConfirmedError(sessionError)) {
+          res.status(403).json({ error: "Tu correo todavía no está confirmado en Supabase." });
+          return;
+        }
+
+        res.status(401).json({ error: "No se pudo iniciar sesión. Verificá tus credenciales o restablecé tu contraseña." });
+        return;
+      }
+
+      accessToken = sessionData.session.access_token;
+      supabaseUserId = sessionData.user?.id || supabaseUserId;
+    }
+
     const [user] = await db.select().from(users).where(eq(users.supabaseAuthId, supabaseUserId));
     if (!user) {
       const [byEmail] = await db.select().from(users).where(eq(users.email, trimmedEmail));
@@ -687,12 +709,14 @@ authRouter.get("/auth/me", async (req, res) => {
     const cookieToken = typeof req.cookies?.token === "string" ? req.cookies.token : null;
 
     let user: typeof users.$inferSelect | null = null;
+    let sessionAccessToken: string | null = null;
 
     if (bearerToken) {
       const resolved = await resolveLocalUserFromSupabase(bearerToken);
 
       if (resolved.user) {
         user = resolved.user;
+        sessionAccessToken = bearerToken;
       }
     }
 
@@ -701,6 +725,7 @@ authRouter.get("/auth/me", async (req, res) => {
 
       if (resolved.user) {
         user = resolved.user;
+        sessionAccessToken = cookieToken;
       }
     }
 
@@ -724,6 +749,7 @@ authRouter.get("/auth/me", async (req, res) => {
     res.json({
       user: userProfile(user),
       subscription: subscription || null,
+      accessToken: sessionAccessToken,
     });
   } catch (err) {
     console.error("GET /auth/me error:", err);
