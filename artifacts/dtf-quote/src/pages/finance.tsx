@@ -14,6 +14,7 @@ import { useAllSuppliers } from "@/hooks/use-suppliers";
 import { useAllOrders } from "@/hooks/use-orders";
 import { useAllFinancialAccounts } from "@/hooks/use-financial-accounts";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { CreationFormGuide } from "@/components/creation-form-guide";
 import { clearFinanceDraft, loadFinanceDraft } from "@/lib/drafts";
 import {
   Plus,
@@ -83,6 +84,34 @@ function TransactionFormModal({ tx, draft, onClose, onSaved }: TxFormProps) {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const amountIsValid = amount > 0;
+  const categoryIsValid = Boolean(category);
+  const canSubmit = amountIsValid && categoryIsValid;
+
+  const fillExampleData = () => {
+    setType("income");
+    setAmount(85000);
+    setCategory("venta");
+    setDescription("Cobro parcial pedido #102 - transferencia");
+    setDate(new Date().toISOString().slice(0, 10));
+    setClientId(null);
+    setSupplierId(null);
+    setOrderId(null);
+  };
+
+  const clearForm = () => {
+    setType("income");
+    setAmount(0);
+    setDescription("");
+    setCategory("venta");
+    setClientId(null);
+    setSupplierId(null);
+    setOrderId(null);
+    setFinancialAccountId(null);
+    setDate(new Date().toISOString().slice(0, 10));
+    setError("");
+  };
 
   const categories = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
@@ -96,6 +125,7 @@ function TransactionFormModal({ tx, draft, onClose, onSaved }: TxFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
     if (amount <= 0) { setError("El monto debe ser mayor a 0"); return; }
     if (!category) { setError("Seleccioná una categoría"); return; }
     setSaving(true);
@@ -125,10 +155,24 @@ function TransactionFormModal({ tx, draft, onClose, onSaved }: TxFormProps) {
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-semibold">{isEdit ? "Editar Transacción" : "Nueva Transacción"}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X className="w-4 h-4" /></button>
+          <div className="flex items-center gap-2">
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={fillExampleData}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/40 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                Cargar ejemplo
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X className="w-4 h-4" /></button>
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+          {!isEdit && (
+            <CreationFormGuide entityName="movimiento" />
+          )}
 
           <div className="flex rounded-xl overflow-hidden border border-border">
             <button type="button" onClick={() => handleTypeChange("income")} className={cn("flex-1 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-colors", type === "income" ? "bg-emerald-500/15 text-emerald-400" : "bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
@@ -141,7 +185,8 @@ function TransactionFormModal({ tx, draft, onClose, onSaved }: TxFormProps) {
 
           <div>
             <label className="block text-sm font-medium mb-1.5">Monto *</label>
-            <input type="number" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} placeholder="0" min="1" step="1" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            <input type="number" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Ej: 85000" min="1" step="1" className={`w-full px-3 py-2 rounded-lg bg-muted border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${submitAttempted && !amountIsValid ? "border-red-500/60" : "border-border"}`} />
+            {submitAttempted && !amountIsValid && <p className="text-xs text-red-400 mt-1">Ingresá un monto mayor a 0.</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -204,8 +249,11 @@ function TransactionFormModal({ tx, draft, onClose, onSaved }: TxFormProps) {
           )}
 
           <div className="flex gap-3 pt-2">
+            {!isEdit && (
+              <button type="button" onClick={clearForm} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Limpiar</button>
+            )}
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar" : "Crear"}</button>
+            <button type="submit" disabled={saving || !canSubmit} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar" : "Crear"}</button>
           </div>
         </form>
       </div>

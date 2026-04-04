@@ -15,6 +15,7 @@ const RETRYABLE_AUTH_PATHS = new Set([
 ]);
 
 const ACCESS_TOKEN_KEY = "dtf:access-token";
+export const AUTH_EXPIRED_EVENT = "dtf:auth-expired";
 
 const HEALTH_PATHS = ["/healthz/db", "/healthz", "/health/ready", "/health"] as const;
 
@@ -51,6 +52,14 @@ export function setAccessToken(token: string | null): void {
   }
 
   window.localStorage.setItem(ACCESS_TOKEN_KEY, JSON.stringify(token));
+}
+
+function notifyAuthExpired(status: number): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { status } }));
 }
 
 export async function waitForApiReady(
@@ -111,6 +120,11 @@ export async function apiFetch<T = unknown>(
       const payload = isJson ? await res.json() : await res.text();
 
       if (!res.ok) {
+        if (res.status === 401) {
+          setAccessToken(null);
+          notifyAuthExpired(res.status);
+        }
+
         const retryableStatus = res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
         if (shouldRetry && retryableStatus && attempt < maxAttempts) {
           await sleep(200 * attempt);

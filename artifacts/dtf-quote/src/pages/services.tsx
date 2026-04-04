@@ -11,7 +11,14 @@ import {
   type ServicePricingType,
 } from "@/hooks/use-services";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { CreationFormGuide } from "@/components/creation-form-guide";
 import { Plus, Search, Trash2, Pencil, X, Wrench, ChevronDown, ChevronUp, Eye, EyeOff, TrendingUp } from "lucide-react";
+
+const PRICING_TYPE_EXAMPLES: Record<ServicePricingType, string> = {
+  fixed: "Ejemplo: bajada de plancha a precio fijo por trabajo.",
+  hourly: "Ejemplo: diseño gráfico cobrado por hora.",
+  volume: "Ejemplo: estampado por cantidad con tramos 1-10, 11-50, 51+.",
+};
 
 function createDefaultServiceRule(): ServicePricingRule {
   return {
@@ -46,6 +53,42 @@ function ServiceFormModal({
   const [isActive, setIsActive] = useState(service?.isActive ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const nameIsValid = name.trim().length > 0;
+  const canSubmit = nameIsValid;
+
+  const fillExampleData = () => {
+    setName("Estampado DTF Full Color");
+    setCategory("Estampado");
+    setPricingType("volume");
+    setUnit("prenda");
+    setBaseCost(950);
+    setSuggestedPrice(1800);
+    setReportArea("produccion");
+    setReportConcept("estampado_dtf");
+    setNotes("Incluye preparación, impresión y planchado. No incluye prenda.");
+    setIsActive(true);
+    setPricingRules([
+      { id: `rule_${Date.now()}_1`, label: "1 a 10 prendas", minQty: 1, maxQty: 10, unitPrice: 2000 },
+      { id: `rule_${Date.now()}_2`, label: "11 a 50 prendas", minQty: 11, maxQty: 50, unitPrice: 1800 },
+      { id: `rule_${Date.now()}_3`, label: "51 o más", minQty: 51, maxQty: null, unitPrice: 1600 },
+    ]);
+  };
+
+  const clearForm = () => {
+    setName("");
+    setCategory("");
+    setPricingType("fixed");
+    setPricingRules([createDefaultServiceRule()]);
+    setUnit("unidad");
+    setBaseCost(0);
+    setSuggestedPrice(0);
+    setReportArea("");
+    setReportConcept("");
+    setNotes("");
+    setIsActive(true);
+    setError("");
+  };
 
   const updateRule = (index: number, key: keyof ServicePricingRule, value: string | number | null) => {
     setPricingRules((prev) =>
@@ -69,6 +112,7 @@ function ServiceFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
 
     if (!name.trim()) {
       setError("El nombre del servicio es obligatorio");
@@ -120,18 +164,33 @@ function ServiceFormModal({
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-semibold">{isEdit ? "Editar servicio" : "Nuevo servicio"}</h2>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors" aria-label="Cerrar">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={fillExampleData}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/40 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                Cargar ejemplo
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors" aria-label="Cerrar">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+          {!isEdit && (
+            <CreationFormGuide entityName="servicio" />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5">Nombre *</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Estampado DTF Full Color" className={`w-full px-3 py-2 rounded-lg bg-muted border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${submitAttempted && !nameIsValid ? "border-red-500/60" : "border-border"}`} />
+              {submitAttempted && !nameIsValid && <p className="text-xs text-red-400 mt-1">Completá el nombre del servicio.</p>}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Categoría</label>
@@ -143,24 +202,26 @@ function ServiceFormModal({
             <div>
               <label className="block text-sm font-medium mb-1.5">Tipo de precio</label>
               <select value={pricingType} onChange={(e) => setPricingType(e.target.value as ServicePricingType)} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
-                <option value="fixed">Fijo por unidad</option>
-                <option value="hourly">Por hora</option>
-                <option value="volume">Por volumen</option>
+                <option value="fixed">Fijo por unidad (ej: bajada de plancha)</option>
+                <option value="hourly">Por hora (ej: diseño)</option>
+                <option value="volume">Por volumen (ej: estampado por cantidad)</option>
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Unidad</label>
-              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="unidad" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Ej: prenda, hora, metro" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Precio sugerido</label>
-              <input type="number" min="0" value={suggestedPrice || ""} onChange={(e) => setSuggestedPrice(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              <input type="number" min="0" value={suggestedPrice || ""} onChange={(e) => setSuggestedPrice(Number(e.target.value))} placeholder="Ej: 1800" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
           </div>
 
+          <p className="text-xs text-muted-foreground -mt-2">{PRICING_TYPE_EXAMPLES[pricingType]}</p>
+
           <div>
             <label className="block text-sm font-medium mb-1.5">Costo base</label>
-            <input type="number" min="0" value={baseCost || ""} onChange={(e) => setBaseCost(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            <input type="number" min="0" value={baseCost || ""} onChange={(e) => setBaseCost(Number(e.target.value))} placeholder="Ej: 950" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
           </div>
 
           {pricingType === "volume" && (
@@ -174,7 +235,7 @@ function ServiceFormModal({
                   <div key={rule.id || `${index}`} className="grid grid-cols-1 md:grid-cols-12 gap-2 rounded-lg border border-border bg-muted/20 p-2.5">
                     <div className="md:col-span-4">
                       <label className="block text-[11px] text-muted-foreground mb-1">Etiqueta</label>
-                      <input value={rule.label || ""} onChange={(e) => updateRule(index, "label", e.target.value)} className="w-full px-2.5 py-2 rounded-lg bg-muted border border-border text-xs" />
+                      <input value={rule.label || ""} onChange={(e) => updateRule(index, "label", e.target.value)} placeholder="Ej: 1 a 10 prendas" className="w-full px-2.5 py-2 rounded-lg bg-muted border border-border text-xs" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[11px] text-muted-foreground mb-1">Min</label>
@@ -186,7 +247,7 @@ function ServiceFormModal({
                     </div>
                     <div className="md:col-span-3">
                       <label className="block text-[11px] text-muted-foreground mb-1">Precio unit.</label>
-                      <input type="number" min="0" value={Number(rule.unitPrice) || ""} onChange={(e) => updateRule(index, "unitPrice", Math.max(0, Number(e.target.value) || 0))} className="w-full px-2.5 py-2 rounded-lg bg-muted border border-border text-xs" />
+                      <input type="number" min="0" value={Number(rule.unitPrice) || ""} onChange={(e) => updateRule(index, "unitPrice", Math.max(0, Number(e.target.value) || 0))} placeholder="Ej: 1800" className="w-full px-2.5 py-2 rounded-lg bg-muted border border-border text-xs" />
                     </div>
                     <div className="md:col-span-1 flex items-end justify-end">
                       <button type="button" onClick={() => removeRule(index)} className="text-xs text-red-400 hover:text-red-300">Quitar</button>
@@ -200,11 +261,11 @@ function ServiceFormModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5">Área de reporte</label>
-              <input value={reportArea} onChange={(e) => setReportArea(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm" />
+              <input value={reportArea} onChange={(e) => setReportArea(e.target.value)} placeholder="Ej: produccion" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Concepto de reporte</label>
-              <input value={reportConcept} onChange={(e) => setReportConcept(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm" />
+              <input value={reportConcept} onChange={(e) => setReportConcept(e.target.value)} placeholder="Ej: estampado_dtf" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm" />
             </div>
           </div>
 
@@ -219,8 +280,11 @@ function ServiceFormModal({
           </label>
 
           <div className="flex gap-3 pt-2">
+            {!isEdit && (
+              <button type="button" onClick={clearForm} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Limpiar</button>
+            )}
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear servicio"}</button>
+            <button type="submit" disabled={saving || !canSubmit} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear servicio"}</button>
           </div>
         </form>
       </div>

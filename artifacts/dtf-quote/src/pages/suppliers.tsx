@@ -9,6 +9,7 @@ import {
   type CreateSupplierData,
 } from "@/hooks/use-suppliers";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { CreationFormGuide } from "@/components/creation-form-guide";
 import {
   Plus,
   Search,
@@ -62,9 +63,32 @@ function SupplierFormModal({ supplier, onClose, onSaved }: SupplierFormProps) {
   const [notes, setNotes] = useState(supplier?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const nameIsValid = name.trim().length > 0;
+  const canSubmit = nameIsValid;
+
+  const fillExampleData = () => {
+    setName("Textiles del Sur");
+    setEmail("ventas@textilesdelsur.com");
+    setPhone("+54 11 4321-9876");
+    setBusinessName("Textiles del Sur S.A.");
+    setCategory("telas");
+    setNotes("Entrega semanal. Lista mayorista vigente.");
+  };
+
+  const clearForm = () => {
+    setName("");
+    setEmail("");
+    setPhone("");
+    setBusinessName("");
+    setCategory("");
+    setNotes("");
+    setError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
     if (!name.trim()) {
       setError("El nombre es obligatorio");
       return;
@@ -94,15 +118,30 @@ function SupplierFormModal({ supplier, onClose, onSaved }: SupplierFormProps) {
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-semibold">{isEdit ? "Editar Proveedor" : "Nuevo Proveedor"}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X className="w-4 h-4" /></button>
+          <div className="flex items-center gap-2">
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={fillExampleData}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/40 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                Cargar ejemplo
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X className="w-4 h-4" /></button>
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
           )}
+          {!isEdit && (
+            <CreationFormGuide entityName="proveedor" />
+          )}
           <div>
             <label className="block text-sm font-medium mb-1.5">Nombre *</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del proveedor" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Textiles del Sur" className={`w-full px-3 py-2 rounded-lg bg-muted border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${submitAttempted && !nameIsValid ? "border-red-500/60" : "border-border"}`} />
+            {submitAttempted && !nameIsValid && <p className="text-xs text-red-400 mt-1">Completá el nombre del proveedor.</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -132,8 +171,11 @@ function SupplierFormModal({ supplier, onClose, onSaved }: SupplierFormProps) {
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas adicionales..." rows={3} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
           </div>
           <div className="flex gap-3 pt-2">
+            {!isEdit && (
+              <button type="button" onClick={clearForm} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Limpiar</button>
+            )}
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar Cambios" : "Crear Proveedor"}</button>
+            <button type="submit" disabled={saving || !canSubmit} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar Cambios" : "Crear Proveedor"}</button>
           </div>
         </form>
       </div>

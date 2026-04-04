@@ -16,6 +16,7 @@ import {
 import { createSupplier, useAllSuppliers } from "@/hooks/use-suppliers";
 import { useAllOrders } from "@/hooks/use-orders";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { CreationFormGuide } from "@/components/creation-form-guide";
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -117,6 +118,50 @@ function ProductFormModal({ product, onClose, onSaved }: ProductFormProps) {
   const [creatingSupplier, setCreatingSupplier] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const nameIsValid = name.trim().length > 0;
+  const canSubmit = nameIsValid;
+
+  const fillExampleData = () => {
+    const retail = 12500;
+    setName("Remera Oversize Negra");
+    setSku("REM-OVR-BLK-M");
+    setCategory("Indumentaria");
+    setUnit("prenda");
+    setSalePrice(retail);
+    setCostPrice(6200);
+    setCurrentStock(120);
+    setMinStock(20);
+    setAllowManualPrice(true);
+    setNotes("Algodón 24/1. Talles S a XL.");
+    setIsActive(true);
+    setPriceTiers(createDefaultPriceTiers(retail));
+  };
+
+  const clearForm = () => {
+    setName("");
+    setSupplierId(null);
+    setSku("");
+    setCategory("");
+    setUnit("unidad");
+    setSalePrice(0);
+    setPriceTiers(createDefaultPriceTiers(0));
+    setAllowManualPrice(true);
+    setCostPrice(0);
+    setCurrentStock(0);
+    setMinStock(0);
+    setNotes("");
+    setIsActive(true);
+    setShowCreateSupplier(false);
+    setSupplierName("");
+    setSupplierEmail("");
+    setSupplierPhone("");
+    setSupplierBusinessName("");
+    setSupplierCategory("");
+    setSupplierNotes("");
+    setSupplierError("");
+    setError("");
+  };
 
   const updatePriceTier = (index: number, key: keyof ProductPriceTier, value: string | number | boolean | null) => {
     setPriceTiers((prev) =>
@@ -216,6 +261,7 @@ function ProductFormModal({ product, onClose, onSaved }: ProductFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
 
     if (!name.trim()) {
       setError("El nombre del producto es obligatorio");
@@ -272,20 +318,35 @@ function ProductFormModal({ product, onClose, onSaved }: ProductFormProps) {
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-semibold">{isEdit ? "Editar producto" : "Nuevo producto"}</h2>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors" aria-label="Cerrar">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={fillExampleData}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/40 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                Cargar ejemplo
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors" aria-label="Cerrar">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
           )}
+          {!isEdit && (
+            <CreationFormGuide entityName="producto" />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5">Nombre *</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Remera Oversize Negra" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Remera Oversize Negra" className={`w-full px-3 py-2 rounded-lg bg-muted border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${submitAttempted && !nameIsValid ? "border-red-500/60" : "border-border"}`} />
+              {submitAttempted && !nameIsValid && <p className="text-xs text-red-400 mt-1">Completá el nombre del producto.</p>}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Proveedor</label>
@@ -346,7 +407,7 @@ function ProductFormModal({ product, onClose, onSaved }: ProductFormProps) {
 
                   <div>
                     <label className="block text-xs font-medium mb-1">Notas</label>
-                    <textarea value={supplierNotes} onChange={(e) => setSupplierNotes(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
+                    <textarea value={supplierNotes} onChange={(e) => setSupplierNotes(e.target.value)} placeholder="Ej: Entrega los martes, pago a 15 días" rows={2} className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
                   </div>
 
                   <button
@@ -372,8 +433,9 @@ function ProductFormModal({ product, onClose, onSaved }: ProductFormProps) {
               <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ej: Indumentaria" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Unidad</label>
-              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="unidad" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              <label className="block text-sm font-medium mb-1.5">Unidad de medida</label>
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Ej: prenda, unidad, metro, kg" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              <p className="text-[11px] text-muted-foreground mt-1">Define cómo se interpreta la cantidad en pedidos y stock.</p>
             </div>
           </div>
 
@@ -495,8 +557,11 @@ function ProductFormModal({ product, onClose, onSaved }: ProductFormProps) {
           </label>
 
           <div className="flex gap-3 pt-2">
+            {!isEdit && (
+              <button type="button" onClick={clearForm} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Limpiar</button>
+            )}
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear producto"}</button>
+            <button type="submit" disabled={saving || !canSubmit} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">{saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear producto"}</button>
           </div>
         </form>
       </div>

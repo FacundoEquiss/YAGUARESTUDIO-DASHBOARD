@@ -18,6 +18,7 @@ import { useProducts } from "@/hooks/use-products";
 import { useAllServices, type ServiceItem } from "@/hooks/use-services";
 import { useAllFinancialAccounts } from "@/hooks/use-financial-accounts";
 import { HelpTooltip } from "@/components/help-tooltip";
+import { CreationFormGuide } from "@/components/creation-form-guide";
 import { clearOrderDraft, loadOrderDraft } from "@/lib/drafts";
 import {
   Plus,
@@ -202,6 +203,9 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
   const [createClientProfile, setCreateClientProfile] = useState(Boolean(draft?.clientName && !draft?.clientId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const clientNameIsValid = clientName.trim().length > 0;
+  const canSubmit = clientNameIsValid;
 
   const initialLines: FormOrderLine[] = (() => {
     if (order?.lineItems && order.lineItems.length > 0) {
@@ -264,6 +268,54 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
   })();
 
   const [orderLines, setOrderLines] = useState<FormOrderLine[]>(initialLines);
+
+  const fillExampleData = () => {
+    setClientName("Café Central");
+    setSelectedClientId(null);
+    setCreateClientProfile(true);
+    setTitle("Uniformes staff abril");
+    setDescription("Producción de indumentaria para nuevo personal");
+    setStatus("nuevo");
+    setDueDate("");
+    setNotes("Entregar en 2 tandas. Confirmar talles finales 48h antes.");
+    setOrderLines([
+      {
+        key: nextLineKey(),
+        type: "manual",
+        sourceId: null,
+        priceTierId: null,
+        title: "Remeras personalizadas",
+        description: "Frente y espalda full color",
+        quantity: "40",
+        unitCost: "5200",
+        unitPrice: "9500",
+      },
+      {
+        key: nextLineKey(),
+        type: "manual",
+        sourceId: null,
+        priceTierId: null,
+        title: "Diseño y armado de pliegos",
+        description: "Servicio creativo y preprensa",
+        quantity: "1",
+        unitCost: "0",
+        unitPrice: "45000",
+      },
+    ]);
+  };
+
+  const clearForm = () => {
+    setSelectedClientId(null);
+    setClientName("");
+    setTitle("");
+    setDescription("");
+    setStatus("nuevo");
+    setDueDate("");
+    setNotes("");
+    setCreateClientProfile(false);
+    setOrderLines([createEmptyFormLine()]);
+    setError("");
+  };
 
   const { totalCost, totalPrice } = orderLines.reduce(
     (acc, line) => {
@@ -475,6 +527,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
     if (!clientName.trim()) {
       setError("El nombre del cliente es obligatorio");
       return;
@@ -583,9 +636,20 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
           <h2 className="text-lg font-display font-bold text-foreground">
             {isEdit ? "Editar Pedido" : "Nuevo Pedido"}
           </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={fillExampleData}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/40 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                Cargar ejemplo
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -594,6 +658,9 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
               <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
+          )}
+          {!isEdit && (
+            <CreationFormGuide entityName="pedido" />
           )}
 
           <div>
@@ -614,10 +681,11 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
               type="text"
               value={clientName}
               onChange={(e) => { setClientName(e.target.value); setSelectedClientId(null); }}
-              placeholder="Nombre del cliente"
-              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+              placeholder="Ej: Café Central"
+              className={`w-full px-3 py-2.5 rounded-xl bg-white/5 border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm ${submitAttempted && !clientNameIsValid ? "border-red-500/60" : "border-border"}`}
               autoFocus={!allClients.length}
             />
+            {submitAttempted && !clientNameIsValid && <p className="text-xs text-red-400 mt-1">Completá el nombre del cliente.</p>}
           </div>
 
           <div>
@@ -890,6 +958,15 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
           </div>
 
           <div className="flex gap-3 pt-2">
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={clearForm}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-white/5 transition-colors"
+              >
+                Limpiar
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -899,7 +976,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !canSubmit}
               className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
             >
               {saving ? "Guardando..." : isEdit ? "Guardar Cambios" : "Crear Pedido"}

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { getStorage, setStorage } from "@/lib/storage";
-import { apiFetch, setAccessToken, waitForApiReady } from "@/lib/api";
+import { AUTH_EXPIRED_EVENT, apiFetch, setAccessToken, waitForApiReady } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 export interface AuthUser {
@@ -113,6 +113,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStorage<string | null>(SESSION_KEY, null);
       })
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setCurrentUser(null);
+      setSubscription(null);
+      setStorage<string | null>(SESSION_KEY, null);
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
