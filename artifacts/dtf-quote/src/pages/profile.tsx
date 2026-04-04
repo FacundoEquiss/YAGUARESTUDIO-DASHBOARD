@@ -154,7 +154,10 @@ export function ProfilePage() {
 
     apiFetch<{ result?: { localStatus?: string } }>("/subscription/sync", {
       method: "POST",
-      body: JSON.stringify({ preapprovalId: pendingPreapprovalId }),
+      body: JSON.stringify({
+        preapprovalId: pendingPreapprovalId,
+        planSlug: pendingPlanSlug || undefined,
+      }),
     })
       .then(async ({ data, error }) => {
         if (cancelled) return;

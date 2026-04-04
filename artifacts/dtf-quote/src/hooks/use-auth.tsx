@@ -58,6 +58,14 @@ function mapUser(u: ApiUser): AuthUser {
   };
 }
 
+function getServerUnavailableMessage(status: number, error: string | null): string {
+  if (status === 0) {
+    return "El servidor está despertando. Probá de nuevo en unos segundos.";
+  }
+
+  return error || "No se pudo completar la solicitud.";
+}
+
 interface AuthContextValue {
   currentUser: AuthUser | null;
   subscription: SubscriptionInfo | null;
@@ -184,33 +192,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     setError(null);
-    const apiReady = await waitForApiReady();
 
     const { data, error, status } = await apiFetch<{ user: ApiUser; accessToken?: string | null }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
     if (error) {
-      if (!apiReady && status === 0) {
-        return "El servidor está despertando. Probá de nuevo en unos segundos.";
-      }
-      return error;
+      return getServerUnavailableMessage(status, error);
     }
     if (data?.user) {
       setAccessToken(data.accessToken || null);
+      setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
       setStorage(POST_AUTH_WELCOME_KEY, { kind: "login", ts: Date.now() });
-
-      const sessionValid = await refreshSession();
       setLoading(false);
 
-      if (!sessionValid) {
-        setAccessToken(null);
-        setStorage<string | null>(SESSION_KEY, null);
-        setCurrentUser(null);
-        setSubscription(null);
-        return "No pudimos validar la sesión después del login. Volvé a iniciar sesión.";
-      }
+      void refreshSession();
     }
     return null;
   }, [refreshSession]);
@@ -226,33 +223,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     businessName?: string;
   }): Promise<string | null> => {
     setError(null);
-    const apiReady = await waitForApiReady();
 
     const { data, error, status } = await apiFetch<{ user: ApiUser; accessToken?: string | null }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
     });
     if (error) {
-      if (!apiReady && status === 0) {
-        return "El servidor está despertando. Probá de nuevo en unos segundos.";
-      }
-      return error;
+      return getServerUnavailableMessage(status, error);
     }
     if (data?.user) {
       setAccessToken(data.accessToken || null);
+      setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
       setStorage(POST_AUTH_WELCOME_KEY, { kind: "register", ts: Date.now() });
-
-      const sessionValid = await refreshSession();
       setLoading(false);
 
-      if (!sessionValid) {
-        setAccessToken(null);
-        setStorage<string | null>(SESSION_KEY, null);
-        setCurrentUser(null);
-        setSubscription(null);
-        return "No pudimos validar la sesión después del registro. Volvé a intentarlo.";
-      }
+      void refreshSession();
     }
     return null;
   }, [refreshSession]);

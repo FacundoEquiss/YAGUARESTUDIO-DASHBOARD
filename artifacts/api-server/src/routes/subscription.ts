@@ -211,14 +211,19 @@ subscriptionRouter.post("/subscription/checkout", requireAuth, async (req, res) 
 subscriptionRouter.post("/subscription/sync", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { preapprovalId } = req.body as { preapprovalId?: string };
+    const { preapprovalId, planSlug } = req.body as { preapprovalId?: string; planSlug?: string };
 
     if (!preapprovalId) {
       res.status(400).json({ error: "preapprovalId es requerido" });
       return;
     }
 
-    const result = await syncMercadoPagoPreapprovalById(preapprovalId);
+    const normalizedPlanSlug = typeof planSlug === "string" ? planSlug.trim().toLowerCase() : null;
+
+    const result = await syncMercadoPagoPreapprovalById(preapprovalId, {
+      expectedUserId: userId,
+      expectedPlanSlug: normalizedPlanSlug,
+    });
 
     if (result.userId !== userId) {
       res.status(403).json({ error: "La suscripción no pertenece al usuario autenticado" });

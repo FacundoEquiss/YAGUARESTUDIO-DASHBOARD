@@ -60,8 +60,15 @@ function extractPlanIdFromInput(value?: string | null): string | null {
   }
 }
 
-function buildHostedPlanUrl(planId: string): string {
-  return `https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=${planId}`;
+function buildHostedPlanUrl(planId: string, backUrl?: string | null): string {
+  const url = new URL("https://www.mercadopago.com.ar/subscriptions/checkout");
+  url.searchParams.set("preapproval_plan_id", planId);
+
+  if (backUrl) {
+    url.searchParams.set("back_url", backUrl);
+  }
+
+  return url.toString();
 }
 
 function resolveSubscriptionBackUrl(): string | null {
@@ -77,7 +84,7 @@ function resolveSubscriptionBackUrl(): string | null {
   return `${frontendOrigin}/profile?billing=returned`;
 }
 
-function getPlanConfig(planSlug: string) {
+function getPlanConfig(planSlug: string, backUrl?: string | null) {
   const envKey = planSlug === "standard"
     ? "MP_STANDARD_PLAN_ID"
     : planSlug === "premium"
@@ -96,7 +103,7 @@ function getPlanConfig(planSlug: string) {
 
   return {
     id,
-    initPoint: buildHostedPlanUrl(id),
+    initPoint: buildHostedPlanUrl(id, backUrl),
   };
 }
 
@@ -277,14 +284,14 @@ export async function createMercadoPagoSubscriptionCheckout(args: {
     throw new Error("El plan gratuito no requiere checkout");
   }
 
-  const planConfig = getPlanConfig(plan.slug);
-  if (!planConfig) {
-    throw new Error(`El plan '${plan.name}' aún no está asociado a Mercado Pago.`);
-  }
-
   const backUrl = resolveSubscriptionBackUrl();
   if (!backUrl) {
     throw new Error("FRONTEND_URL no permite construir el retorno desde Mercado Pago.");
+  }
+
+  const planConfig = getPlanConfig(plan.slug, backUrl);
+  if (!planConfig) {
+    throw new Error(`El plan '${plan.name}' aún no está asociado a Mercado Pago.`);
   }
 
   return {

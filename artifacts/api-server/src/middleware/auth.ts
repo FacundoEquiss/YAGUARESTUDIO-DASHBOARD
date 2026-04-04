@@ -52,22 +52,34 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     .select()
     .from(users)
     .where(eq(users.supabaseAuthId, validatedUser.id));
-    
-  if (!localUser) {
-     const [byEmail] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, validatedUser.email || ""));
-        
-     if (!byEmail) {
-       res.status(401).json({ error: "Usuario no encontrado" });
-       return;
-     }
-     
-     req.user = { userId: byEmail.id, email: byEmail.email, role: byEmail.role };
-  } else {
-     req.user = { userId: localUser.id, email: localUser.email, role: localUser.role };
+
+  if (localUser) {
+    req.user = { userId: localUser.id, email: localUser.email, role: localUser.role };
+    next();
+    return;
   }
+
+  const validatedEmail = typeof validatedUser.email === "string" ? validatedUser.email.trim().toLowerCase() : "";
+  if (!validatedEmail) {
+    res.status(401).json({ error: "Usuario no encontrado" });
+    return;
+  }
+
+  const [byEmail] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, validatedEmail));
+
+  if (!byEmail) {
+    res.status(401).json({ error: "Usuario no encontrado" });
+    return;
+  }
+
+  if (byEmail.supabaseAuthId !== validatedUser.id) {
+    await db.update(users).set({ supabaseAuthId: validatedUser.id }).where(eq(users.id, byEmail.id));
+  }
+
+  req.user = { userId: byEmail.id, email: byEmail.email, role: byEmail.role };
 
   next();
 }

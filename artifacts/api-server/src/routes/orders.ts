@@ -83,6 +83,23 @@ function toMoney(value: number): string {
   return value.toFixed(2);
 }
 
+function parseOptionalDate(value: unknown): Date | null | "invalid" {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return "invalid";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "invalid";
+  }
+
+  return parsed;
+}
+
 function parsePositiveInt(value: unknown): number | null {
   const parsed = Number(value);
   if (Number.isNaN(parsed) || parsed <= 0) {
@@ -340,6 +357,17 @@ function mapOrderForResponse(
 }
 
 async function recalculateOrderAggregates(orderId: number, userId: number, executor: any = db) {
+  await executor.execute(
+    sql`
+      select ${orders.id}
+      from ${orders}
+      where ${orders.id} = ${orderId}
+        and ${orders.userId} = ${userId}
+        and ${orders.deletedAt} is null
+      for update
+    `,
+  );
+
   const [currentOrder] = await executor
     .select()
     .from(orders)
@@ -376,9 +404,7 @@ async function recalculateOrderAggregates(orderId: number, userId: number, execu
     financialStatus = "paid";
   }
 
-  const quotedTotal = Number(currentOrder.quotedTotal || 0) > 0
-    ? Number(currentOrder.quotedTotal)
-    : subtotalPrice;
+  const quotedTotal = Math.max(Number(currentOrder.quotedTotal || 0), subtotalPrice);
 
   const [updated] = await executor
     .update(orders)
@@ -391,8 +417,12 @@ async function recalculateOrderAggregates(orderId: number, userId: number, execu
       financialStatus,
       updatedAt: new Date(),
     })
-    .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
+    .where(and(eq(orders.id, orderId), eq(orders.userId, userId), isNull(orders.deletedAt)))
     .returning();
+
+  if (!updated) {
+    throw new Error(`No se pudo recalcular agregados para pedido ${orderId}`);
+  }
 
   return updated;
 }
@@ -678,6 +708,11 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
     const normalizedQuotedTotal = Math.max(0, Number(quotedTotal) || subtotalPrice);
 
     const order = await db.transaction(async (tx) => {
+      const parsedDueDate = parseOptionalDate(dueDate);
+      if (parsedDueDate === "invalid") {
+        throw new Error("invalid_due_date");
+      }
+
       const [created] = await tx
         .insert(orders)
         .values({
@@ -695,7 +730,7 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
           amountPaid: toMoney(0),
           financialStatus: "pending",
           status: orderStatus,
-          dueDate: dueDate ? new Date(dueDate) : null,
+          dueDate: parsedDueDate,
           sourceQuoteId: normalizedSourceQuoteId,
           notes: notes?.trim() || null,
         })
@@ -724,8 +759,7 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
         })),
       );
 
-      const recalculated = await recalculateOrderAggregates(created.id, userId, tx);
-      return recalculated || created;
+      return recalculateOrderAggregates(created.id, userId, tx);
     });
 
     const [lineItemsMap, expenseMap] = await Promise.all([
@@ -737,6 +771,10 @@ ordersRouter.post("/orders", requireAuth, async (req, res) => {
       order: mapOrderForResponse(order, lineItemsMap[order.id] || [], expenseMap[order.id]),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "invalid_due_date") {
+      res.status(400).json({ error: "Fecha de entrega inválida" });
+      return;
+    }
     if (err instanceof DtfPricingError) {
       res.status(err.statusCode).json({ error: err.message });
       return;
@@ -830,7 +868,6 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
     if (unitPrice !== undefined) updates.unitPrice = toMoney(Math.max(0, Number(unitPrice) || 0));
     if (totalPrice !== undefined) updates.quotedTotal = toMoney(Math.max(0, Number(totalPrice) || 0));
     if (status !== undefined && VALID_STATUSES.includes(status as OrderStatus)) updates.status = status;
-    if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
     if (notes !== undefined) updates.notes = notes?.trim() || null;
     if (quotedTotal !== undefined) updates.quotedTotal = toMoney(Math.max(0, Number(quotedTotal) || 0));
     if (sourceQuoteId !== undefined) updates.sourceQuoteId = sourceQuoteId?.trim() || null;
@@ -885,6 +922,14 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
     }
 
     const order = await db.transaction(async (tx) => {
+      if (dueDate !== undefined) {
+        const parsedDueDate = parseOptionalDate(dueDate);
+        if (parsedDueDate === "invalid") {
+          throw new Error("invalid_due_date");
+        }
+        updates.dueDate = parsedDueDate;
+      }
+
       const [updatedOrder] = await tx
         .update(orders)
         .set(updates)
@@ -892,7 +937,7 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
         .returning();
 
       if (parsedLineItems) {
-        await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+        await tx.delete(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.userId, userId)));
 
         if (parsedLineItems.length > 0) {
           await tx.insert(orderItems).values(
@@ -920,8 +965,11 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
         }
       }
 
-      const recalculated = await recalculateOrderAggregates(orderId, userId, tx);
-      return recalculated || updatedOrder;
+      if (!updatedOrder) {
+        throw new Error("order_not_found_in_update");
+      }
+
+      return recalculateOrderAggregates(orderId, userId, tx);
     });
 
     const [lineItemsMap, expenseMap] = await Promise.all([
@@ -933,6 +981,10 @@ ordersRouter.put("/orders/:id", requireAuth, async (req, res) => {
       order: mapOrderForResponse(order, lineItemsMap[order.id] || [], expenseMap[order.id]),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "invalid_due_date") {
+      res.status(400).json({ error: "Fecha de entrega inválida" });
+      return;
+    }
     if (err instanceof DtfPricingError) {
       res.status(err.statusCode).json({ error: err.message });
       return;

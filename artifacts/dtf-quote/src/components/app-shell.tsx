@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Navbar } from "@/components/navbar";
 
 interface AppShellProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {

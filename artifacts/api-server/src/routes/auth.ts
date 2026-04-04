@@ -287,6 +287,18 @@ async function resolveLocalUserFromSupabase(accessToken: string) {
       .where(eq(users.email, normalizedEmail));
 
     localUser = byEmail ?? null;
+
+    if (localUser && localUser.supabaseAuthId !== supabaseAuthId) {
+      await db
+        .update(users)
+        .set({ supabaseAuthId })
+        .where(eq(users.id, localUser.id));
+
+      localUser = {
+        ...localUser,
+        supabaseAuthId,
+      };
+    }
   }
 
   if (!localUser) {
