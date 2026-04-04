@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import { db, users, subscriptionPlans, userSubscriptions } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { compare } from "bcryptjs";
 import { requireAuth } from "../middleware/auth";
 import { env } from "../env";
 import { supabase } from "../lib/supabase";
@@ -237,6 +238,16 @@ function getBearerToken(authHeader?: string): string | null {
   return token.length > 0 ? token : null;
 }
 
+function isSupabaseUserAlreadyExistsError(error: unknown): boolean {
+  const message = String((error as { message?: unknown } | null)?.message || "").toLowerCase();
+  return message.includes("already registered") || message.includes("already exists") || message.includes("user exists");
+}
+
+function isSupabaseEmailNotConfirmedError(error: unknown): boolean {
+  const message = String((error as { message?: unknown } | null)?.message || "").toLowerCase();
+  return message.includes("email not confirmed") || message.includes("email_not_confirmed");
+}
+
 async function validateSupabaseAccessToken(accessToken: string) {
   if (!supabase) {
     return { user: null as SupabaseTokenUser | null, error: "Supabase Auth no está configurado en el servidor" };
@@ -413,9 +424,31 @@ authRouter.post("/auth/register", async (req, res) => {
       }
     });
 
-    if (authError || !authData.user) {
+    let supabaseUserId = authData?.user?.id;
+    let accessToken = authData?.session?.access_token || "";
+
+    if (authError || !supabaseUserId) {
+      if (isSupabaseUserAlreadyExistsError(authError)) {
+        // Permite recuperar registros parcialmente migrados: cuenta existe en Supabase,
+        // pero no necesariamente en la tabla local.
+        const { data: existingSession, error: existingSessionError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password,
+        });
+
+        if (existingSessionError || !existingSession.user) {
+          res.status(409).json({
+            error: "Ya existe una cuenta con ese correo. Iniciá sesión o restablecé tu contraseña.",
+          });
+          return;
+        }
+
+        supabaseUserId = existingSession.user.id;
+        accessToken = existingSession.session?.access_token || "";
+      } else {
         res.status(400).json({ error: authError?.message || "Error registrando usuario en Supabase" });
         return;
+      }
     }
 
     const [newUser] = await db
@@ -428,7 +461,7 @@ authRouter.post("/auth/register", async (req, res) => {
         birthDate: normalizedBirthDate || null,
         phone: trimmedPhone || null,
         businessName: trimmedBusinessName || null,
-        supabaseAuthId: authData.user.id,
+        supabaseAuthId: supabaseUserId,
         role: "user",
       })
       .returning();
@@ -452,13 +485,20 @@ authRouter.post("/auth/register", async (req, res) => {
       });
     }
 
-    // Attempt to log them right away to create session token
-    const { data: sessionData } = await supabase.auth.signInWithPassword({
+    if (!accessToken) {
+      const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
         email: trimmedEmail,
-        password: password
-    });
+        password,
+      });
 
-    res.cookie("token", sessionData?.session?.access_token || "", getAuthCookieOptions());
+      if (!sessionError && sessionData?.session?.access_token) {
+        accessToken = sessionData.session.access_token;
+      }
+    }
+
+    if (accessToken) {
+      res.cookie("token", accessToken, getAuthCookieOptions());
+    }
     registerRateLimiter.clear(limiterKey);
 
     res.json({ user: userProfile(newUser) });
@@ -507,28 +547,97 @@ authRouter.post("/auth/login", async (req, res) => {
        return;
     }
 
+    let supabaseUserId: string | null = null;
+    let accessToken = "";
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: password
+      email: trimmedEmail,
+      password,
     });
 
-    if (authError || !authData.user) {
+    if (!authError && authData.user) {
+      supabaseUserId = authData.user.id;
+      accessToken = authData.session?.access_token || "";
+    } else {
+      const [legacyUser] = await db.select().from(users).where(eq(users.email, trimmedEmail));
+
+      if (!legacyUser) {
         res.status(401).json({ error: "Credenciales incorrectas" });
         return;
+      }
+
+      if (isSupabaseEmailNotConfirmedError(authError)) {
+        res.status(403).json({ error: "Tu correo todavía no está confirmado en Supabase." });
+        return;
+      }
+
+      if (!legacyUser.passwordHash) {
+        res.status(401).json({ error: "Credenciales incorrectas" });
+        return;
+      }
+
+      const passwordMatches = await compare(password, legacyUser.passwordHash);
+      if (!passwordMatches) {
+        res.status(401).json({ error: "Credenciales incorrectas" });
+        return;
+      }
+
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          data: {
+            name: legacyUser.name,
+            ...(legacyUser.lastName ? { lastName: legacyUser.lastName } : {}),
+          },
+        },
+      });
+
+      if (!signupError && signupData.user) {
+        supabaseUserId = signupData.user.id;
+        accessToken = signupData.session?.access_token || "";
+      } else if (isSupabaseUserAlreadyExistsError(signupError)) {
+        const { data: migratedSession, error: migratedSessionError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password,
+        });
+
+        if (migratedSessionError || !migratedSession.user) {
+          res.status(409).json({
+            error: "Tu cuenta existe en Supabase pero la contraseña no coincide. Restablecé tu contraseña para continuar.",
+          });
+          return;
+        }
+
+        supabaseUserId = migratedSession.user.id;
+        accessToken = migratedSession.session?.access_token || "";
+      } else {
+        res.status(500).json({ error: "No se pudo migrar la cuenta a Supabase" });
+        return;
+      }
+
+      if (supabaseUserId && legacyUser.supabaseAuthId !== supabaseUserId) {
+        await db.update(users).set({ supabaseAuthId: supabaseUserId }).where(eq(users.id, legacyUser.id));
+      }
     }
 
-    const [user] = await db.select().from(users).where(eq(users.supabaseAuthId, authData.user.id));
+    if (!supabaseUserId) {
+      res.status(401).json({ error: "Credenciales incorrectas" });
+      return;
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.supabaseAuthId, supabaseUserId));
     if (!user) {
-      // Intento de fallback por si el usuario fue creado previamente
       const [byEmail] = await db.select().from(users).where(eq(users.email, trimmedEmail));
       if (!byEmail) {
         res.status(404).json({ error: "Usuario no encontrado en base local." });
         return;
       }
-      
-      // Vincular cuenta
-      await db.update(users).set({ supabaseAuthId: authData.user.id }).where(eq(users.id, byEmail.id));
-      res.cookie("token", authData.session?.access_token || "", getAuthCookieOptions());
+
+      await db.update(users).set({ supabaseAuthId: supabaseUserId }).where(eq(users.id, byEmail.id));
+      if (accessToken) {
+        res.cookie("token", accessToken, getAuthCookieOptions());
+      }
       loginRateLimiter.clear(limiterKey);
 
       res.json({ user: userProfile(byEmail) });
@@ -536,7 +645,9 @@ authRouter.post("/auth/login", async (req, res) => {
     }
 
     loginRateLimiter.clear(limiterKey);
-    res.cookie("token", authData.session?.access_token || "", getAuthCookieOptions());
+    if (accessToken) {
+      res.cookie("token", accessToken, getAuthCookieOptions());
+    }
 
     res.json({ user: userProfile(user) });
   } catch (err) {
