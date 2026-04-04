@@ -131,7 +131,15 @@ subscriptionRouter.get("/subscription/plans", async (_req, res) => {
     const plans = await db
       .select()
       .from(subscriptionPlans)
-      .where(eq(subscriptionPlans.isActive, true));
+      .where(eq(subscriptionPlans.isActive, true))
+      .orderBy(sql`
+        case
+          when ${subscriptionPlans.slug} = 'free' then 0
+          when ${subscriptionPlans.slug} = 'standard' then 1
+          when ${subscriptionPlans.slug} = 'premium' then 2
+          else 99
+        end
+      `);
     res.json({ plans });
   } catch (err) {
     console.error("GET /subscription/plans error:", err);

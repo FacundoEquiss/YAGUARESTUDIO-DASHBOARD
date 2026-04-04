@@ -23,6 +23,7 @@ import {
   FileText,
   Sun,
   Moon,
+  Wrench,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarActions } from "./sidebar-actions";
@@ -48,6 +49,7 @@ const MAIN_NAV: NavItem[] = [
   { href: "/clients", label: "Clientes", icon: Users, ready: true },
   { href: "/suppliers", label: "Proveedores", icon: Truck, ready: true },
   { href: "/products", label: "Productos / Stock", icon: Package2, ready: true },
+  { href: "/services", label: "Servicios", icon: Wrench, ready: true },
 ];
 
 const TOOLS_NAV: NavItem[] = [

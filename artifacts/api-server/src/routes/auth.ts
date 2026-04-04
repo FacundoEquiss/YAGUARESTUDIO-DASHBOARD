@@ -501,7 +501,10 @@ authRouter.post("/auth/register", async (req, res) => {
     }
     registerRateLimiter.clear(limiterKey);
 
-    res.json({ user: userProfile(newUser) });
+    res.json({
+      user: userProfile(newUser),
+      accessToken: accessToken || null,
+    });
   } catch (err) {
     console.error("POST /auth/register error:", {
       email: trimmedEmail || req.body?.email || null,
@@ -640,7 +643,10 @@ authRouter.post("/auth/login", async (req, res) => {
       }
       loginRateLimiter.clear(limiterKey);
 
-      res.json({ user: userProfile(byEmail) });
+      res.json({
+        user: userProfile(byEmail),
+        accessToken: accessToken || null,
+      });
       return;
     }
 
@@ -649,7 +655,10 @@ authRouter.post("/auth/login", async (req, res) => {
       res.cookie("token", accessToken, getAuthCookieOptions());
     }
 
-    res.json({ user: userProfile(user) });
+    res.json({
+      user: userProfile(user),
+      accessToken: accessToken || null,
+    });
   } catch (err) {
     console.error("POST /auth/login error:", {
       email: trimmedEmail || req.body?.email || null,
@@ -670,13 +679,12 @@ authRouter.get("/auth/me", async (req, res) => {
     if (bearerToken) {
       const resolved = await resolveLocalUserFromSupabase(bearerToken);
 
-      if (!resolved.user) {
-        sendError(req, res, resolved.status, "auth_me_bearer_invalid", resolved.error || "No autenticado");
-        return;
+      if (resolved.user) {
+        user = resolved.user;
       }
+    }
 
-      user = resolved.user;
-    } else if (cookieToken) {
+    if (!user && cookieToken) {
       const resolved = await resolveLocalUserFromSupabase(cookieToken);
 
       if (resolved.user) {

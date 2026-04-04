@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { getStorage, setStorage } from "@/lib/storage";
-import { apiFetch, waitForApiReady } from "@/lib/api";
+import { apiFetch, setAccessToken, waitForApiReady } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 export interface AuthUser {
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     const apiReady = await waitForApiReady();
 
-    const { data, error, status } = await apiFetch<{ user: ApiUser }>("/auth/login", {
+    const { data, error, status } = await apiFetch<{ user: ApiUser; accessToken?: string | null }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -129,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return error;
     }
     if (data?.user) {
+      setAccessToken(data.accessToken || null);
       setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
       setStorage(POST_AUTH_WELCOME_KEY, { kind: "login", ts: Date.now() });
@@ -151,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }): Promise<string | null> => {
     const apiReady = await waitForApiReady();
 
-    const { data, error, status } = await apiFetch<{ user: ApiUser }>("/auth/register", {
+    const { data, error, status } = await apiFetch<{ user: ApiUser; accessToken?: string | null }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -162,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return error;
     }
     if (data?.user) {
+      setAccessToken(data.accessToken || null);
       setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
       setStorage(POST_AUTH_WELCOME_KEY, { kind: "register", ts: Date.now() });
@@ -191,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (supabase) {
       await supabase.auth.signOut();
     }
+    setAccessToken(null);
     setStorage<string | null>(SESSION_KEY, null);
     setCurrentUser(null);
     setSubscription(null);

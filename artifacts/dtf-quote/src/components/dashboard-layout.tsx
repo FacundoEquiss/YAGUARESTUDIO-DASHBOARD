@@ -15,6 +15,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   "/clients": "Clientes",
   "/suppliers": "Proveedores",
   "/products": "Productos / Stock",
+  "/services": "Servicios",
   "/finance": "Ingresos / Gastos",
   "/reports": "Reportes",
   "/accounts": "Cuentas Corrientes",

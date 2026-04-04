@@ -14,10 +14,43 @@ const RETRYABLE_AUTH_PATHS = new Set([
   "/auth/register",
 ]);
 
+const ACCESS_TOKEN_KEY = "dtf:access-token";
+
 const HEALTH_PATHS = ["/healthz/db", "/healthz", "/health/ready", "/health"] as const;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawToken = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!rawToken) {
+      return null;
+    }
+
+    const token = JSON.parse(rawToken);
+    return typeof token === "string" && token.trim().length > 0 ? token.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAccessToken(token: string | null): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!token) {
+    window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(ACCESS_TOKEN_KEY, JSON.stringify(token));
 }
 
 export async function waitForApiReady(
@@ -58,12 +91,18 @@ export async function apiFetch<T = unknown>(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      const accessToken = getAccessToken();
+      const headers = new Headers(options.headers || {});
+      if (!headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+      if (accessToken && !headers.has("Authorization")) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+      }
+
       const res = await fetch(`${API_BASE}${path}`, {
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
+        headers,
         ...options,
       });
 

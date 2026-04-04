@@ -60,11 +60,25 @@ function apiPlanToDisplay(p: ApiPlan): DisplayPlan {
   };
 }
 
-const FALLBACK_PLANS: DisplayPlan[] = [
+function sortPlans(plans: DisplayPlan[]): DisplayPlan[] {
+  const order: Record<string, number> = {
+    free: 0,
+    standard: 1,
+    premium: 2,
+  };
+
+  return [...plans].sort((a, b) => {
+    const aOrder = order[a.slug] ?? 99;
+    const bOrder = order[b.slug] ?? 99;
+    return aOrder - bOrder;
+  });
+}
+
+const FALLBACK_PLANS: DisplayPlan[] = sortPlans([
   { slug: "free", name: "Gratis", price: 0, features: ["10 cotizaciones/mes", "5 sesiones de mockup/mes", "3 exportaciones PDF/mes"], color: "from-gray-400 to-gray-500" },
   { slug: "standard", name: "Estándar", price: 7990, features: ["40 cotizaciones/mes", "30 sesiones de mockup/mes", "25 exportaciones PDF/mes"], color: "from-blue-500 to-indigo-600", popular: true },
   { slug: "premium", name: "Premium", price: 14990, features: ["Cotizaciones ilimitadas", "Sesiones de mockup ilimitadas", "Exportaciones PDF ilimitadas"], color: "from-orange-500 to-red-500" },
-];
+]);
 
 export function UpgradePrompt({ open, onClose, feature, mode = "limit" }: UpgradePromptProps) {
   const { subscription } = useAuth();
@@ -82,7 +96,7 @@ export function UpgradePrompt({ open, onClose, feature, mode = "limit" }: Upgrad
     setError(null);
     apiFetch<{ plans: ApiPlan[] }>("/subscription/plans").then(({ data }) => {
       if (data?.plans) {
-        setPlans(data.plans.map(apiPlanToDisplay));
+        setPlans(sortPlans(data.plans.map(apiPlanToDisplay)));
       }
     });
   }, [open]);

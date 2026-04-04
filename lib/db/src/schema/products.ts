@@ -1,7 +1,18 @@
-import { pgTable, serial, integer, varchar, timestamp, text, numeric, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, timestamp, text, numeric, boolean, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { suppliers } from "./suppliers";
 import { orders } from "./orders";
+
+export interface ProductPriceTier {
+  id: string;
+  label: string;
+  type: string;
+  price: number;
+  isDefault?: boolean;
+  minQty?: number;
+  maxQty?: number | null;
+  isActive?: boolean;
+}
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -12,6 +23,8 @@ export const products = pgTable("products", {
   category: varchar("category", { length: 100 }),
   unit: varchar("unit", { length: 50 }).notNull().default("unidad"),
   salePrice: numeric("sale_price", { precision: 14, scale: 2 }).notNull().default("0"),
+  priceTiers: jsonb("price_tiers").notNull().$type<ProductPriceTier[]>().default([]),
+  allowManualPrice: boolean("allow_manual_price").notNull().default(true),
   costPrice: numeric("cost_price", { precision: 14, scale: 2 }).notNull().default("0"),
   currentStock: numeric("current_stock", { precision: 14, scale: 2 }).notNull().default("0"),
   minStock: numeric("min_stock", { precision: 14, scale: 2 }).notNull().default("0"),

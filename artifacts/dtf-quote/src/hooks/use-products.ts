@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
+export interface ProductPriceTier {
+  id: string;
+  label: string;
+  type: string;
+  price: number;
+  isDefault?: boolean;
+  minQty?: number;
+  maxQty?: number | null;
+  isActive?: boolean;
+}
+
 export interface ProductItem {
   id: number;
   userId: number;
@@ -10,6 +21,8 @@ export interface ProductItem {
   category: string | null;
   unit: string;
   salePrice: string;
+  priceTiers: ProductPriceTier[];
+  allowManualPrice: boolean;
   costPrice: string;
   currentStock: string;
   minStock: string;
@@ -45,6 +58,8 @@ export interface CreateProductData {
   category?: string;
   unit?: string;
   salePrice?: number;
+  priceTiers?: ProductPriceTier[];
+  allowManualPrice?: boolean;
   costPrice?: number;
   currentStock?: number;
   minStock?: number;

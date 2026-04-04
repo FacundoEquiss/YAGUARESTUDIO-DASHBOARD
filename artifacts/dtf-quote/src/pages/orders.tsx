@@ -15,6 +15,7 @@ import {
 } from "@/hooks/use-orders";
 import { useAllClients, createClient } from "@/hooks/use-clients";
 import { useProducts } from "@/hooks/use-products";
+import { useAllServices, type ServiceItem } from "@/hooks/use-services";
 import { useAllFinancialAccounts } from "@/hooks/use-financial-accounts";
 import { HelpTooltip } from "@/components/help-tooltip";
 import { clearOrderDraft, loadOrderDraft } from "@/lib/drafts";
@@ -83,6 +84,7 @@ interface FormOrderLine {
   key: string;
   type: FormLineType;
   sourceId: number | null;
+  priceTierId: string | null;
   title: string;
   description: string;
   quantity: string;
@@ -125,6 +127,7 @@ function createEmptyFormLine(type: FormLineType = "manual"): FormOrderLine {
     key: nextLineKey(),
     type,
     sourceId: null,
+    priceTierId: null,
     title: "",
     description: "",
     quantity: "1",
@@ -147,6 +150,36 @@ function calculateLineTotals(line: FormOrderLine) {
   };
 }
 
+function getDefaultProductTier(product: { priceTiers?: Array<{ id: string; isDefault?: boolean; isActive?: boolean; price: number }> }) {
+  const tiers = Array.isArray(product.priceTiers) ? product.priceTiers.filter((tier) => tier.isActive !== false) : [];
+  if (tiers.length === 0) {
+    return null;
+  }
+
+  return tiers.find((tier) => tier.isDefault) || tiers[0];
+}
+
+function resolveServiceUnitPrice(service: ServiceItem, quantity: number): number {
+  const safeQuantity = Math.max(0, quantity || 0);
+
+  if (service.pricingType === "volume") {
+    const sortedRules = (service.pricingRules || [])
+      .slice()
+      .sort((a, b) => Number(a.minQty || 0) - Number(b.minQty || 0));
+
+    for (const rule of sortedRules) {
+      const minQty = Math.max(1, Number(rule.minQty) || 1);
+      const maxQty = rule.maxQty == null ? null : Math.max(minQty, Number(rule.maxQty) || minQty);
+
+      if (safeQuantity >= minQty && (maxQty == null || safeQuantity <= maxQty)) {
+        return Math.max(0, Number(rule.unitPrice) || 0);
+      }
+    }
+  }
+
+  return Math.max(0, Number(service.suggestedPrice) || 0);
+}
+
 interface OrderFormProps {
   order?: OrderItem | null;
   draft?: Partial<CreateOrderData> | null;
@@ -158,6 +191,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
   const isEdit = !!order;
   const { clients: allClients } = useAllClients();
   const { products } = useProducts();
+  const { services } = useAllServices();
   const [selectedClientId, setSelectedClientId] = useState<number | null>(order?.clientId ?? draft?.clientId ?? null);
   const [clientName, setClientName] = useState(order?.clientName ?? draft?.clientName ?? "");
   const [title, setTitle] = useState(order?.title ?? draft?.title ?? "");
@@ -175,6 +209,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
         key: nextLineKey(),
         type: resolveFormLineType(line.lineType, line.sourceType),
         sourceId: line.sourceId ?? null,
+        priceTierId: null,
         title: line.title,
         description: line.description || "",
         quantity: toNumericString(line.quantity, 1),
@@ -188,6 +223,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
         key: nextLineKey(),
         type: resolveFormLineType(line.lineType, line.sourceType),
         sourceId: line.sourceId ?? null,
+        priceTierId: null,
         title: line.title,
         description: line.description || "",
         quantity: toNumericString(line.quantity, 1),
@@ -201,6 +237,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
         key: nextLineKey(),
         type: "manual" as const,
         sourceId: null,
+        priceTierId: null,
         title: line.title,
         description: "",
         quantity: "1",
@@ -214,6 +251,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
         key: nextLineKey(),
         type: "manual" as const,
         sourceId: null,
+        priceTierId: null,
         title: line.title,
         description: "",
         quantity: "1",
@@ -263,20 +301,99 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
       return {
         ...line,
         sourceId,
+        priceTierId: null,
       };
     }
+
+    const defaultTier = getDefaultProductTier(selected);
+    const resolvedUnitPrice = defaultTier ? Number(defaultTier.price || 0) : Number(selected.salePrice || 0);
+
+    return {
+      ...line,
+      sourceId,
+      priceTierId: defaultTier?.id || null,
+      title: selected.name,
+      unitCost: toNumericString(selected.costPrice, 0),
+      unitPrice: toNumericString(resolvedUnitPrice, 0),
+    };
+  };
+
+  const changeLineProductPriceTier = (key: string, tierId: string | null) => {
+    setOrderLines((prev) =>
+      prev.map((line) => {
+        if (line.key !== key) {
+          return line;
+        }
+
+        if (line.type !== "product" || !line.sourceId) {
+          return { ...line, priceTierId: tierId };
+        }
+
+        const selected = products.find((product) => product.id === line.sourceId);
+        if (!selected) {
+          return { ...line, priceTierId: tierId };
+        }
+
+        if (!tierId || tierId === "manual") {
+          return { ...line, priceTierId: "manual" };
+        }
+
+        const tier = (selected.priceTiers || []).find((priceTier) => priceTier.id === tierId && priceTier.isActive !== false);
+        if (!tier) {
+          return { ...line, priceTierId: "manual" };
+        }
+
+        return {
+          ...line,
+          priceTierId: tier.id,
+          unitPrice: toNumericString(tier.price, 0),
+        };
+      }),
+    );
+  };
+
+  const addOrderLine = () => {
+    setOrderLines((prev) => [...prev, createEmptyFormLine()]);
+  };
+
+  const applyServiceSelection = (line: FormOrderLine, sourceId: number | null): FormOrderLine => {
+    if (!sourceId) {
+      return {
+        ...line,
+        sourceId: null,
+      };
+    }
+
+    const selected = services.find((service) => service.id === sourceId);
+    if (!selected) {
+      return {
+        ...line,
+        sourceId,
+      };
+    }
+
+    const quantity = Math.max(0, parseLineNumber(line.quantity));
+    const resolvedUnitPrice = resolveServiceUnitPrice(selected, quantity);
 
     return {
       ...line,
       sourceId,
       title: selected.name,
-      unitCost: toNumericString(selected.costPrice, 0),
-      unitPrice: toNumericString(selected.salePrice, 0),
+      unitCost: toNumericString(selected.baseCost, 0),
+      unitPrice: toNumericString(resolvedUnitPrice, 0),
     };
   };
 
-  const addOrderLine = () => {
-    setOrderLines((prev) => [...prev, createEmptyFormLine()]);
+  const changeLineService = (key: string, sourceId: number | null) => {
+    setOrderLines((prev) =>
+      prev.map((line) => {
+        if (line.key !== key) {
+          return line;
+        }
+
+        return applyServiceSelection(line, sourceId);
+      }),
+    );
   };
 
   const updateOrderLine = (key: string, field: keyof FormOrderLine, value: string | number | null) => {
@@ -286,10 +403,20 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
           return line;
         }
 
-        return {
+        const updatedLine = {
           ...line,
           [field]: value,
         } as FormOrderLine;
+
+        if (line.type === "service" && line.sourceId && field === "quantity") {
+          const selectedService = services.find((service) => service.id === line.sourceId);
+          if (selectedService) {
+            const nextQuantity = Math.max(0, parseLineNumber(String(value)));
+            updatedLine.unitPrice = toNumericString(resolveServiceUnitPrice(selectedService, nextQuantity), 0);
+          }
+        }
+
+        return updatedLine;
       }),
     );
   };
@@ -307,6 +434,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
             ...line,
             type,
             sourceId: preferredProductId,
+            priceTierId: null,
             quantity: line.quantity || "1",
           };
           return applyProductSelection(productLine, preferredProductId);
@@ -316,6 +444,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
           ...line,
           type,
           sourceId: null,
+          priceTierId: null,
           title: line.title || (type === "service" ? "Servicio" : ""),
         };
       }),
@@ -359,8 +488,12 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
         line.type === "product" && line.sourceId
           ? products.find((product) => product.id === line.sourceId)
           : null;
+      const selectedService =
+        line.type === "service" && line.sourceId
+          ? services.find((service) => service.id === line.sourceId)
+          : null;
 
-      const resolvedTitle = line.title.trim() || selectedProduct?.name || "";
+      const resolvedTitle = line.title.trim() || selectedProduct?.name || selectedService?.name || "";
       if (!resolvedTitle || totals.quantity <= 0) {
         continue;
       }
@@ -523,6 +656,9 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
                   line.type === "product" && line.sourceId
                     ? products.find((product) => product.id === line.sourceId)
                     : null;
+                const activePriceTiers = selectedProduct?.priceTiers?.filter((tier) => tier.isActive !== false) || [];
+                const manualPricingEnabled = selectedProduct?.allowManualPrice ?? true;
+                const isManualTier = !line.priceTierId || line.priceTierId === "manual";
                 const totals = calculateLineTotals(line);
 
                 return (
@@ -554,12 +690,25 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
                               </option>
                             ))}
                           </select>
+                        ) : line.type === "service" ? (
+                          <select
+                            value={line.sourceId ?? ""}
+                            onChange={(e) => changeLineService(line.key, e.target.value ? Number(e.target.value) : null)}
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                          >
+                            <option value="">Seleccionar servicio</option>
+                            {services.map((service) => (
+                              <option key={service.id} value={service.id}>
+                                {service.name}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           <input
                             type="text"
                             value={line.title}
                             onChange={(e) => updateOrderLine(line.key, "title", e.target.value)}
-                            placeholder={line.type === "service" ? "Ej: Estampado, logística, diseño" : `Ej: Línea ${index + 1}`}
+                            placeholder={`Ej: Línea ${index + 1}`}
                             className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                           />
                         )}
@@ -568,6 +717,30 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
 
                     {line.type === "product" && (
                       <div className="space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[11px] text-muted-foreground block mb-1">Precio aplicado</label>
+                            <select
+                              value={line.priceTierId || "manual"}
+                              onChange={(e) => changeLineProductPriceTier(line.key, e.target.value || null)}
+                              className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                            >
+                              {activePriceTiers.map((tier) => (
+                                <option key={tier.id} value={tier.id}>
+                                  {tier.label} ({formatCurrency(Number(tier.price || 0))})
+                                </option>
+                              ))}
+                              {manualPricingEnabled && <option value="manual">Precio manual</option>}
+                            </select>
+                          </div>
+                          <div className="flex items-end">
+                            <p className="text-[11px] text-muted-foreground">
+                              {isManualTier
+                                ? "Precio editable manualmente para esta línea."
+                                : "Precio tomado desde la configuración del producto."}
+                            </p>
+                          </div>
+                        </div>
                         <input
                           type="text"
                           value={line.title}
@@ -614,6 +787,7 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
                           step={1}
                           value={line.unitPrice}
                           onChange={(e) => updateOrderLine(line.key, "unitPrice", e.target.value)}
+                          disabled={line.type === "product" && !isManualTier}
                           className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                         />
                       </div>

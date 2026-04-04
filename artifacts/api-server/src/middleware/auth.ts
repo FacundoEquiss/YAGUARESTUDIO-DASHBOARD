@@ -18,8 +18,12 @@ declare global {
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const token = req.cookies?.token || req.headers.authorization?.replace("Bearer ", "");
-  if (!token) {
+  const cookieToken = typeof req.cookies?.token === "string" ? req.cookies.token.trim() : "";
+  const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization.trim() : "";
+  const bearerToken = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+  const tokens = [cookieToken, bearerToken].filter((value, index, array) => value.length > 0 && array.indexOf(value) === index);
+
+  if (tokens.length === 0) {
     res.status(401).json({ error: "No autenticado" });
     return;
   }
@@ -29,9 +33,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  
-  if (error || !user) {
+  let validatedUser: { id: string; email?: string | null } | null = null;
+
+  for (const token of tokens) {
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (user) {
+      validatedUser = user;
+      break;
+    }
+  }
+
+  if (!validatedUser) {
     res.status(401).json({ error: "Token inválido o expirado" });
     return;
   }
@@ -39,13 +51,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const [localUser] = await db
     .select()
     .from(users)
-    .where(eq(users.supabaseAuthId, user.id));
+    .where(eq(users.supabaseAuthId, validatedUser.id));
     
   if (!localUser) {
      const [byEmail] = await db
         .select()
         .from(users)
-        .where(eq(users.email, user.email || ""));
+        .where(eq(users.email, validatedUser.email || ""));
         
      if (!byEmail) {
        res.status(401).json({ error: "Usuario no encontrado" });

@@ -1,5 +1,13 @@
-import { pgTable, serial, integer, varchar, timestamp, text, numeric, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, timestamp, text, numeric, boolean, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./users";
+
+export interface ServicePricingRule {
+  id: string;
+  label?: string;
+  minQty: number;
+  maxQty?: number | null;
+  unitPrice: number;
+}
 
 export const services = pgTable("services", {
   id: serial("id").primaryKey(),
@@ -7,6 +15,7 @@ export const services = pgTable("services", {
   name: varchar("name", { length: 255 }).notNull(),
   category: varchar("category", { length: 100 }),
   pricingType: varchar("pricing_type", { length: 50 }).notNull().default("fixed"),
+  pricingRules: jsonb("pricing_rules").notNull().$type<ServicePricingRule[]>().default([]),
   unit: varchar("unit", { length: 50 }).notNull().default("unidad"),
   baseCost: numeric("base_cost", { precision: 14, scale: 2 }).notNull().default("0"),
   suggestedPrice: numeric("suggested_price", { precision: 14, scale: 2 }).notNull().default("0"),

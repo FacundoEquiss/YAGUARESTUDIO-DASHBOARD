@@ -302,6 +302,10 @@ export function ProfilePage() {
       })
     : null;
 
+  const hasLimitedPlan = subscription && limits.dtfQuotes !== -1;
+  const remainingDtfQuotes = hasLimitedPlan ? Math.max(0, limits.dtfQuotes - usage.dtfQuotes) : -1;
+  const remainingMockups = hasLimitedPlan ? Math.max(0, limits.mockupPngs - usage.mockupPngs) : -1;
+
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-6 max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -392,8 +396,13 @@ export function ProfilePage() {
           <p className="mt-3 text-xs text-muted-foreground">
             Los planes pagos se autorizan en Mercado Pago y luego se sincronizan automáticamente con tu cuenta.
           </p>
-          {subscription && limits.dtfQuotes !== -1 && (
+          {hasLimitedPlan && (
             <div className="mt-3 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {subscription?.planSlug === "free"
+                  ? "Cupo del plan gratis"
+                  : "Cupo disponible de tu plan"}
+              </p>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Cotizaciones</span>
                 <span className="font-bold text-foreground">{usage.dtfQuotes} / {limits.dtfQuotes}</span>
@@ -414,6 +423,9 @@ export function ProfilePage() {
                   style={{ width: `${Math.min(100, (usage.mockupPngs / limits.mockupPngs) * 100)}%` }}
                 />
               </div>
+              <p className="text-[11px] text-muted-foreground pt-1">
+                Te quedan {remainingDtfQuotes} cotizaciones y {remainingMockups} mockups este mes.
+              </p>
             </div>
           )}
         </div>

@@ -8,6 +8,91 @@ const productsRouter = Router();
 type MovementType = "purchase" | "sale" | "adjustment_in" | "adjustment_out";
 const MOVEMENT_TYPES: MovementType[] = ["purchase", "sale", "adjustment_in", "adjustment_out"];
 
+type ProductPriceTierInput = {
+  id?: string;
+  label?: string;
+  type?: string;
+  price?: number | string;
+  isDefault?: boolean;
+  minQty?: number | string;
+  maxQty?: number | string | null;
+  isActive?: boolean;
+};
+
+type ProductPriceTier = {
+  id: string;
+  label: string;
+  type: string;
+  price: number;
+  isDefault: boolean;
+  minQty: number;
+  maxQty: number | null;
+  isActive: boolean;
+};
+
+function normalizeTierType(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_-]/g, "") || "custom";
+}
+
+function normalizePriceTiers(input: unknown, salePriceFallback: number): ProductPriceTier[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  const normalized: ProductPriceTier[] = [];
+
+  for (let index = 0; index < input.length; index += 1) {
+    const row = input[index] as ProductPriceTierInput;
+    const label = String(row?.label || "").trim();
+    if (!label) {
+      continue;
+    }
+
+    const price = Math.max(0, Number(row?.price) || 0);
+    const minQty = Math.max(1, Number(row?.minQty) || 1);
+    const rawMax = row?.maxQty;
+    const maxQty = rawMax == null || rawMax === "" ? null : Math.max(minQty, Number(rawMax) || minQty);
+    const type = normalizeTierType(String(row?.type || label));
+    const tierId = String(row?.id || `${type}_${index + 1}`).trim() || `${type}_${index + 1}`;
+
+    normalized.push({
+      id: tierId,
+      label,
+      type,
+      price,
+      isDefault: Boolean(row?.isDefault),
+      minQty,
+      maxQty,
+      isActive: row?.isActive ?? true,
+    });
+  }
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  const defaultIndex = normalized.findIndex((tier) => tier.isDefault);
+  if (defaultIndex === -1) {
+    normalized[0].isDefault = true;
+  } else {
+    for (let i = 0; i < normalized.length; i += 1) {
+      normalized[i].isDefault = i === defaultIndex;
+    }
+  }
+
+  const fallbackPrice = Math.max(0, salePriceFallback || 0);
+  const hasPrice = normalized.some((tier) => tier.price > 0);
+  if (!hasPrice && fallbackPrice > 0) {
+    normalized[0].price = fallbackPrice;
+  }
+
+  return normalized;
+}
+
 function normalizeSignedQuantity(quantity: number, movementType: MovementType): number {
   if (movementType === "sale" || movementType === "adjustment_out") {
     return -Math.abs(quantity);
@@ -64,6 +149,8 @@ productsRouter.get("/products", requireAuth, async (req, res) => {
         category: products.category,
         unit: products.unit,
         salePrice: products.salePrice,
+        priceTiers: products.priceTiers,
+        allowManualPrice: products.allowManualPrice,
         costPrice: products.costPrice,
         currentStock: products.currentStock,
         minStock: products.minStock,
@@ -110,6 +197,8 @@ productsRouter.get("/products/:id", requireAuth, async (req, res) => {
         category: products.category,
         unit: products.unit,
         salePrice: products.salePrice,
+        priceTiers: products.priceTiers,
+        allowManualPrice: products.allowManualPrice,
         costPrice: products.costPrice,
         currentStock: products.currentStock,
         minStock: products.minStock,
@@ -162,13 +251,15 @@ productsRouter.get("/products/:id", requireAuth, async (req, res) => {
 productsRouter.post("/products", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { supplierId, name, sku, category, unit, salePrice, costPrice, currentStock, minStock, notes, isActive } = req.body as {
+    const { supplierId, name, sku, category, unit, salePrice, priceTiers, allowManualPrice, costPrice, currentStock, minStock, notes, isActive } = req.body as {
       supplierId?: number | null;
       name?: string;
       sku?: string;
       category?: string;
       unit?: string;
       salePrice?: number | string;
+      priceTiers?: ProductPriceTierInput[];
+      allowManualPrice?: boolean;
       costPrice?: number | string;
       currentStock?: number | string;
       minStock?: number | string;
@@ -191,6 +282,9 @@ productsRouter.post("/products", requireAuth, async (req, res) => {
       validSupplierId = parsed;
     }
 
+    const numericSalePrice = Math.max(0, Number(salePrice) || 0);
+    const normalizedPriceTiers = normalizePriceTiers(priceTiers, numericSalePrice);
+
     const [product] = await db
       .insert(products)
       .values({
@@ -200,7 +294,9 @@ productsRouter.post("/products", requireAuth, async (req, res) => {
         sku: sku?.trim() || null,
         category: category?.trim() || null,
         unit: unit?.trim() || "unidad",
-        salePrice: Math.max(0, Number(salePrice) || 0).toFixed(2),
+        salePrice: numericSalePrice.toFixed(2),
+        priceTiers: normalizedPriceTiers,
+        allowManualPrice: allowManualPrice ?? true,
         costPrice: Math.max(0, Number(costPrice) || 0).toFixed(2),
         currentStock: Math.max(0, Number(currentStock) || 0).toFixed(2),
         minStock: Math.max(0, Number(minStock) || 0).toFixed(2),
@@ -236,13 +332,15 @@ productsRouter.put("/products/:id", requireAuth, async (req, res) => {
       return;
     }
 
-    const { supplierId, name, sku, category, unit, salePrice, costPrice, minStock, notes, isActive } = req.body as {
+    const { supplierId, name, sku, category, unit, salePrice, priceTiers, allowManualPrice, costPrice, minStock, notes, isActive } = req.body as {
       supplierId?: number | null;
       name?: string;
       sku?: string;
       category?: string;
       unit?: string;
       salePrice?: number | string;
+      priceTiers?: ProductPriceTierInput[];
+      allowManualPrice?: boolean;
       costPrice?: number | string;
       minStock?: number | string;
       notes?: string;
@@ -261,6 +359,11 @@ productsRouter.put("/products/:id", requireAuth, async (req, res) => {
     if (category !== undefined) updates.category = category?.trim() || null;
     if (unit !== undefined) updates.unit = unit?.trim() || "unidad";
     if (salePrice !== undefined) updates.salePrice = Math.max(0, Number(salePrice) || 0).toFixed(2);
+    if (priceTiers !== undefined) {
+      const fallbackSale = Number(salePrice ?? existing.salePrice ?? 0);
+      updates.priceTiers = normalizePriceTiers(priceTiers, fallbackSale);
+    }
+    if (allowManualPrice !== undefined) updates.allowManualPrice = allowManualPrice;
     if (costPrice !== undefined) updates.costPrice = Math.max(0, Number(costPrice) || 0).toFixed(2);
     if (minStock !== undefined) updates.minStock = Math.max(0, Number(minStock) || 0).toFixed(2);
     if (notes !== undefined) updates.notes = notes?.trim() || null;
