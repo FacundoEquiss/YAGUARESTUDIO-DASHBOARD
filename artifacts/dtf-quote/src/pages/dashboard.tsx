@@ -283,6 +283,10 @@ export function DashboardPage() {
       .slice(0, 8);
   }, [orders]);
 
+  const monthIncome = Number(financeSummary?.monthIncome || 0);
+  const monthExpenses = Number(financeSummary?.monthExpenses || 0);
+  const monthBalance = monthIncome - monthExpenses;
+
   const urgentAlerts = useMemo(() => {
     const alerts = [];
     if (lowStockProducts.length > 0) {
@@ -313,7 +317,7 @@ export function DashboardPage() {
       });
     }
     return alerts;
-  }, [lowStockProducts.length, activeOrders]);
+  }, [lowStockProducts.length, activeOrders, monthBalance]);
 
   const calendarItemsByDate = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
@@ -354,10 +358,6 @@ export function DashboardPage() {
 
   const monthGrid = useMemo(() => buildMonthGrid(monthCursor), [monthCursor]);
   const selectedDayItems = calendarItemsByDate.get(selectedDateKey) || [];
-
-  const monthIncome = Number(financeSummary?.monthIncome || 0);
-  const monthExpenses = Number(financeSummary?.monthExpenses || 0);
-  const monthBalance = monthIncome - monthExpenses;
 
   const modeFlags = {
     showSales: mode === "general" || mode === "ventas",

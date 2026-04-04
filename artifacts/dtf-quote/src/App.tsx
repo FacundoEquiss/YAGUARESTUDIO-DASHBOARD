@@ -31,6 +31,7 @@ import { UsageProvider } from "@/hooks/use-usage";
 import { PlanGuard } from "@/components/plan-guard";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
+import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { getProtectedRedirectTarget, sanitizeNextPath } from "@/lib/routing";
 
 const queryClient = new QueryClient();
@@ -202,7 +203,9 @@ function App() {
           <UsageProvider>
             <ThemeProvider defaultTheme="dark" storageKey="app-theme">
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Router />
+                <AppErrorBoundary>
+                  <Router />
+                </AppErrorBoundary>
               </WouterRouter>
             </ThemeProvider>
           </UsageProvider>
