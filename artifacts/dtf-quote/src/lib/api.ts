@@ -16,6 +16,7 @@ const RETRYABLE_AUTH_PATHS = new Set([
 
 const ACCESS_TOKEN_KEY = "dtf:access-token";
 export const AUTH_EXPIRED_EVENT = "dtf:auth-expired";
+export const AUTH_RECOVERY_EVENT = "dtf:auth-recovery";
 
 const HEALTH_PATHS = ["/healthz/db", "/healthz", "/health/ready", "/health"] as const;
 
@@ -62,17 +63,38 @@ function notifyAuthExpired(status: number): void {
   window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { status } }));
 }
 
+function notifyAuthRecovered(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(AUTH_RECOVERY_EVENT));
+}
+
 export async function waitForApiReady(
   attempts = 5,
   delayMs = 1000
 ): Promise<boolean> {
+  const maxTimeMs = 5000;
+  const start = Date.now();
+
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (Date.now() - start >= maxTimeMs) {
+      return false;
+    }
+
     for (const healthPath of HEALTH_PATHS) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1000);
+
         const res = await fetch(`${API_BASE}${healthPath}`, {
           method: "GET",
           credentials: "include",
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (res.ok) {
           return true;
@@ -83,17 +105,40 @@ export async function waitForApiReady(
     }
 
     if (attempt < attempts) {
-      await sleep(delayMs);
+      const remaining = maxTimeMs - (Date.now() - start);
+      if (remaining <= 0) {
+        return false;
+      }
+      await sleep(Math.min(delayMs, remaining));
     }
   }
 
   return false;
 }
 
+export interface ApiFetchResponse<T> {
+  data?: T;
+  error?: string;
+  status: number;
+}
+
+export interface ApiFetchOptions extends RequestInit {
+  suppressAuthExpired?: boolean;
+  suppressAuthRecovery?: boolean;
+  timeoutMs?: number;
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
-  options: RequestInit = {}
-): Promise<{ data?: T; error?: string; status: number }> {
+  options: ApiFetchOptions = {}
+): Promise<ApiFetchResponse<T>> {
+  const {
+    suppressAuthExpired = false,
+    suppressAuthRecovery = false,
+    timeoutMs = 30000,
+    ...requestOptions
+  } = options;
+
   const method = (options.method || "GET").toUpperCase();
   const shouldRetry = RETRYABLE_AUTH_PATHS.has(path) && method === "POST";
   const maxAttempts = shouldRetry ? 3 : 1;
@@ -101,7 +146,7 @@ export async function apiFetch<T = unknown>(
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const accessToken = getAccessToken();
-      const headers = new Headers(options.headers || {});
+      const headers = new Headers(requestOptions.headers || {});
       if (!headers.has("Content-Type")) {
         headers.set("Content-Type", "application/json");
       }
@@ -109,27 +154,37 @@ export async function apiFetch<T = unknown>(
         headers.set("Authorization", `Bearer ${accessToken}`);
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
       const res = await fetch(`${API_BASE}${path}`, {
         credentials: "include",
         headers,
-        ...options,
+        signal: controller.signal,
+        ...requestOptions,
       });
+
+      clearTimeout(timeoutId);
 
       const contentType = res.headers.get("content-type") || "";
       const isJson = contentType.includes("application/json");
       const payload = isJson ? await res.json() : await res.text();
 
       if (!res.ok) {
-        // Only force global session reset when the explicit session endpoint rejects auth.
-        // Other endpoints may return 401 for transient/backend reasons and should not hard-logout the user.
-        if (res.status === 401 && path === "/auth/me") {
-          setAccessToken(null);
-          notifyAuthExpired(res.status);
+        // Session endpoint rejected auth: hard logout.
+        // Other protected endpoints can fail transiently; trigger recovery without hard-logout.
+        if (res.status === 401) {
+          if (path === "/auth/me" && !suppressAuthExpired) {
+            setAccessToken(null);
+            notifyAuthExpired(res.status);
+          } else if (!suppressAuthRecovery && path !== "/auth/login" && path !== "/auth/register") {
+            notifyAuthRecovered();
+          }
         }
 
         const retryableStatus = res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
         if (shouldRetry && retryableStatus && attempt < maxAttempts) {
-          await sleep(200 * attempt);
+          await sleep(200 * (attempt * attempt));
           continue;
         }
 
@@ -149,8 +204,12 @@ export async function apiFetch<T = unknown>(
 
       return { data: payload as T, status: res.status };
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return { error: "La solicitud tardó demasiado. Probá de nuevo.", status: 0 };
+      }
+
       if (attempt < maxAttempts) {
-        await sleep(200 * attempt);
+        await sleep(200 * (attempt * attempt));
         continue;
       }
 

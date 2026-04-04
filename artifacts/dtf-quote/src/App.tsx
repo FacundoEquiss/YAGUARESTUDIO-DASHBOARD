@@ -30,6 +30,7 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UsageProvider } from "@/hooks/use-usage";
 import { PlanGuard } from "@/components/plan-guard";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
 import { getProtectedRedirectTarget, sanitizeNextPath } from "@/lib/routing";
 
 const queryClient = new QueryClient();
@@ -52,13 +53,17 @@ function ProtectedRedirect() {
 }
 
 function Router() {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, retrySessionRestore } = useAuth();
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[100dvh]">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
+      <AuthLoadingBoundary
+        isLoading={loading}
+        error={null}
+        onRetry={retrySessionRestore}
+      >
+        <AppShell />
+      </AuthLoadingBoundary>
     );
   }
 
