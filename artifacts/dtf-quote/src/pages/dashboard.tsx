@@ -5,17 +5,12 @@ import { getStorage, setStorage } from "@/lib/storage";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
 import { useUsageEvents } from "@/hooks/use-usage-events";
-import { useOrderStats } from "@/hooks/use-orders";
+import { useOrderStats, useAllOrders } from "@/hooks/use-orders";
 import { useTransactionSummary } from "@/hooks/use-transactions";
+import { useProducts } from "@/hooks/use-products";
+import { useAllServices } from "@/hooks/use-services";
 import { HelpTooltip } from "@/components/help-tooltip";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   BarChart,
   Bar,
@@ -24,129 +19,135 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  AreaChart,
+  Area,
+  Legend,
 } from "recharts";
 import type { TooltipProps } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import {
-  Calculator,
-  Shirt,
-  ClipboardList,
-  ArrowRight,
-  Sparkles,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  FileText,
-  Clock,
-  Crown,
-  Zap,
-  CheckCircle2,
-  Circle,
-  UserRound,
-  Rocket,
+  AlertCircle,
+  Banknote,
+  BarChart3,
+  Calendar,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
+  Clock,
+  Crown,
+  Disc3,
+  DollarSign,
+  FileText,
+  GripVertical,
+  Radio,
+  Rocket,
+  Shirt,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  TriangleAlert,
+  Zap,
 } from "lucide-react";
 
-function getDayLabel(date: Date): string {
+type CalendarItem = {
+  id: string;
+  type: "order_due" | "activity";
+  title: string;
+  subtitle: string;
+  date: Date;
+};
+
+type DashboardPeriod = "7d" | "30d" | "month" | "90d";
+type DashboardMode = "general" | "ventas" | "produccion" | "finanzas";
+type WidgetId = "stock" | "activity" | "actions";
+
+const PERIOD_OPTIONS: Array<{ id: DashboardPeriod; label: string; hint: string }> = [
+  { id: "7d", label: "7 dias", hint: "Ultima semana" },
+  { id: "30d", label: "30 dias", hint: "Ultimo mes" },
+  { id: "month", label: "Mes actual", hint: "Desde inicio de mes" },
+  { id: "90d", label: "90 dias", hint: "Ultimo trimestre" },
+];
+
+const MODE_OPTIONS: Array<{ id: DashboardMode; label: string; icon: any; color: string }> = [
+  { id: "general", label: "General", icon: BarChart3, color: "from-blue-500 to-cyan-500" },
+  { id: "ventas", label: "Ventas", icon: TrendingUp, color: "from-emerald-500 to-green-600" },
+  { id: "produccion", label: "Produccion", icon: Radio, color: "from-amber-500 to-orange-500" },
+  { id: "finanzas", label: "Finanzas", icon: Banknote, color: "from-purple-500 to-fuchsia-500" },
+];
+
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ["stock", "activity", "actions"];
+
+const EMPTY_STATE_TIPS: Record<DashboardMode, string> = {
+  general: "Comienza por crear una cotizacion o un pedido para ver actividad.",
+  ventas: "Crea nuevas cotizaciones y pedidos para ver metricas de ventas.",
+  produccion: "Monitoea el stock y los pedidos activos en tiempo real.",
+  finanzas: "Revisa ingresos y gastos para mantener control financiero.",
+};
+
+function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function monthLabel(date: Date): string {
+  return date.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+}
+
+function weekdayLabel(date: Date): string {
   return date.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "");
 }
 
-function getDateKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+function buildMonthGrid(monthDate: Date): Date[] {
+  const firstDay = startOfMonth(monthDate);
+  const startWeekDay = firstDay.getDay();
+  const offset = startWeekDay === 0 ? 6 : startWeekDay - 1;
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(firstDay.getDate() - offset);
+
+  const days: Date[] = [];
+  for (let i = 0; i < 42; i += 1) {
+    const day = new Date(gridStart);
+    day.setDate(gridStart.getDate() + i);
+    days.push(day);
+  }
+  return days;
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  dtf_quotes: "Cotización iniciada",
-  mockup_pngs: "Sesión de mockup iniciada",
-  pdf_exports: "Exportación PDF",
-};
+function getPeriodStart(period: DashboardPeriod): Date {
+  const now = new Date();
+  if (period === "month") {
+    return startOfMonth(now);
+  }
+  const days = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+  const from = new Date(now);
+  from.setHours(0, 0, 0, 0);
+  from.setDate(from.getDate() - (days - 1));
+  return from;
+}
 
-const EVENT_ICONS: Record<string, typeof Calculator> = {
-  dtf_quotes: Calculator,
-  mockup_pngs: Shirt,
-  pdf_exports: FileText,
-};
+function periodToUsageDays(period: DashboardPeriod): number {
+  if (period === "7d") return 14;
+  if (period === "30d") return 45;
+  if (period === "month") return 45;
+  return 120;
+}
 
-const EVENT_COLORS: Record<string, string> = {
-  dtf_quotes: "text-orange-500 bg-orange-500/10",
-  mockup_pngs: "text-blue-500 bg-blue-500/10",
-  pdf_exports: "text-emerald-500 bg-emerald-500/10",
-};
+function moveItem<T>(items: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return items;
+  const copy = items.slice();
+  const [moved] = copy.splice(from, 1);
+  copy.splice(to, 0, moved);
+  return copy;
+}
 
-type PostAuthWelcomePayload = {
-  kind: "login" | "register";
-  ts: number;
-};
-
-type ChecklistItemKey = "firstQuote" | "firstOrder" | "profileSetup";
-
-type ChecklistStorage = {
-  dismissed: boolean;
-  completed: Partial<Record<ChecklistItemKey, boolean>>;
-};
-
-type TourStorage = {
-  completed: boolean;
-  dismissedAt: number | null;
-};
-
-type TourStep = {
-  id: string;
-  title: string;
-  description: string;
-  href: string;
-  cta: string;
-  icon: typeof Calculator;
-  accent: string;
-};
-
-const POST_AUTH_WELCOME_KEY = "dtf:post-auth-welcome";
-const POST_AUTH_WELCOME_MAX_AGE_MS = 1000 * 60 * 30;
-const CHECKLIST_STORAGE_PREFIX = "dtf:onboarding-checklist";
-const TOUR_STORAGE_PREFIX = "dtf:dashboard-tour";
-
-const CHECKLIST_DEFAULT_STATE: ChecklistStorage = {
-  dismissed: false,
-  completed: {},
-};
-
-const TOUR_DEFAULT_STATE: TourStorage = {
-  completed: false,
-  dismissedAt: null,
-};
-
-const TOUR_STEPS: TourStep[] = [
-  {
-    id: "dashboard",
-    title: "Leé tu tablero en 10 segundos",
-    description: "Acá vas a ver métricas del mes, actividad semanal y lo más urgente para operar rápido.",
-    href: "/dashboard",
-    cta: "Quedarme en dashboard",
-    icon: Rocket,
-    accent: "from-primary to-orange-500",
-  },
-  {
-    id: "quotes",
-    title: "Empezá por cotizar",
-    description: "El cotizador es el flujo más rápido para pasar de idea a precio con criterio de margen.",
-    href: "/app",
-    cta: "Abrir cotizador",
-    icon: Calculator,
-    accent: "from-orange-500 to-amber-500",
-  },
-  {
-    id: "ops",
-    title: "Convertí cotizaciones en pedidos",
-    description: "En Pedidos vas a seguir estados, pagos y ejecución. Ese es tu centro operativo diario.",
-    href: "/orders",
-    cta: "Ir a pedidos",
-    icon: ClipboardList,
-    accent: "from-emerald-500 to-teal-500",
-  },
-];
-
-function CustomTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
+function ActivityTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-gray-900/95 backdrop-blur border border-white/10 rounded-xl px-3 py-2 shadow-xl">
@@ -160,759 +161,732 @@ function CustomTooltip({ active, payload, label }: TooltipProps<ValueType, NameT
   );
 }
 
+function FinanceTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-gray-900/95 backdrop-blur border border-white/10 rounded-xl px-3 py-2 shadow-xl">
+      <p className="text-xs text-muted-foreground font-medium">{String(label)}</p>
+      {payload.map((p) => (
+        <p key={String(p.dataKey)} className="text-sm font-bold" style={{ color: String(p.color || p.fill) }}>
+          {String(p.name)}: {formatCurrency(Number(p.value || 0))}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const { currentUser, subscription } = useAuth();
+  const [period, setPeriod] = useState<DashboardPeriod>("30d");
+  const [mode, setMode] = useState<DashboardMode>("general");
+  const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(DEFAULT_WIDGET_ORDER);
+  const [draggingWidget, setDraggingWidget] = useState<WidgetId | null>(null);
+
   const { usage, limits } = useUsage();
-  const { events } = useUsageEvents(7);
-  const orderStats = useOrderStats();
+  const { events } = useUsageEvents(periodToUsageDays(period));
+  const { activeOrders, monthOrders } = useOrderStats();
+  const { orders } = useAllOrders();
   const { summary: financeSummary } = useTransactionSummary();
+  const { products: lowStockProducts } = useProducts({ lowStock: true });
+  const { services } = useAllServices();
+
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
+  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
 
   const isMaster = currentUser?.role === "master";
   const isGuest = currentUser?.role === "guest";
-  const [showUpgrade, setShowUpgrade] = useState(false);
-  const [pendingWelcome, setPendingWelcome] = useState<PostAuthWelcomePayload | null>(null);
-  const [checklistState, setChecklistState] = useState<ChecklistStorage>(CHECKLIST_DEFAULT_STATE);
-  const [tourState, setTourState] = useState<TourStorage>(TOUR_DEFAULT_STATE);
-  const [tourOpen, setTourOpen] = useState(false);
-  const [tourStepIndex, setTourStepIndex] = useState(0);
 
-  const checklistStorageKey = currentUser ? `${CHECKLIST_STORAGE_PREFIX}:${currentUser.id}` : null;
-  const tourStorageKey = currentUser ? `${TOUR_STORAGE_PREFIX}:${currentUser.id}` : null;
+  const greeting = currentUser?.name ? `Hola, ${currentUser.name.split(" ")[0]}` : "Dashboard";
 
-  const checklistItems: Array<{
-    key: ChecklistItemKey;
-    title: string;
-    description: string;
-    href: string;
-    cta: string;
-    icon: typeof Calculator;
-  }> = [
-    {
-      key: "firstQuote",
-      title: "Crear primera cotización",
-      description: "Lanzá tu primer presupuesto desde el cotizador DTF.",
-      href: "/app",
-      cta: "Ir al cotizador",
-      icon: Calculator,
-    },
-    {
-      key: "firstOrder",
-      title: "Registrar primer pedido",
-      description: "Pasá una cotización a ejecución para tener control operativo.",
-      href: "/orders",
-      cta: "Ir a pedidos",
-      icon: ClipboardList,
-    },
-    {
-      key: "profileSetup",
-      title: "Completar perfil de negocio",
-      description: "Añadí datos clave para personalizar tu gestión.",
-      href: "/profile",
-      cta: "Editar perfil",
-      icon: UserRound,
-    },
-  ];
-
-  const autoChecklistCompletion = useMemo<Record<ChecklistItemKey, boolean>>(
-    () => ({
-      firstQuote: usage.dtfQuotes > 0,
-      firstOrder: orderStats.activeOrders > 0 || orderStats.monthOrders > 0,
-      profileSetup: Boolean(
-        currentUser?.businessName?.trim() || currentUser?.phone?.trim() || currentUser?.profilePhotoUrl
-      ),
-    }),
-    [
-      usage.dtfQuotes,
-      orderStats.activeOrders,
-      orderStats.monthOrders,
-      currentUser?.businessName,
-      currentUser?.phone,
-      currentUser?.profilePhotoUrl,
-    ]
-  );
-
-  const updateChecklistState = (updater: (prev: ChecklistStorage) => ChecklistStorage) => {
-    if (!checklistStorageKey) return;
-    setChecklistState((prev) => {
-      const next = updater(prev);
-      setStorage(checklistStorageKey, next);
-      return next;
-    });
-  };
-
-  const updateTourState = (updater: (prev: TourStorage) => TourStorage) => {
-    if (!tourStorageKey) return;
-    setTourState((prev) => {
-      const next = updater(prev);
-      setStorage(tourStorageKey, next);
-      return next;
-    });
-  };
-
-  const openTour = () => {
-    setTourStepIndex(0);
-    setTourOpen(true);
-  };
-
-  const closeTour = () => {
-    setTourOpen(false);
-    updateTourState((prev) => {
-      if (prev.completed) return prev;
-      return { ...prev, dismissedAt: Date.now() };
-    });
-  };
-
-  const nextTourStep = () => {
-    if (tourStepIndex >= TOUR_STEPS.length - 1) {
-      setTourOpen(false);
-      updateTourState(() => ({ completed: true, dismissedAt: Date.now() }));
-      return;
-    }
-    setTourStepIndex((prev) => prev + 1);
-  };
-
-  const prevTourStep = () => {
-    setTourStepIndex((prev) => (prev > 0 ? prev - 1 : prev));
-  };
-
-  const markChecklistDone = (key: ChecklistItemKey) => {
-    updateChecklistState((prev) => ({
-      ...prev,
-      completed: { ...prev.completed, [key]: true },
-    }));
-  };
+  const dashboardStorageKey = useMemo(() => {
+    if (!currentUser) return null;
+    return `dtf:dashboard-prefs:${currentUser.id}`;
+  }, [currentUser]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !currentUser || isGuest) {
-      return;
+    if (!dashboardStorageKey) return;
+    const saved = getStorage<{ mode?: DashboardMode; period?: DashboardPeriod; widgetOrder?: WidgetId[] } | null>(dashboardStorageKey, null);
+    if (saved?.mode) {
+      setMode(saved.mode);
     }
-
-    const payload = getStorage<PostAuthWelcomePayload | null>(POST_AUTH_WELCOME_KEY, null);
-    if (!payload) {
-      return;
+    if (saved?.period) {
+      setPeriod(saved.period);
     }
-
-    if ((payload.kind !== "login" && payload.kind !== "register") || typeof payload.ts !== "number") {
-      setStorage(POST_AUTH_WELCOME_KEY, null);
-      return;
+    if (saved?.widgetOrder && saved.widgetOrder.length === DEFAULT_WIDGET_ORDER.length) {
+      setWidgetOrder(saved.widgetOrder);
     }
-
-    const isFresh = Date.now() - payload.ts <= POST_AUTH_WELCOME_MAX_AGE_MS;
-    if (!isFresh) {
-      setStorage(POST_AUTH_WELCOME_KEY, null);
-      return;
-    }
-
-    setPendingWelcome(payload);
-    setStorage(POST_AUTH_WELCOME_KEY, null);
-  }, [currentUser, isGuest]);
+  }, [dashboardStorageKey]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !checklistStorageKey || isGuest) {
-      setChecklistState(CHECKLIST_DEFAULT_STATE);
-      return;
-    }
-    const payload = getStorage<ChecklistStorage | null>(checklistStorageKey, null);
-    setChecklistState({
-      dismissed: Boolean(payload?.dismissed),
-      completed: payload?.completed ?? {},
+    if (!dashboardStorageKey) return;
+    setStorage(dashboardStorageKey, { mode, period, widgetOrder });
+  }, [dashboardStorageKey, mode, period, widgetOrder]);
+
+  const periodStart = useMemo(() => getPeriodStart(period), [period]);
+
+  const filteredEvents = useMemo(() => {
+    return (events || []).filter((ev) => new Date(ev.createdAt) >= periodStart);
+  }, [events, periodStart]);
+
+  const filteredOrders = useMemo(() => {
+    return (orders || []).filter((o) => {
+      const created = new Date(o.createdAt);
+      return created >= periodStart;
     });
-  }, [checklistStorageKey, isGuest]);
+  }, [orders, periodStart]);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !tourStorageKey || isGuest) {
-      setTourState(TOUR_DEFAULT_STATE);
-      return;
-    }
-    const payload = getStorage<TourStorage | null>(tourStorageKey, null);
-    setTourState({
-      completed: Boolean(payload?.completed),
-      dismissedAt: typeof payload?.dismissedAt === "number" ? payload.dismissedAt : null,
-    });
-  }, [tourStorageKey, isGuest]);
+  const quotesInPeriod = useMemo(() => filteredEvents.filter((ev) => ev.eventType === "dtf_quotes").length, [filteredEvents]);
+  const mockupsInPeriod = useMemo(() => filteredEvents.filter((ev) => ev.eventType === "mockup_pngs").length, [filteredEvents]);
 
-  useEffect(() => {
-    if (!checklistStorageKey || isGuest) return;
-    setChecklistState((prev) => {
-      const merged = { ...prev.completed };
-      let changed = false;
-
-      for (const key of Object.keys(autoChecklistCompletion) as ChecklistItemKey[]) {
-        if (autoChecklistCompletion[key] && !merged[key]) {
-          merged[key] = true;
-          changed = true;
-        }
-      }
-
-      if (!changed) return prev;
-      const next = { ...prev, completed: merged };
-      setStorage(checklistStorageKey, next);
-      return next;
-    });
-  }, [
-    autoChecklistCompletion.firstQuote,
-    autoChecklistCompletion.firstOrder,
-    autoChecklistCompletion.profileSetup,
-    checklistStorageKey,
-    isGuest,
-  ]);
-
-  useEffect(() => {
-    if (!pendingWelcome || pendingWelcome.kind !== "register") return;
-    if (!currentUser || isGuest || tourState.completed || tourState.dismissedAt) return;
-    openTour();
-  }, [pendingWelcome, currentUser, isGuest, tourState.completed, tourState.dismissedAt]);
-
-  const greeting = currentUser?.name
-    ? `Hola, ${currentUser.name.split(" ")[0]}`
-    : "Bienvenido";
-
-  const chartData = useMemo(() => {
+  const activityChart = useMemo(() => {
     const now = new Date();
-    const days: { label: string; dateKey: string; quotes: number; mockups: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
+    const chartDays = period === "7d" ? 7 : 14;
+    const rows: { label: string; dateKey: string; quotes: number; mockups: number }[] = [];
+
+    for (let i = chartDays - 1; i >= 0; i -= 1) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      days.push({
-        label: i === 0 ? "Hoy" : i === 1 ? "Ayer" : getDayLabel(d),
-        dateKey: getDateKey(d),
+      rows.push({
+        label: i === 0 ? "Hoy" : weekdayLabel(d),
+        dateKey: toDateKey(d),
         quotes: 0,
         mockups: 0,
       });
     }
+
+    for (const ev of filteredEvents) {
+      const key = toDateKey(new Date(ev.createdAt));
+      const row = rows.find((r) => r.dateKey === key);
+      if (!row) continue;
+      if (ev.eventType === "dtf_quotes") row.quotes += 1;
+      if (ev.eventType === "mockup_pngs") row.mockups += 1;
+    }
+
+    return rows;
+  }, [filteredEvents, period]);
+
+  const financeChart = useMemo(() => {
+    return (financeSummary?.monthlyChart || []).map((row) => ({
+      month: row.month,
+      income: Number(row.income || 0),
+      expenses: Number(row.expenses || 0),
+    }));
+  }, [financeSummary]);
+
+  const upcomingOrders = useMemo(() => {
+    return (orders || [])
+      .filter((o) => o.dueDate)
+      .map((o) => ({ ...o, due: new Date(String(o.dueDate)) }))
+      .filter((o) => !Number.isNaN(o.due.getTime()))
+      .sort((a, b) => a.due.getTime() - b.due.getTime())
+      .slice(0, 8);
+  }, [orders]);
+
+  const urgentAlerts = useMemo(() => {
+    const alerts = [];
+    if (lowStockProducts.length > 0) {
+      alerts.push({
+        id: "stock-alert",
+        title: "Stock critico",
+        description: `${lowStockProducts.length} producto(s) bajo minimo`,
+        severity: "high",
+        icon: TriangleAlert,
+      });
+    }
+    if (activeOrders > 5) {
+      alerts.push({
+        id: "orders-alert",
+        title: "Carga alta",
+        description: `${activeOrders} pedidos en ejecucion`,
+        severity: "medium",
+        icon: Clock,
+      });
+    }
+    if (monthBalance < 0) {
+      alerts.push({
+        id: "finance-alert",
+        title: "Balance negativo",
+        description: `Resultado deficitario este mes`,
+        severity: "high",
+        icon: AlertCircle,
+      });
+    }
+    return alerts;
+  }, [lowStockProducts.length, activeOrders]);
+
+  const calendarItemsByDate = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>();
+
+    for (const order of orders || []) {
+      if (!order.dueDate) continue;
+      const dueDate = new Date(String(order.dueDate));
+      if (Number.isNaN(dueDate.getTime())) continue;
+      const key = toDateKey(dueDate);
+      const list = map.get(key) || [];
+      list.push({
+        id: `order-${order.id}`,
+        type: "order_due",
+        title: `Entrega pedido #${order.id}`,
+        subtitle: order.clientName,
+        date: dueDate,
+      });
+      map.set(key, list);
+    }
+
     for (const ev of events) {
       const d = new Date(ev.createdAt);
-      const key = getDateKey(d);
-      const day = days.find((dd) => dd.dateKey === key);
-      if (day) {
-        if (ev.eventType === "dtf_quotes") day.quotes++;
-        if (ev.eventType === "mockup_pngs") day.mockups++;
-      }
+      if (Number.isNaN(d.getTime())) continue;
+      const key = toDateKey(d);
+      const list = map.get(key) || [];
+      list.push({
+        id: `ev-${ev.id}`,
+        type: "activity",
+        title: ev.eventType === "dtf_quotes" ? "Cotizacion creada" : ev.eventType === "mockup_pngs" ? "Sesion de mockup" : "Actividad",
+        subtitle: d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+        date: d,
+      });
+      map.set(key, list);
     }
-    return days;
-  }, [events]);
 
-  const totalWeeklyActivity = chartData.reduce((sum, d) => sum + d.quotes + d.mockups, 0);
+    return map;
+  }, [orders, events]);
 
-  const recentEvents = useMemo(() => {
-    return events.slice(0, 8);
-  }, [events]);
+  const monthGrid = useMemo(() => buildMonthGrid(monthCursor), [monthCursor]);
+  const selectedDayItems = calendarItemsByDate.get(selectedDateKey) || [];
 
-  const metrics = [
+  const monthIncome = Number(financeSummary?.monthIncome || 0);
+  const monthExpenses = Number(financeSummary?.monthExpenses || 0);
+  const monthBalance = monthIncome - monthExpenses;
+
+  const modeFlags = {
+    showSales: mode === "general" || mode === "ventas",
+    showProduction: mode === "general" || mode === "produccion",
+    showFinance: mode === "general" || mode === "finanzas",
+  };
+
+  const modeOption = MODE_OPTIONS.find((m) => m.id === mode);
+  const ModeIcon = modeOption?.icon || BarChart3;
+
+  const kpis = [
     {
-      id: "quotes",
-      label: "Cotizaciones",
-      sublabel: "este mes",
-      value: usage.dtfQuotes,
-      icon: Calculator,
-      color: "from-orange-500 to-amber-500",
-      help: "Cantidad de cotizaciones iniciadas en el mes actual.",
+      id: "orders-active",
+      label: "Pedidos activos",
+      value: activeOrders,
+      hint: "En ejecucion",
+      icon: ClipboardList,
+      color: "from-blue-500 to-indigo-500",
+      visible: true,
     },
     {
-      id: "mockups",
+      id: "orders-period",
+      label: "Pedidos periodo",
+      value: filteredOrders.length,
+      hint: "Segun filtro",
+      icon: FileText,
+      color: "from-cyan-500 to-sky-500",
+      visible: modeFlags.showSales,
+    },
+    {
+      id: "quotes-period",
+      label: "Cotizaciones",
+      value: quotesInPeriod,
+      hint: "Actividad comercial",
+      icon: Rocket,
+      color: "from-orange-500 to-amber-500",
+      visible: modeFlags.showSales,
+    },
+    {
+      id: "mockups-period",
       label: "Mockups",
-      sublabel: "este mes",
-      value: usage.mockupPngs,
+      value: mockupsInPeriod,
+      hint: "Actividad creativa",
       icon: Shirt,
       color: "from-blue-500 to-indigo-500",
-      help: "Cantidad de sesiones de mockup iniciadas en el mes actual.",
+      visible: modeFlags.showSales,
     },
     {
-      id: "income-month",
+      id: "income",
       label: "Ingresos",
-      sublabel: "este mes",
-      value: formatCurrency(Number(financeSummary?.monthIncome || 0)),
+      value: formatCurrency(monthIncome),
+      hint: "Mes actual",
       icon: TrendingUp,
       color: "from-emerald-500 to-teal-500",
-      help: "Total de ingresos registrados en Finanzas durante el mes actual.",
+      visible: modeFlags.showFinance,
     },
     {
-      id: "expenses-month",
+      id: "expenses",
       label: "Gastos",
-      sublabel: "este mes",
-      value: formatCurrency(Number(financeSummary?.monthExpenses || 0)),
+      value: formatCurrency(monthExpenses),
+      hint: "Mes actual",
       icon: TrendingDown,
-      color: "from-red-500 to-rose-500",
-      help: "Total de gastos registrados en Finanzas durante el mes actual.",
+      color: "from-rose-500 to-red-500",
+      visible: modeFlags.showFinance,
     },
     {
-      id: "balance-month",
+      id: "balance",
       label: "Balance",
-      sublabel: "este mes",
-      value: formatCurrency(Number(financeSummary?.monthIncome || 0) - Number(financeSummary?.monthExpenses || 0)),
+      value: formatCurrency(monthBalance),
+      hint: monthBalance >= 0 ? "Resultado positivo" : "Resultado negativo",
       icon: DollarSign,
-      color: "from-purple-500 to-violet-500",
-      help: "Diferencia entre ingresos y gastos del mes. Positivo = ganancia.",
+      color: monthBalance >= 0 ? "from-violet-500 to-fuchsia-500" : "from-amber-500 to-orange-600",
+      visible: modeFlags.showFinance,
     },
-  ];
+    {
+      id: "low-stock",
+      label: "Stock bajo",
+      value: lowStockProducts.length,
+      hint: "Productos criticos",
+      icon: TriangleAlert,
+      color: "from-amber-500 to-orange-500",
+      visible: modeFlags.showProduction,
+    },
+    {
+      id: "services",
+      label: "Servicios activos",
+      value: services.filter((s) => s.isActive).length,
+      hint: "Catalogo operativo",
+      icon: Sparkles,
+      color: "from-fuchsia-500 to-purple-600",
+      visible: modeFlags.showProduction,
+    },
+    {
+      id: "usage",
+      label: "Uso cuotas",
+      value: limits.dtfQuotes > 0 ? `${usage.dtfQuotes}/${limits.dtfQuotes}` : String(usage.dtfQuotes),
+      hint: "Plan mensual",
+      icon: Crown,
+      color: "from-purple-500 to-indigo-600",
+      visible: true,
+    },
+  ].filter((kpi) => kpi.visible);
 
-  const quickActions = [
-    { href: "/app", label: "Nueva Cotización", desc: "Cotizador DTF", icon: Calculator, color: "from-orange-500 to-amber-500" },
-    { href: "/mockups", label: "Crear Mockup", desc: "Generador de mockups", icon: Shirt, color: "from-blue-500 to-indigo-500" },
-    { href: "/history", label: "Ver Historial", desc: "Cotizaciones guardadas", icon: FileText, color: "from-emerald-500 to-teal-500" },
-  ];
+  const onWidgetDrop = (targetId: WidgetId) => {
+    if (!draggingWidget || draggingWidget === targetId) return;
+    const from = widgetOrder.indexOf(draggingWidget);
+    const to = widgetOrder.indexOf(targetId);
+    setWidgetOrder((prev) => moveItem(prev, from, to));
+    setDraggingWidget(null);
+  };
 
-  const showUsageBars = !isMaster && !isGuest && limits.dtfQuotes !== -1;
-  const activeTourStep = TOUR_STEPS[Math.min(tourStepIndex, TOUR_STEPS.length - 1)];
-  const isLastTourStep = tourStepIndex === TOUR_STEPS.length - 1;
-  const tourProgress = ((tourStepIndex + 1) / TOUR_STEPS.length) * 100;
+  const DragHandle = () => (
+    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+      <GripVertical className="w-4 h-4 text-muted-foreground" />
+    </div>
+  );
 
-  const checklistProgress = checklistItems.reduce((sum, item) => {
-    const isDone = autoChecklistCompletion[item.key] || checklistState.completed[item.key];
-    return sum + (isDone ? 1 : 0);
-  }, 0);
-  const checklistCompleted = checklistProgress === checklistItems.length;
-  const showChecklist = Boolean(currentUser) && !isGuest && !checklistState.dismissed;
-
-  return (
-    <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-6 max-w-6xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-            {greeting}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Resumen de tu negocio textil
-          </p>
-        </div>
-        {!isMaster && !isGuest && subscription && (
-          <div className="shrink-0 flex items-center gap-2">
-            <div className="flex items-center gap-2 bg-primary/8 px-3 py-1.5 rounded-xl">
-              <Crown className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-bold text-primary">{subscription.planName}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowUpgrade(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-lg shadow-orange-500/20"
-            >
-              <Zap className="w-3 h-3" />
-              Mejorar plan
-            </button>
+  const widgetCards = {
+    stock: (
+      <div
+        key="stock"
+        draggable
+        onDragStart={() => setDraggingWidget("stock")}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => onWidgetDrop("stock")}
+        className="group rounded-2xl border border-border bg-card/60 p-5 cursor-move hover:border-primary/30 transition-colors relative"
+      >
+        <DragHandle />
+        <h3 className="text-base font-display font-bold text-foreground mb-3">Alertas de stock</h3>
+        {!modeFlags.showProduction ? (
+          <p className="text-xs text-muted-foreground italic">Visible en modo Produccion o General.</p>
+        ) : lowStockProducts.length === 0 ? (
+          <div className="text-center py-6">
+            <Sparkles className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-xs text-muted-foreground">Stock optimo. Sin alertas.</p>
           </div>
-        )}
-      </div>
-
-      {pendingWelcome && (
-        <div className="bg-gradient-to-r from-primary/12 via-primary/5 to-transparent border border-primary/20 rounded-2xl p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-primary/90 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                {pendingWelcome.kind === "register" ? "Cuenta creada" : "Sesión iniciada"}
-              </p>
-              <h2 className="text-base sm:text-lg font-display font-bold text-foreground mt-1">
-                Todo listo, {currentUser?.name?.split(" ")[0] ?? "bienvenido"}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {pendingWelcome.kind === "register"
-                  ? "Empezá con una cotización y construí tu primer flujo de trabajo en minutos."
-                  : "Entraste correctamente. Acá tenés tus accesos más usados para continuar rápido."}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/app"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                <Calculator className="w-4 h-4" />
-                Nueva cotización
-              </Link>
-              <Link
-                href="/orders"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-card/70 transition-colors"
-              >
-                <ClipboardList className="w-4 h-4" />
-                Ver pedidos
-              </Link>
-              {!tourState.completed && (
-                <button
-                  type="button"
-                  onClick={openTour}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-primary/30 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Rocket className="w-4 h-4" />
-                  Tour rápido
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setPendingWelcome(null)}
-                className="px-3 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-              >
-                Ocultar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showChecklist && (
-        <div className="bg-card/60 backdrop-blur rounded-2xl p-4 sm:p-5 border border-border space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                Primeros pasos
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                {checklistProgress}/{checklistItems.length} completados
-                {checklistCompleted ? " · Ya tenés el onboarding completo" : " · Avanzá para activar todo tu flujo"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {!tourState.completed && (
-                <button
-                  type="button"
-                  onClick={openTour}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/30 text-xs font-bold text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Rocket className="w-3.5 h-3.5" />
-                  Ver tour
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => updateChecklistState((prev) => ({ ...prev, dismissed: true }))}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-              >
-                Ocultar checklist
-              </button>
-            </div>
-          </div>
-
-          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-orange-500 transition-all duration-500"
-              style={{ width: `${(checklistProgress / checklistItems.length) * 100}%` }}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {checklistItems.map((item) => {
-              const Icon = item.icon;
-              const isDone = autoChecklistCompletion[item.key] || checklistState.completed[item.key];
-              return (
-                <div
-                  key={item.key}
-                  className={`rounded-2xl border p-3.5 ${isDone ? "border-primary/30 bg-primary/5" : "border-border bg-card/40"}`}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
-                      <Icon className="w-[18px] h-[18px] text-primary" />
-                    </div>
-                    {isDone ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Listo
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-                        <Circle className="w-3.5 h-3.5" />
-                        Pendiente
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-sm font-bold text-foreground">{item.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1 min-h-[34px]">{item.description}</p>
-
-                  <div className="mt-3 flex items-center gap-2">
-                    <Link
-                      href={item.href}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold text-foreground transition-colors"
-                    >
-                      {item.cta}
-                    </Link>
-                    {!isDone && (
-                      <button
-                        type="button"
-                        onClick={() => markChecklistDone(item.key)}
-                        className="px-2.5 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-                      >
-                        Marcar listo
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-        {metrics.map((m) => {
-          const Icon = m.icon;
-          return (
-            <div
-              key={m.id}
-              className="relative bg-card/60 backdrop-blur rounded-2xl p-4 border border-border overflow-hidden group hover:border-white/10 transition-colors"
-            >
-              <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${m.color} opacity-[0.06] rounded-full -mr-8 -mt-8 group-hover:opacity-[0.10] transition-opacity`} />
-              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${m.color} flex items-center justify-center mb-3 shadow-lg`}>
-                <Icon className="w-[18px] h-[18px] text-white" />
-              </div>
-              <p className="text-2xl font-display font-black text-foreground leading-none">
-                {m.value}
-              </p>
-              <p className="text-[11px] text-muted-foreground font-medium mt-1 flex items-center gap-1">
-                {m.label} · {m.sublabel}
-                <HelpTooltip text={m.help} iconSize={11} side="bottom" />
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      <div>
-        <h2 className="text-base font-display font-bold text-foreground mb-3 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          Acciones rápidas
-          <HelpTooltip text="Accesos directos a las herramientas más usadas de tu plataforma." side="right" />
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="group flex items-center gap-4 bg-card/60 backdrop-blur rounded-2xl p-4 border border-border hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all"
-              >
-                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg shrink-0`}>
-                  <Icon className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-foreground text-sm">{action.label}</p>
-                  <p className="text-xs text-muted-foreground">{action.desc}</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5">
-        <div className="lg:col-span-3 bg-card/60 backdrop-blur rounded-2xl p-5 border border-border">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                Actividad semanal
-                <HelpTooltip text="Cotizaciones y mockups creados en los últimos 7 días. Te ayuda a ver tu ritmo de trabajo." />
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {totalWeeklyActivity} acción{totalWeeklyActivity !== 1 ? "es" : ""} en los últimos 7 días
-              </p>
-            </div>
-          </div>
-          <div className="h-[200px] sm:h-[220px]">
-            {totalWeeklyActivity > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} barCategoryGap="25%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#888", fontSize: 11, fontWeight: 500 }}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#666", fontSize: 11 }}
-                    width={24}
-                  />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                  <Bar dataKey="quotes" fill="#f97316" radius={[6, 6, 0, 0]} maxBarSize={36} name="Cotizaciones" />
-                  <Bar dataKey="mockups" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={36} name="Mockups" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center">
-                <TrendingUp className="w-10 h-10 text-muted-foreground/20 mb-3" />
-                <p className="text-sm font-medium text-muted-foreground">Sin actividad esta semana</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">
-                  Creá tu primera cotización para ver el gráfico
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 bg-card/60 backdrop-blur rounded-2xl p-5 border border-border flex flex-col">
-          <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2 mb-4">
-            <Clock className="w-4 h-4 text-primary" />
-            Actividad reciente
-            <HelpTooltip text="Últimas acciones que realizaste en la plataforma: cotizaciones, mockups y exportaciones." />
-          </h2>
-          {recentEvents.length > 0 ? (
-            <div className="flex-1 space-y-2.5 overflow-y-auto custom-scrollbar">
-              {recentEvents.map((ev) => {
-                const Icon = EVENT_ICONS[ev.eventType] ?? FileText;
-                const colorClass = EVENT_COLORS[ev.eventType] ?? "text-gray-500 bg-gray-500/10";
-                const [textColor, bgColor] = colorClass.split(" ");
-                const date = new Date(ev.createdAt);
-                const isToday = getDateKey(date) === getDateKey(new Date());
-                const timeStr = isToday
-                  ? `Hoy ${date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}`
-                  : date.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
-                return (
-                  <div
-                    key={ev.id}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
-                  >
-                    <div className={`w-8 h-8 rounded-lg ${bgColor} flex items-center justify-center shrink-0`}>
-                      <Icon className={`w-4 h-4 ${textColor}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">
-                        {EVENT_LABELS[ev.eventType] ?? ev.eventType}
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground/70 font-medium shrink-0">
-                      {timeStr}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
-              <FileText className="w-8 h-8 text-muted-foreground/20 mb-2" />
-              <p className="text-sm text-muted-foreground">Sin actividad aún</p>
-              <Link
-                href="/app"
-                className="text-xs text-primary font-semibold mt-2 hover:underline"
-              >
-                Crear primera cotización
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showUsageBars && (
-        <div className="bg-card/60 backdrop-blur rounded-2xl p-5 border border-border">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
-              <Crown className="w-4 h-4 text-primary" />
-              Uso del plan
-              <HelpTooltip text="Cuánto del límite mensual de tu plan actual has utilizado. Al llegar al 100% no podrás crear más hasta el próximo ciclo." />
-            </h2>
-            <Link href="/profile" className="text-xs text-primary font-semibold hover:underline">
-              Ver plan
-            </Link>
-          </div>
-          <div className="space-y-4">
-            {[
-              { label: "Cotizaciones DTF", used: usage.dtfQuotes, limit: limits.dtfQuotes, color: "#f97316" },
-              { label: "Sesiones de mockup", used: usage.mockupPngs, limit: limits.mockupPngs, color: "#6366f1" },
-              { label: "Exportaciones PDF", used: usage.pdfExports, limit: limits.pdfExports, color: "#10b981" },
-            ].map((bar) => {
-              const pct = bar.limit > 0 ? Math.min(100, (bar.used / bar.limit) * 100) : 0;
-              const isNearLimit = pct >= 80;
-              return (
-                <div key={bar.label}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-medium text-foreground">{bar.label}</span>
-                    <span className={`text-xs font-bold ${isNearLimit ? "text-red-400" : "text-muted-foreground"}`}>
-                      {bar.used} / {bar.limit}
-                    </span>
-                  </div>
-                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+        ) : (
+          <div className="space-y-2.5">
+            {lowStockProducts.slice(0, 6).map((p) => (
+              <Link key={p.id} href="/products" className="block rounded-xl border border-border bg-background/40 px-3 py-2.5 hover:bg-white/5 transition-colors">
+                <p className="text-sm font-semibold text-foreground">{p.name}</p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-muted-foreground">Stock {Number(p.currentStock)} / Min {Number(p.minStock)}</p>
+                  <div className="w-16 h-1.5 bg-background rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${pct}%`,
-                        backgroundColor: isNearLimit ? "#ef4444" : bar.color,
-                      }}
+                      className={`h-full ${Number(p.currentStock) / Number(p.minStock) < 0.5 ? "bg-red-500" : "bg-amber-500"}`}
+                      style={{ width: `${Math.min((Number(p.currentStock) / Number(p.minStock)) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    ),
+    activity: (
+      <div
+        key="activity"
+        draggable
+        onDragStart={() => setDraggingWidget("activity")}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => onWidgetDrop("activity")}
+        className="group rounded-2xl border border-border bg-card/60 p-5 cursor-move hover:border-primary/30 transition-colors relative"
+      >
+        <DragHandle />
+        <h3 className="text-base font-display font-bold text-foreground mb-3">Actividad reciente</h3>
+        {filteredEvents.length === 0 ? (
+          <div className="text-center py-6">
+            <Radio className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-xs text-muted-foreground">Sin actividad en este periodo.</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5 max-h-[280px] overflow-y-auto custom-scrollbar">
+            {filteredEvents.slice(0, 10).map((ev) => {
+              const d = new Date(ev.createdAt);
+              const isQuote = ev.eventType === "dtf_quotes";
+              return (
+                <div key={ev.id} className="rounded-xl border border-border bg-background/40 px-3 py-2.5 hover:bg-white/5 transition-colors">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    {isQuote ? <Rocket className="w-3.5 h-3.5" /> : <Shirt className="w-3.5 h-3.5" />}
+                    {isQuote ? "Cotizacion" : "Mockup"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {d.toLocaleDateString("es-AR", { day: "2-digit", month: "short" })} · {d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
               );
             })}
           </div>
+        )}
+      </div>
+    ),
+    actions: (
+      <div
+        key="actions"
+        draggable
+        onDragStart={() => setDraggingWidget("actions")}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => onWidgetDrop("actions")}
+        className="group rounded-2xl border border-border bg-card/60 p-5 cursor-move hover:border-primary/30 transition-colors relative"
+      >
+        <DragHandle />
+        <h3 className="text-base font-display font-bold text-foreground mb-3">Acciones rapidas</h3>
+        <div className="grid grid-cols-2 md:grid-cols-1 gap-2.5">
+          <Link href="/app" className="inline-flex items-center justify-center rounded-xl border border-border bg-background/40 px-3 py-3 text-xs font-semibold hover:bg-white/5 transition-colors">
+            <Rocket className="w-4 h-4 mr-1.5" />
+            Nueva cotizacion
+          </Link>
+          <Link href="/orders" className="inline-flex items-center justify-center rounded-xl border border-border bg-background/40 px-3 py-3 text-xs font-semibold hover:bg-white/5 transition-colors">
+            <ClipboardList className="w-4 h-4 mr-1.5" />
+            Nuevo pedido
+          </Link>
+          <Link href="/services" className="inline-flex items-center justify-center rounded-xl border border-border bg-background/40 px-3 py-3 text-xs font-semibold hover:bg-white/5 transition-colors">
+            <Sparkles className="w-4 h-4 mr-1.5" />
+            Gestionar servicios
+          </Link>
+          <Link href="/mockups" className="inline-flex items-center justify-center rounded-xl border border-border bg-background/40 px-3 py-3 text-xs font-semibold hover:bg-white/5 transition-colors">
+            <Shirt className="w-4 h-4 mr-1.5" />
+            Crear mockup
+          </Link>
+        </div>
+      </div>
+    ),
+  };
+
+  return (
+    <div className="px-4 py-6 sm:px-6 lg:px-8 space-y-6 w-full max-w-none">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">{greeting}</h1>
+            {modeOption && (
+              <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r ${modeOption.color} bg-opacity-10 border border-white/10`}>
+                <Disc3 className="w-3 h-3 text-white animate-pulse" />
+                <span className="text-xs font-bold text-white">{modeOption.label}</span>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">Centro de control operativo</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap items-start sm:items-center gap-3">
+          <div className="flex items-center gap-1.5 bg-white/5 rounded-lg p-1 border border-border">
+            <Calendar className="w-3.5 h-3.5 text-muted-foreground ml-2" />
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                title={opt.hint}
+                onClick={() => setPeriod(opt.id)}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-bold border transition-all ${
+                  period === opt.id
+                    ? "border-primary bg-primary/20 text-primary shadow-lg shadow-primary/20"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as DashboardMode)}
+            className="px-3 py-2 rounded-lg border border-border bg-card text-xs font-bold text-foreground hover:border-primary/50 transition-colors"
+          >
+            {MODE_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+
+          {!isMaster && !isGuest && subscription && (
+            <div className="inline-flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-3 py-2">
+              <Crown className="w-4 h-4 text-primary" />
+              <span className="text-xs font-bold text-primary">{subscription.planName}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowUpgrade(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-lg"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            Plan
+          </button>
+        </div>
+      </div>
+
+      {urgentAlerts.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {urgentAlerts.map((alert) => {
+            const Icon = alert.icon;
+            const bgColor = alert.severity === "high" ? "bg-red-500/20 border-red-500/30" : "bg-amber-500/20 border-amber-500/30";
+            return (
+              <div key={alert.id} className={`rounded-lg border ${bgColor} p-3 flex items-start gap-3`}>
+                <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${alert.severity === "high" ? "text-red-400" : "text-amber-400"}`} />
+                <div>
+                  <p className="text-xs font-bold text-white">{alert.title}</p>
+                  <p className="text-xs text-white/80">{alert.description}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      <Dialog
-        open={tourOpen}
-        onOpenChange={(open) => {
-          if (open) {
-            setTourOpen(true);
-            return;
-          }
-          closeTour();
-        }}
-      >
-        <DialogContent className="sm:max-w-xl rounded-2xl border-border bg-card/95 backdrop-blur">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl">Tour de inicio</DialogTitle>
-            <DialogDescription>
-              Paso {tourStepIndex + 1} de {TOUR_STEPS.length}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-orange-500 transition-all duration-500"
-              style={{ width: `${tourProgress}%` }}
-            />
-          </div>
-
-          <div className="rounded-2xl border border-border bg-background/50 p-4">
-            <div className="flex items-start gap-3">
-              <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${activeTourStep.accent} flex items-center justify-center shrink-0 shadow-lg`}>
-                <activeTourStep.icon className="w-5 h-5 text-white" />
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-10 gap-3 auto-rows-max">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={kpi.id} className="relative rounded-2xl border border-border bg-card/60 p-4 group hover:border-primary/50 transition-all">
+              <div className={`absolute top-0 right-0 w-20 h-20 rounded-full bg-gradient-to-br ${kpi.color} opacity-10 -mr-8 -mt-8 group-hover:opacity-15 transition-opacity`} />
+              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${kpi.color} flex items-center justify-center mb-3`}>
+                <Icon className="w-4 h-4 text-white" />
               </div>
-              <div>
-                <p className="text-base font-display font-bold text-foreground">{activeTourStep.title}</p>
-                <p className="text-sm text-muted-foreground mt-1">{activeTourStep.description}</p>
+              <p className="text-xl font-display font-black text-foreground leading-none">{kpi.value}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{kpi.label}</p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">{kpi.hint}</p>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+        <div className="xl:col-span-8 space-y-5">
+          {modeFlags.showSales && (
+            <div className="rounded-2xl border border-border bg-card/60 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  Actividad comercial
+                  <HelpTooltip text="Cotizaciones y mockups dentro del periodo seleccionado." />
+                </h2>
+              </div>
+              {activityChart.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-sm text-muted-foreground mb-2">{EMPTY_STATE_TIPS[mode]}</p>
+                </div>
+              ) : (
+                <div className="h-[260px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={activityChart} barCategoryGap="25%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                      <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#8b8b8b", fontSize: 11 }} />
+                      <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "#8b8b8b", fontSize: 11 }} width={24} />
+                      <Tooltip content={<ActivityTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                      <Bar name="Cotizaciones" dataKey="quotes" fill="#f97316" radius={[6, 6, 0, 0]} maxBarSize={34} />
+                      <Bar name="Mockups" dataKey="mockups" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={34} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+
+          {modeFlags.showFinance && (
+            <div className="rounded-2xl border border-border bg-card/60 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Evolucion financiera
+                  <HelpTooltip text="Comparativa mensual de ingresos y gastos." />
+                </h2>
+              </div>
+              {financeChart.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-sm text-muted-foreground mb-2">Sin datos financieros para mostrar.</p>
+                </div>
+              ) : (
+                <div className="h-[260px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={financeChart}>
+                      <defs>
+                        <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="expensesFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#8b8b8b", fontSize: 11 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: "#8b8b8b", fontSize: 11 }} width={48} />
+                      <Tooltip content={<FinanceTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: "12px" }} />
+                      <Area name="Ingresos" type="monotone" dataKey="income" stroke="#10b981" fill="url(#incomeFill)" strokeWidth={2} />
+                      <Area name="Gastos" type="monotone" dataKey="expenses" stroke="#ef4444" fill="url(#expensesFill)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <aside className="xl:col-span-4 space-y-5">
+          {modeFlags.showProduction && (
+            <div className="rounded-2xl border border-border bg-card/60 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-primary" />
+                  Calendario operativo
+                </h2>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-1.5 rounded-lg hover:bg-white/5">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button type="button" onClick={() => setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-1.5 rounded-lg hover:bg-white/5">
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-sm font-semibold text-foreground capitalize mb-3">{monthLabel(monthCursor)}</p>
+
+              <div className="grid grid-cols-7 gap-1 text-[10px] text-muted-foreground mb-1.5 font-bold">
+                {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((day) => (
+                  <div key={day} className="text-center py-1">{day}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {monthGrid.map((day) => {
+                  const key = toDateKey(day);
+                  const inMonth = day.getMonth() === monthCursor.getMonth();
+                  const isToday = key === toDateKey(new Date());
+                  const isSelected = key === selectedDateKey;
+                  const items = calendarItemsByDate.get(key) || [];
+                  const dueCount = items.filter((it) => it.type === "order_due").length;
+                  const actCount = items.filter((it) => it.type === "activity").length;
+
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedDateKey(key)}
+                      className={`min-h-[52px] rounded-lg border p-1.5 text-left transition-all ${
+                        isSelected ? "border-primary bg-primary/15 shadow-lg shadow-primary/10" : "border-border hover:bg-white/5 hover:border-primary/30"
+                      } ${!inMonth ? "opacity-40" : "opacity-100"}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] font-bold ${isToday ? "text-primary font-black" : "text-foreground"}`}>{day.getDate()}</span>
+                        {(dueCount > 0 || actCount > 0) && (
+                          <span className="text-[8px] font-black text-primary bg-primary/20 rounded-full w-4 h-4 flex items-center justify-center">{dueCount + actCount}</span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-1">
+                        {dueCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                        {actCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-border bg-background/40 p-3">
+                <p className="text-xs font-bold text-foreground mb-2">{toDateKey(new Date(selectedDateKey))}</p>
+                {selectedDayItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">Sin eventos para este dia.</p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                    {selectedDayItems.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-border px-2.5 py-2 bg-white/5 hover:bg-white/10 transition-colors">
+                        <p className="text-xs font-semibold text-foreground">{item.title}</p>
+                        <p className="text-[11px] text-muted-foreground">{item.subtitle}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={activeTourStep.href}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-            >
-              {activeTourStep.cta}
-            </Link>
-
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                type="button"
-                onClick={prevTourStep}
-                disabled={tourStepIndex === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Anterior
-              </button>
-              <button
-                type="button"
-                onClick={nextTourStep}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 text-sm font-semibold text-foreground hover:bg-white/15 transition-colors"
-              >
-                {isLastTourStep ? "Finalizar" : "Siguiente"}
-                {!isLastTourStep && <ChevronRight className="w-4 h-4" />}
-              </button>
+          {(modeFlags.showProduction || modeFlags.showSales) && (
+            <div className="rounded-2xl border border-border bg-card/60 p-5">
+              <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-primary" />
+                Entregas proximas
+              </h2>
+              {upcomingOrders.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-xs text-muted-foreground italic">No hay pedidos con fecha de entrega.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {upcomingOrders.map((order) => {
+                    const daysUntil = Math.ceil((order.due.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    const isUrgent = daysUntil <= 3;
+                    return (
+                      <Link key={order.id} href="/orders" className={`block rounded-xl border px-3 py-2.5 transition-colors ${isUrgent ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20" : "border-border bg-background/40 hover:bg-white/5"}`}>
+                        <p className="text-sm font-semibold text-foreground flex items-center justify-between">
+                          #{order.id} {isUrgent && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-bold">Urgente</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {order.clientName}
+                        </p>
+                        <div className="flex items-center justify-between mt-1.5 text-xs">
+                          <span className="text-muted-foreground">Entrega {order.due.toLocaleDateString("es-AR", { day: "2-digit", month: "short" })}</span>
+                          <span className={`font-bold ${daysUntil <= 1 ? "text-red-400" : daysUntil <= 3 ? "text-amber-400" : "text-emerald-400"}`}>{daysUntil} dias</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(Number(order.totalPrice || 0))}</p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          )}
+        </aside>
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        {widgetOrder.map((id) => widgetCards[id])}
+      </section>
 
       <UpgradePrompt
         open={showUpgrade}
         onClose={() => setShowUpgrade(false)}
-        feature="herramientas y límites"
+        feature="herramientas y limites"
         mode="plans"
       />
     </div>
   );
 }
+
+

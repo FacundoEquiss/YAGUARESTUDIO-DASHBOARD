@@ -120,7 +120,9 @@ export async function apiFetch<T = unknown>(
       const payload = isJson ? await res.json() : await res.text();
 
       if (!res.ok) {
-        if (res.status === 401) {
+        // Only force global session reset when the explicit session endpoint rejects auth.
+        // Other endpoints may return 401 for transient/backend reasons and should not hard-logout the user.
+        if (res.status === 401 && path === "/auth/me") {
           setAccessToken(null);
           notifyAuthExpired(res.status);
         }
