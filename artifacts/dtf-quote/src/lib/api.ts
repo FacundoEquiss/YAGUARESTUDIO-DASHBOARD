@@ -14,26 +14,30 @@ const RETRYABLE_AUTH_PATHS = new Set([
   "/auth/register",
 ]);
 
+const HEALTH_PATHS = ["/healthz/db", "/healthz", "/health/ready", "/health"] as const;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function waitForApiReady(
-  attempts = 8,
-  delayMs = 1500
+  attempts = 5,
+  delayMs = 1000
 ): Promise<boolean> {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      const res = await fetch(`${API_BASE}/healthz/db`, {
-        method: "GET",
-        credentials: "include",
-      });
+    for (const healthPath of HEALTH_PATHS) {
+      try {
+        const res = await fetch(`${API_BASE}${healthPath}`, {
+          method: "GET",
+          credentials: "include",
+        });
 
-      if (res.ok) {
-        return true;
+        if (res.ok) {
+          return true;
+        }
+      } catch {
+        // El backend puede estar despertando o reiniciando.
       }
-    } catch {
-      // El backend puede estar despertando o reiniciando.
     }
 
     if (attempt < attempts) {

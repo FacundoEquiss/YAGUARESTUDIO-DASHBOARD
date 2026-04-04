@@ -117,15 +117,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     const apiReady = await waitForApiReady();
-    if (!apiReady) {
-      return "El servidor está despertando. Probá de nuevo en unos segundos.";
-    }
 
-    const { data, error } = await apiFetch<{ user: ApiUser }>("/auth/login", {
+    const { data, error, status } = await apiFetch<{ user: ApiUser }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
-    if (error) return error;
+    if (error) {
+      if (!apiReady && status === 0) {
+        return "El servidor está despertando. Probá de nuevo en unos segundos.";
+      }
+      return error;
+    }
     if (data?.user) {
       setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
@@ -148,15 +150,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     businessName?: string;
   }): Promise<string | null> => {
     const apiReady = await waitForApiReady();
-    if (!apiReady) {
-      return "El servidor está despertando. Probá de nuevo en unos segundos.";
-    }
 
-    const { data, error } = await apiFetch<{ user: ApiUser }>("/auth/register", {
+    const { data, error, status } = await apiFetch<{ user: ApiUser }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    if (error) return error;
+    if (error) {
+      if (!apiReady && status === 0) {
+        return "El servidor está despertando. Probá de nuevo en unos segundos.";
+      }
+      return error;
+    }
     if (data?.user) {
       setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");

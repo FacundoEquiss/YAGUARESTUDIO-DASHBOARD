@@ -1,6 +1,17 @@
 import { Router } from "express";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 const healthRouter = Router();
+
+async function isDatabaseReady(): Promise<boolean> {
+  try {
+    await db.execute(sql`select 1`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function getMemoryUsage() {
   const mem = process.memoryUsage();
@@ -26,6 +37,35 @@ healthRouter.get("/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
     version: process.env.npm_package_version || "0.0.0",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Canonical health endpoint expected by smoke checks and frontend warmup.
+healthRouter.get("/healthz", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    version: process.env.npm_package_version || "0.0.0",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Database liveness endpoint for readiness checks.
+healthRouter.get("/healthz/db", async (_req, res) => {
+  const databaseReady = await isDatabaseReady();
+
+  if (!databaseReady) {
+    res.status(503).json({
+      status: "degraded",
+      database: "error",
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
+  res.status(200).json({
+    status: "ok",
+    database: "ok",
     timestamp: new Date().toISOString(),
   });
 });
