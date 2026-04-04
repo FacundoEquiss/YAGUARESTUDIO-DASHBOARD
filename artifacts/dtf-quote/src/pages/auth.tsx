@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, User, LogIn, UserPlus, Loader2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { sanitizeNextPath } from "@/lib/routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,42 +20,25 @@ function getInitialTab(): Tab {
 }
 
 function getNextRoute(): string {
-  return getSearchParams().get("next") || "/dashboard";
+  return sanitizeNextPath(getSearchParams().get("next"));
 }
 
-const PAGE_LABELS: Record<string, string> = {
-  "/dashboard": "TRAZO",
-  "/app": "TRAZO",
-  "/mockups": "Generador de Mockups",
-  "/history": "Historial",
-  "/profile": "Mi Perfil",
-};
+const MIN_PASSWORD_LENGTH = 6;
 
 export function AuthPage() {
-  const { login, register, signInWithGoogle } = useAuth();
+  const { login, register } = useAuth();
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState<Tab>(getInitialTab);
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [name, setName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [username, setUsername] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [phone, setPhone] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const oauthError = getSearchParams().get("error");
-  const [error, setError] = useState<string | null>(
-    oauthError ? "No se pudo completar el acceso con Google" : null
-  );
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   const nextRoute = getNextRoute();
-  const pageLabel = PAGE_LABELS[nextRoute] || "TRAZO";
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const usernameRegex = /^[a-z0-9._-]{3,30}$/;
 
   const handleSuccess = () => {
     setLocation(nextRoute);
@@ -65,46 +49,43 @@ export function AuthPage() {
     setError(null);
     setLoading(true);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (!emailRegex.test(normalizedEmail)) {
+        setError("Ingresá un correo válido");
+        setLoading(false);
+        return;
+      }
+
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        setError(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
+        setLoading(false);
+        return;
+      }
+
       if (tab === "register") {
-        if (!name.trim() || !lastName.trim() || !username.trim() || !birthDate || !phone.trim() || !businessName.trim()) {
-          setError("Completá todos los campos del registro");
+        const trimmedName = name.trim();
+        if (trimmedName.length < 2) {
+          setError("Ingresá tu nombre (mínimo 2 caracteres)");
           setLoading(false);
           return;
         }
-        if (!emailRegex.test(email.trim().toLowerCase())) {
-          setError("Ingresá un correo válido");
-          setLoading(false);
-          return;
-        }
-        if (!usernameRegex.test(username.trim().toLowerCase())) {
-          setError("El nombre de usuario debe tener 3-30 caracteres y usar solo letras minúsculas, números, punto, guion o guion bajo");
-          setLoading(false);
-          return;
-        }
-        if (password.length < 6) {
-          setError("La contraseña debe tener al menos 6 caracteres");
-          setLoading(false);
-          return;
-        }
+
         if (password !== confirmPassword) {
           setError("Las contraseñas no coinciden");
           setLoading(false);
           return;
         }
+
         const err = await register({
-          email: email.trim().toLowerCase(),
+          email: normalizedEmail,
           password,
-          name: name.trim(),
-          lastName: lastName.trim(),
-          username: username.trim().toLowerCase(),
-          birthDate,
-          phone: phone.trim(),
-          businessName: businessName.trim(),
+          name: trimmedName,
         });
         if (err) setError(err);
         else handleSuccess();
       } else {
-        const err = await login(email, password);
+        const err = await login(normalizedEmail, password);
         if (err) setError(err);
         else handleSuccess();
       }
@@ -115,230 +96,160 @@ export function AuthPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError(null);
-    setGoogleLoading(true);
-
-    try {
-      const err = await signInWithGoogle(nextRoute);
-      if (err) {
-        setError(err);
-      }
-    } catch {
-      setError("No se pudo iniciar sesión con Google");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
   return (
-      <div className="auth-card-wrapper">
-        <div className="auth-card">
+    <div className="auth-card-wrapper">
+      <div className="auth-card">
+        <button
+          onClick={() => setLocation("/")}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Volver al inicio
+        </button>
 
-          <button
-            onClick={() => setLocation("/")}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Volver al inicio
-          </button>
-
-          <div className="mb-8">
-            <h1 className="text-4xl font-display font-bold text-primary">{pageLabel}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              <span className="font-black text-foreground">Trazo</span> by Yaguar Estudio
-            </p>
-          </div>
-
-          <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 p-4">
-            <div className="font-bold text-foreground">Acceso con cuenta</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Para guardar trabajo, controlar límites y activar el plan correcto en tu perfil.
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="w-full rounded-2xl mb-5"
-            disabled={googleLoading}
-            onClick={handleGoogleLogin}
-          >
-            {googleLoading ? "Redirigiendo a Google..." : "Continuar con Google"}
-          </Button>
-
-          <div className="flex bg-secondary rounded-2xl p-1 mb-5">
-            {(["login", "register"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => { setTab(t); setError(null); }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
-                  tab === t
-                    ? "bg-gray-800 text-white shadow-sm"
-                    : "text-gray-400 hover:text-gray-200"
-                }`}
-              >
-                {t === "login" ? "Iniciar Sesión" : "Crear Cuenta"}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <AnimatePresence mode="wait">
-              {tab === "register" && (
-                <motion.div
-                  key="name-field"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-3 pb-1">
-                    <Label htmlFor="auth-name" className="font-bold flex items-center gap-1.5">
-                      <User className="w-4 h-4" /> Nombre
-                    </Label>
-                    <Input
-                      id="auth-name"
-                      placeholder="Tu nombre"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required={tab === "register"}
-                    />
-
-                    <Label htmlFor="auth-last-name" className="font-bold flex items-center gap-1.5">
-                      <User className="w-4 h-4" /> Apellido
-                    </Label>
-                    <Input
-                      id="auth-last-name"
-                      placeholder="Tu apellido"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required={tab === "register"}
-                    />
-
-                    <Label htmlFor="auth-username" className="font-bold flex items-center gap-1.5">
-                      <User className="w-4 h-4" /> Nombre de usuario
-                    </Label>
-                    <Input
-                      id="auth-username"
-                      placeholder="ej: yaguar.estudio"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                      required={tab === "register"}
-                    />
-
-                    <Label htmlFor="auth-birth-date" className="font-bold">Fecha de nacimiento</Label>
-                    <Input
-                      id="auth-birth-date"
-                      type="date"
-                      value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                      required={tab === "register"}
-                    />
-
-                    <Label htmlFor="auth-phone" className="font-bold">Teléfono</Label>
-                    <Input
-                      id="auth-phone"
-                      type="tel"
-                      placeholder="+54 11 1234 5678"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      required={tab === "register"}
-                    />
-
-                    <Label htmlFor="auth-business-name" className="font-bold">Nombre de negocio o marca</Label>
-                    <Input
-                      id="auth-business-name"
-                      placeholder="Yaguar Studio"
-                      value={businessName}
-                      onChange={(e) => setBusinessName(e.target.value)}
-                      required={tab === "register"}
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="auth-email" className="font-bold flex items-center gap-1.5">
-                <Mail className="w-4 h-4" /> Correo
-              </Label>
-              <Input
-                id="auth-email"
-                type="email"
-                placeholder="tucorreo@ejemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="auth-password" className="font-bold flex items-center gap-1.5">
-                <Lock className="w-4 h-4" /> Contraseña
-              </Label>
-              <Input
-                id="auth-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            <AnimatePresence mode="wait">
-              {tab === "register" && (
-                <motion.div
-                  key="confirm-password-field"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-1.5 pb-1">
-                    <Label htmlFor="auth-confirm-password" className="font-bold flex items-center gap-1.5">
-                      <Lock className="w-4 h-4" /> Confirmar contraseña
-                    </Label>
-                    <Input
-                      id="auth-confirm-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required={tab === "register"}
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-destructive/10 text-destructive text-sm px-4 py-3 rounded-xl font-medium"
-                >
-                  {error}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <Button type="submit" size="lg" className="w-full rounded-2xl" disabled={loading}>
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : tab === "login" ? (
-                <><LogIn className="w-5 h-5 mr-2" /> Iniciar Sesión</>
-              ) : (
-                <><UserPlus className="w-5 h-5 mr-2" /> Crear Cuenta</>
-              )}
-            </Button>
-          </form>
-
+        <div className="mb-8">
+          <h1 className="text-4xl font-display font-bold text-primary">TRAZO</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            <span className="font-black text-foreground">Trazo</span> by Yaguar Estudio
+          </p>
         </div>
+
+        <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+          <div className="font-bold text-foreground">Acceso con cuenta</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Iniciá sesión para entrar al dashboard y administrar tu negocio.
+          </div>
+        </div>
+
+        <div className="flex bg-secondary rounded-2xl p-1 mb-5">
+          {(["login", "register"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => {
+                setTab(t);
+                setError(null);
+                setConfirmPassword("");
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                tab === t
+                  ? "bg-gray-800 text-white shadow-sm"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {t === "login" ? "Iniciar Sesión" : "Crear Cuenta"}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <AnimatePresence mode="wait">
+            {tab === "register" && (
+              <motion.div
+                key="register-name"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-1.5 pb-1">
+                  <Label htmlFor="auth-name" className="font-bold flex items-center gap-1.5">
+                    <User className="w-4 h-4" /> Nombre
+                  </Label>
+                  <Input
+                    id="auth-name"
+                    placeholder="Tu nombre"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required={tab === "register"}
+                    autoFocus={tab === "register"}
+                  />
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Vas a poder completar más datos del perfil después de crear la cuenta.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="auth-email" className="font-bold flex items-center gap-1.5">
+              <Mail className="w-4 h-4" /> Correo
+            </Label>
+            <Input
+              id="auth-email"
+              type="email"
+              placeholder="tucorreo@ejemplo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus={tab === "login"}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="auth-password" className="font-bold flex items-center gap-1.5">
+              <Lock className="w-4 h-4" /> Contraseña
+            </Label>
+            <Input
+              id="auth-password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <AnimatePresence mode="wait">
+            {tab === "register" && (
+              <motion.div
+                key="register-confirm-password"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-1.5 pb-1">
+                  <Label htmlFor="auth-confirm-password" className="font-bold flex items-center gap-1.5">
+                    <Lock className="w-4 h-4" /> Confirmar contraseña
+                  </Label>
+                  <Input
+                    id="auth-confirm-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required={tab === "register"}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="bg-destructive/10 text-destructive text-sm px-4 py-3 rounded-xl font-medium"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Button type="submit" size="lg" className="w-full rounded-2xl" disabled={loading}>
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : tab === "login" ? (
+              <><LogIn className="w-5 h-5 mr-2" /> Iniciar Sesión</>
+            ) : (
+              <><UserPlus className="w-5 h-5 mr-2" /> Crear Cuenta</>
+            )}
+          </Button>
+        </form>
       </div>
+    </div>
   );
 }

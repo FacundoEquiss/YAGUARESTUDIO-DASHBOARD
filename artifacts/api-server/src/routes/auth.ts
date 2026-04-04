@@ -1,9 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
 import { db, users, subscriptionPlans, userSubscriptions } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { signToken, requireAuth, verifyToken } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 import { env } from "../env";
 import { supabase } from "../lib/supabase";
 
@@ -50,7 +49,6 @@ function createRateLimiter(maxAttempts: number, windowMs: number) {
 
 const loginRateLimiter = createRateLimiter(8, 10 * 60 * 1000);
 const registerRateLimiter = createRateLimiter(6, 10 * 60 * 1000);
-const supabaseSyncLimiter = createRateLimiter(20, 10 * 60 * 1000);
 
 function isSecureCookieEnvironment(): boolean {
   return env.isHosted;
@@ -82,11 +80,28 @@ export async function seedMasterAccount() {
 
   const existing = await db.select().from(users).where(eq(users.email, masterEmail));
   if (existing.length === 0) {
-    const hash = await bcrypt.hash(masterPassword, 10);
+    if (!supabase) {
+        console.warn("⚠️ Supabase not configured. Cannot seed master account properly.");
+        return;
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: masterEmail,
+      password: masterPassword,
+      options: {
+        data: { name: masterName }
+      }
+    });
+
+    if (authError || !authData.user) {
+        console.error("Error creating master account on Supabase:", authError);
+        return;
+    }
+
     await db.insert(users).values({
       email: masterEmail,
       name: masterName,
-      passwordHash: hash,
+      supabaseAuthId: authData.user.id,
       role: "master",
     });
     console.log("Seeded master account");
@@ -139,39 +154,6 @@ function getClientIp(req: Request): string {
   }
 
   return req.ip || "unknown";
-}
-
-function buildDefaultName(rawName: string | null | undefined, email: string): string {
-  const candidate = (rawName || "").trim();
-  if (candidate.length > 0) {
-    return candidate;
-  }
-
-  const localPart = email.split("@")[0]?.trim();
-  return localPart && localPart.length > 0 ? localPart : "Usuario";
-}
-
-function dbErrorCode(error: unknown): string | null {
-  if (!error || typeof error !== "object") {
-    return null;
-  }
-
-  const maybeCode = (error as { code?: unknown }).code;
-  return typeof maybeCode === "string" ? maybeCode : null;
-}
-
-function dbErrorMessage(error: unknown): string {
-  const code = dbErrorCode(error);
-
-  if (code === "23505") {
-    return "Conflicto de datos al sincronizar la cuenta. Probá iniciar sesión nuevamente.";
-  }
-
-  if (code === "23503") {
-    return "No se pudo crear la suscripción inicial del usuario.";
-  }
-
-  return "Error de base de datos al sincronizar sesión";
 }
 
 function getRequestId(req: Request): string {
@@ -321,11 +303,11 @@ authRouter.post("/auth/register", async (req, res) => {
       email?: string;
       password?: string;
       name?: string;
-      lastName?: string;
-      username?: string;
-      birthDate?: string;
-      phone?: string;
-      businessName?: string;
+      lastName?: string | null;
+      username?: string | null;
+      birthDate?: string | null;
+      phone?: string | null;
+      businessName?: string | null;
     };
 
     const clientIp = getClientIp(req);
@@ -344,9 +326,9 @@ authRouter.post("/auth/register", async (req, res) => {
       return;
     }
 
-    if (!email || !password || !name || !lastName || !username || !birthDate || !phone || !businessName) {
+    if (!email || !password || !name) {
       res.status(400).json({
-        error: "Todos los campos son requeridos",
+        error: "Nombre, correo y contraseña son requeridos",
       });
       return;
     }
@@ -357,13 +339,14 @@ authRouter.post("/auth/register", async (req, res) => {
     const trimmedLastName = sanitizeText(lastName);
     const trimmedPhone = sanitizeText(phone);
     const trimmedBusinessName = sanitizeText(businessName);
+    const normalizedBirthDate = sanitizeText(birthDate);
 
     if (!EMAIL_REGEX.test(trimmedEmail)) {
       res.status(400).json({ error: "Ingresá un correo válido" });
       return;
     }
 
-    if (!USERNAME_REGEX.test(normalizedUsername)) {
+    if (normalizedUsername && !USERNAME_REGEX.test(normalizedUsername)) {
       res.status(400).json({
         error: "El nombre de usuario debe tener entre 3 y 30 caracteres y solo usar letras minúsculas, números, punto, guion o guion bajo",
       });
@@ -375,22 +358,22 @@ authRouter.post("/auth/register", async (req, res) => {
       return;
     }
 
-    if (trimmedLastName.length < 2 || trimmedLastName.length > 80) {
+    if (trimmedLastName && (trimmedLastName.length < 2 || trimmedLastName.length > 80)) {
       res.status(400).json({ error: "El apellido debe tener entre 2 y 80 caracteres" });
       return;
     }
 
-    if (!PHONE_REGEX.test(trimmedPhone)) {
+    if (trimmedPhone && !PHONE_REGEX.test(trimmedPhone)) {
       res.status(400).json({ error: "Ingresá un teléfono válido" });
       return;
     }
 
-    if (trimmedBusinessName.length < 2 || trimmedBusinessName.length > 120) {
+    if (trimmedBusinessName && (trimmedBusinessName.length < 2 || trimmedBusinessName.length > 120)) {
       res.status(400).json({ error: "El nombre de negocio debe tener entre 2 y 120 caracteres" });
       return;
     }
 
-    if (!isIsoDate(birthDate)) {
+    if (normalizedBirthDate && !isIsoDate(normalizedBirthDate)) {
       res.status(400).json({ error: "La fecha de nacimiento debe tener formato YYYY-MM-DD" });
       return;
     }
@@ -406,24 +389,46 @@ authRouter.post("/auth/register", async (req, res) => {
       return;
     }
 
-    const existingUsername = await db.select().from(users).where(eq(users.username, normalizedUsername));
-    if (existingUsername.length > 0) {
-      res.status(409).json({ error: "Ese nombre de usuario ya está en uso" });
-      return;
+    if (normalizedUsername) {
+      const existingUsername = await db.select().from(users).where(eq(users.username, normalizedUsername));
+      if (existingUsername.length > 0) {
+        res.status(409).json({ error: "Ese nombre de usuario ya está en uso" });
+        return;
+      }
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    if (!supabase) {
+       res.status(500).json({ error: "Supabase is not configured" });
+       return;
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password: password,
+      options: {
+        data: {
+          name: trimmedName,
+          ...(trimmedLastName ? { lastName: trimmedLastName } : {}),
+        }
+      }
+    });
+
+    if (authError || !authData.user) {
+        res.status(400).json({ error: authError?.message || "Error registrando usuario en Supabase" });
+        return;
+    }
+
     const [newUser] = await db
       .insert(users)
       .values({
         email: trimmedEmail,
-        username: normalizedUsername,
+        username: normalizedUsername || null,
         name: trimmedName,
-        lastName: trimmedLastName,
-        birthDate,
-        phone: trimmedPhone,
-        businessName: trimmedBusinessName,
-        passwordHash: hash,
+        lastName: trimmedLastName || null,
+        birthDate: normalizedBirthDate || null,
+        phone: trimmedPhone || null,
+        businessName: trimmedBusinessName || null,
+        supabaseAuthId: authData.user.id,
         role: "user",
       })
       .returning();
@@ -447,14 +452,14 @@ authRouter.post("/auth/register", async (req, res) => {
       });
     }
 
-    const token = signToken({
-      userId: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
+    // Attempt to log them right away to create session token
+    const { data: sessionData } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: password
     });
 
+    res.cookie("token", sessionData?.session?.access_token || "", getAuthCookieOptions());
     registerRateLimiter.clear(limiterKey);
-    res.cookie("token", token, getAuthCookieOptions());
 
     res.json({ user: userProfile(newUser) });
   } catch (err) {
@@ -484,45 +489,54 @@ authRouter.post("/auth/login", async (req, res) => {
         res,
         429,
         "login_rate_limited",
-        "Demasiados intentos de inicio de sesión. Probá nuevamente en unos minutos.",
+        "Demasiados intentos. Probá nuevamente en unos minutos.",
         { retryAfterMs: rateResult.retryAfterMs }
       );
       return;
     }
 
     if (!email || !password) {
-      res.status(400).json({ error: "Correo y contraseña son requeridos" });
+      res.status(400).json({ error: "Completá todos los campos" });
       return;
     }
 
     trimmedEmail = email.trim().toLowerCase();
 
-    if (!EMAIL_REGEX.test(trimmedEmail)) {
-      res.status(400).json({ error: "Ingresá un correo válido" });
-      return;
+    if (!supabase) {
+       res.status(500).json({ error: "Supabase no está configurado." });
+       return;
     }
 
-    const [user] = await db.select().from(users).where(eq(users.email, trimmedEmail));
-
-    if (!user) {
-      res.status(401).json({ error: "Correo o contraseña incorrectos" });
-      return;
-    }
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      res.status(401).json({ error: "Correo o contraseña incorrectos" });
-      return;
-    }
-
-    const token = signToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: password
     });
 
+    if (authError || !authData.user) {
+        res.status(401).json({ error: "Credenciales incorrectas" });
+        return;
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.supabaseAuthId, authData.user.id));
+    if (!user) {
+      // Intento de fallback por si el usuario fue creado previamente
+      const [byEmail] = await db.select().from(users).where(eq(users.email, trimmedEmail));
+      if (!byEmail) {
+        res.status(404).json({ error: "Usuario no encontrado en base local." });
+        return;
+      }
+      
+      // Vincular cuenta
+      await db.update(users).set({ supabaseAuthId: authData.user.id }).where(eq(users.id, byEmail.id));
+      res.cookie("token", authData.session?.access_token || "", getAuthCookieOptions());
+      loginRateLimiter.clear(limiterKey);
+
+      res.json({ user: userProfile(byEmail) });
+      return;
+    }
+
     loginRateLimiter.clear(limiterKey);
-    res.cookie("token", token, getAuthCookieOptions());
+    res.cookie("token", authData.session?.access_token || "", getAuthCookieOptions());
 
     res.json({ user: userProfile(user) });
   } catch (err) {
@@ -532,243 +546,6 @@ authRouter.post("/auth/login", async (req, res) => {
       error: err,
     });
     res.status(500).json({ error: "Error al iniciar sesión" });
-  }
-});
-
-authRouter.post("/auth/supabase/sync", async (req, res) => {
-  const startedAt = Date.now();
-
-  try {
-    const clientIp = getClientIp(req);
-    const rateResult = supabaseSyncLimiter.check(clientIp);
-
-    if (!rateResult.allowed) {
-      sendError(
-        req,
-        res,
-        429,
-        "supabase_sync_rate_limited",
-        "Demasiadas sincronizaciones de sesión. Intentá nuevamente en unos minutos.",
-        { retryAfterMs: rateResult.retryAfterMs }
-      );
-      return;
-    }
-
-    const bearerToken = getBearerToken(req.headers.authorization);
-    if (!bearerToken) {
-      sendError(req, res, 400, "missing_bearer_token", "Authorization Bearer token es requerido");
-      return;
-    }
-
-    const validated = await validateSupabaseAccessToken(bearerToken);
-    if (!validated.user) {
-      sendError(req, res, 401, "invalid_supabase_token", validated.error || "Token de Supabase inválido o expirado");
-      return;
-    }
-
-    const supabaseUser = validated.user;
-    const supabaseAuthId = supabaseUser.id;
-    const normalizedEmail = normalizeSupabaseEmail(supabaseUser.email);
-
-    if (!normalizedEmail) {
-      sendError(req, res, 400, "invalid_supabase_email", "La cuenta de Supabase no tiene email válido");
-      return;
-    }
-
-    const metadataName = typeof supabaseUser.user_metadata?.name === "string"
-      ? supabaseUser.user_metadata.name
-      : typeof supabaseUser.user_metadata?.full_name === "string"
-        ? supabaseUser.user_metadata.full_name
-        : null;
-
-    const generatedPasswordHash = await bcrypt.hash(crypto.randomUUID(), 10);
-    let localUser: typeof users.$inferSelect | undefined;
-
-    try {
-      localUser = await db.transaction(async (tx) => {
-        let resolvedUser: typeof users.$inferSelect | undefined;
-
-        const [bySupabaseAuthId] = await tx
-          .select()
-          .from(users)
-          .where(eq(users.supabaseAuthId, supabaseAuthId));
-
-        if (bySupabaseAuthId) {
-          resolvedUser = bySupabaseAuthId;
-        }
-
-        if (!resolvedUser) {
-          const [byEmail] = await tx
-            .select()
-            .from(users)
-            .where(eq(users.email, normalizedEmail));
-
-          if (byEmail) {
-            if (byEmail.supabaseAuthId && byEmail.supabaseAuthId !== supabaseAuthId) {
-              throw new Error("EMAIL_LINKED_TO_OTHER_SUPABASE");
-            }
-
-            const [linkedByEmail] = await tx
-              .update(users)
-              .set({
-                supabaseAuthId,
-                name: byEmail.name || buildDefaultName(metadataName, normalizedEmail),
-              })
-              .where(eq(users.id, byEmail.id))
-              .returning();
-
-            resolvedUser = linkedByEmail;
-          }
-        }
-
-        if (!resolvedUser) {
-          const [createdUser] = await tx
-            .insert(users)
-            .values({
-              email: normalizedEmail,
-              supabaseAuthId,
-              name: buildDefaultName(metadataName, normalizedEmail),
-              passwordHash: generatedPasswordHash,
-              role: "user",
-            })
-            .onConflictDoNothing({ target: users.email })
-            .returning();
-
-          if (createdUser) {
-            resolvedUser = createdUser;
-          } else {
-            const [existingByEmail] = await tx
-              .select()
-              .from(users)
-              .where(eq(users.email, normalizedEmail));
-
-            if (!existingByEmail) {
-              throw new Error("FAILED_TO_RESOLVE_USER_AFTER_INSERT");
-            }
-
-            if (existingByEmail.supabaseAuthId && existingByEmail.supabaseAuthId !== supabaseAuthId) {
-              throw new Error("EMAIL_LINKED_TO_OTHER_SUPABASE");
-            }
-
-            const [linkedExisting] = await tx
-              .update(users)
-              .set({ supabaseAuthId })
-              .where(eq(users.id, existingByEmail.id))
-              .returning();
-
-            resolvedUser = linkedExisting;
-          }
-        }
-
-        const [freePlan] = await tx
-          .select()
-          .from(subscriptionPlans)
-          .where(eq(subscriptionPlans.slug, "free"));
-
-        if (resolvedUser && freePlan) {
-          const now = new Date();
-          const periodEnd = new Date(now);
-          periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-          await tx
-            .insert(userSubscriptions)
-            .values({
-              userId: resolvedUser.id,
-              planId: freePlan.id,
-              status: "active",
-              currentPeriodStart: now,
-              currentPeriodEnd: periodEnd,
-            })
-            .onConflictDoNothing({ target: userSubscriptions.userId });
-        }
-
-        return resolvedUser;
-      });
-    } catch (dbError) {
-      const code = dbErrorCode(dbError);
-      console.error("POST /auth/supabase/sync database error:", {
-        code,
-        supabaseAuthId,
-        email: normalizedEmail,
-        error: dbError,
-      });
-
-      if (dbError instanceof Error && dbError.message === "EMAIL_LINKED_TO_OTHER_SUPABASE") {
-        sendError(req, res, 409, "email_linked_conflict", "El correo ya está vinculado a otra cuenta de Supabase");
-        return;
-      }
-
-      if (dbError instanceof Error && dbError.message === "FAILED_TO_RESOLVE_USER_AFTER_INSERT") {
-        sendError(req, res, 500, "user_resolution_failed", "No se pudo resolver el usuario local");
-        return;
-      }
-
-      if (code === "23505") {
-        sendError(req, res, 409, "database_conflict", dbErrorMessage(dbError), dbError);
-        return;
-      }
-
-      sendError(req, res, 500, "database_error", dbErrorMessage(dbError), dbError);
-      return;
-    }
-
-    if (!localUser) {
-      sendError(req, res, 500, "user_resolution_failed", "No se pudo resolver el usuario local");
-      return;
-    }
-
-    const token = signToken({
-      userId: localUser.id,
-      email: localUser.email,
-      role: localUser.role,
-    });
-
-    res.cookie("token", token, getAuthCookieOptions());
-
-    const [subscription] = await db
-      .select({
-        planName: subscriptionPlans.name,
-        planSlug: subscriptionPlans.slug,
-        limits: subscriptionPlans.limits,
-        status: userSubscriptions.status,
-        periodEnd: userSubscriptions.currentPeriodEnd,
-      })
-      .from(userSubscriptions)
-      .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
-      .where(eq(userSubscriptions.userId, localUser.id));
-
-    res.json({
-      user: userProfile(localUser),
-      subscription: subscription || null,
-    });
-
-    console.info("[auth:sync:success]", {
-      requestId: getRequestId(req),
-      route: req.path,
-      durationMs: Date.now() - startedAt,
-      userId: localUser.id,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Error al sincronizar sesión con Supabase";
-    const status = message.toLowerCase().includes("timeout") ? 504 : 500;
-    const durationMs = Date.now() - startedAt;
-
-    console.error("POST /auth/supabase/sync error:", err);
-    console.error("[auth:sync:timeout-metric]", {
-      requestId: getRequestId(req),
-      route: req.path,
-      durationMs,
-      timeout: status === 504,
-    });
-
-    sendError(
-      req,
-      res,
-      status,
-      status === 504 ? "supabase_validation_timeout" : "supabase_sync_error",
-      message,
-      err
-    );
   }
 });
 
@@ -789,15 +566,10 @@ authRouter.get("/auth/me", async (req, res) => {
 
       user = resolved.user;
     } else if (cookieToken) {
-      const payload = verifyToken(cookieToken);
+      const resolved = await resolveLocalUserFromSupabase(cookieToken);
 
-      if (payload) {
-        const [localByJwt] = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, payload.userId));
-
-        user = localByJwt ?? null;
+      if (resolved.user) {
+        user = resolved.user;
       }
     }
 
@@ -891,43 +663,8 @@ authRouter.put("/auth/profile", requireAuth, async (req, res) => {
   }
 });
 
-authRouter.put("/auth/password", requireAuth, async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body as {
-      currentPassword?: string;
-      newPassword?: string;
-    };
-
-    if (!currentPassword || !newPassword) {
-      res.status(400).json({ error: "Ambas contraseñas son requeridas" });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      res.status(400).json({ error: "La nueva contraseña debe tener al menos 6 caracteres" });
-      return;
-    }
-
-    const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId));
-    if (!user) {
-      res.status(404).json({ error: "Usuario no encontrado" });
-      return;
-    }
-
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!valid) {
-      res.status(401).json({ error: "La contraseña actual es incorrecta" });
-      return;
-    }
-
-    const hash = await bcrypt.hash(newPassword, 10);
-    await db.update(users).set({ passwordHash: hash }).where(eq(users.id, user.id));
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("PUT /auth/password error:", err);
-    res.status(500).json({ error: "Error al cambiar contraseña" });
-  }
+authRouter.put("/auth/password", requireAuth, async (_req, res) => {
+  res.status(400).json({ error: "Para cambiar la contraseña por favor usá la app cliente." });
 });
 
 authRouter.post("/auth/logout", (_req, res) => {

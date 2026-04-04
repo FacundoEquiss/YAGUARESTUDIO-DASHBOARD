@@ -8,6 +8,20 @@
       "when": 1775250657443,
       "tag": "0000_eminent_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775256399714,
+      "tag": "0001_deep_makkari",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775258400000,
+      "tag": "0002_brisk_jaguar",
+      "breakpoints": true
     }
   ]
 }

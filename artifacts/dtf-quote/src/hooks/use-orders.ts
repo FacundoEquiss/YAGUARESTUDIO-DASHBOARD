@@ -12,6 +12,48 @@ export interface CostItemInput {
   amount: number;
 }
 
+export interface OrderLineItem {
+  id: number;
+  orderId: number;
+  userId: number;
+  lineType: string;
+  sourceType: string | null;
+  sourceId: number | null;
+  title: string;
+  description: string | null;
+  quantity: string;
+  unitCost: string;
+  unitPrice: string;
+  totalCost: string;
+  totalPrice: string;
+  grossMargin: string;
+  affectsStock: boolean;
+  affectsFinance: boolean;
+  reportArea: string | null;
+  reportConcept: string | null;
+  supplierId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderLineInput {
+  lineType?: string;
+  sourceType?: string | null;
+  sourceId?: number | null;
+  title: string;
+  description?: string;
+  quantity?: number;
+  unitCost?: number;
+  unitPrice?: number;
+  totalCost?: number;
+  totalPrice?: number;
+  affectsStock?: boolean;
+  affectsFinance?: boolean;
+  reportArea?: string;
+  reportConcept?: string;
+  supplierId?: number | null;
+}
+
 export interface DtfPricingStampInput {
   id?: string;
   w: number;
@@ -37,9 +79,17 @@ export interface OrderItem {
   quantity: number;
   unitPrice: string;
   totalPrice: string;
+  quotedTotal?: string;
+  subtotalCost?: string;
+  subtotalPrice?: string;
+  amountPaid?: string;
+  financialStatus?: string;
   status: string;
   dueDate: string | null;
+  deliveredAt?: string | null;
+  sourceQuoteId?: string | null;
   notes: string | null;
+  lineItems?: OrderLineItem[];
   costItems: CostItem[];
   paidAmount?: string;
   expenseAmount?: string;
@@ -79,11 +129,39 @@ export interface CreateOrderData {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  quotedTotal?: number;
+  sourceQuoteId?: string;
   status?: string;
   dueDate?: string | null;
   notes?: string;
   costItems?: CostItemInput[];
+  lineItems?: OrderLineInput[];
   pricingInput?: DtfPricingInput;
+}
+
+export interface RegisterOrderPaymentData {
+  amount: number;
+  financialAccountId?: number | null;
+  paymentMethod?: string;
+  paidAt?: string;
+  notes?: string;
+}
+
+export interface RegisterOrderCostPaymentData {
+  amount: number;
+  category?: string;
+  description?: string;
+  supplierId?: number | null;
+  financialAccountId?: number | null;
+  paidAt?: string;
+  orderItemId?: number | null;
+  paymentMethod?: string;
+  reportArea?: string;
+  reportConcept?: string;
+}
+
+export interface UpsertOrderItemData extends OrderLineInput {
+  title: string;
 }
 
 export function useOrders(filters: OrdersFilters = {}) {
@@ -175,4 +253,56 @@ export async function updateOrder(id: number, data: Partial<CreateOrderData>): P
 export async function deleteOrder(id: number): Promise<{ error?: string }> {
   const { error } = await apiFetch(`/orders/${id}`, { method: "DELETE" });
   return { error };
+}
+
+export async function addOrderItem(orderId: number, data: UpsertOrderItemData): Promise<{ order?: OrderItem; error?: string }> {
+  const { data: result, error } = await apiFetch<{ order: OrderItem }>(`/orders/${orderId}/items`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  if (error) return { error };
+  return { order: result?.order };
+}
+
+export async function updateOrderItem(orderId: number, itemId: number, data: Partial<UpsertOrderItemData>): Promise<{ order?: OrderItem; error?: string }> {
+  const { data: result, error } = await apiFetch<{ order: OrderItem }>(`/orders/${orderId}/items/${itemId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+  if (error) return { error };
+  return { order: result?.order };
+}
+
+export async function deleteOrderItem(orderId: number, itemId: number): Promise<{ order?: OrderItem; error?: string }> {
+  const { data: result, error } = await apiFetch<{ order: OrderItem }>(`/orders/${orderId}/items/${itemId}`, {
+    method: "DELETE",
+  });
+  if (error) return { error };
+  return { order: result?.order };
+}
+
+export async function registerOrderPayment(orderId: number, data: RegisterOrderPaymentData): Promise<{ order?: OrderItem; error?: string }> {
+  const { data: result, error } = await apiFetch<{ order: OrderItem }>(`/orders/${orderId}/payments`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  if (error) return { error };
+  return { order: result?.order };
+}
+
+export async function registerOrderCostPayment(orderId: number, data: RegisterOrderCostPaymentData): Promise<{ order?: OrderItem; error?: string }> {
+  const { data: result, error } = await apiFetch<{ order: OrderItem }>(`/orders/${orderId}/cost-payments`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  if (error) return { error };
+  return { order: result?.order };
+}
+
+export async function markOrderDelivered(orderId: number): Promise<{ order?: OrderItem; error?: string }> {
+  const { data: result, error } = await apiFetch<{ order: OrderItem }>(`/orders/${orderId}/mark-delivered`, {
+    method: "POST",
+  });
+  if (error) return { error };
+  return { order: result?.order };
 }

@@ -1,19 +1,23 @@
 import { useState, useCallback, useEffect } from "react";
-import { useLocation } from "wouter";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   useOrders,
   useOrderStats,
   createOrder,
   updateOrder,
+  registerOrderPayment,
+  registerOrderCostPayment,
+  markOrderDelivered,
   deleteOrder,
   type OrderItem,
   type CreateOrderData,
-  type CostItemInput,
+  type OrderLineInput,
 } from "@/hooks/use-orders";
 import { useAllClients, createClient } from "@/hooks/use-clients";
+import { useProducts } from "@/hooks/use-products";
+import { useAllFinancialAccounts } from "@/hooks/use-financial-accounts";
 import { HelpTooltip } from "@/components/help-tooltip";
-import { clearOrderDraft, loadOrderDraft, saveFinanceDraft } from "@/lib/drafts";
+import { clearOrderDraft, loadOrderDraft } from "@/lib/drafts";
 import {
   Plus,
   Search,
@@ -38,6 +42,23 @@ const STATUS_OPTIONS = [
   { value: "cancelado", label: "Cancelado", color: "bg-red-500/15 text-red-400 border-red-500/20" },
 ] as const;
 
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "cash", label: "Efectivo" },
+  { value: "mercado_pago", label: "Mercado Pago" },
+  { value: "bank_transfer", label: "Transferencia" },
+  { value: "debit_card", label: "Tarjeta débito" },
+  { value: "credit_card", label: "Tarjeta crédito" },
+  { value: "other", label: "Otro" },
+] as const;
+
+const EXPENSE_CATEGORIES = [
+  { value: "materiales", label: "Materiales" },
+  { value: "envio", label: "Envío" },
+  { value: "servicios", label: "Servicios" },
+  { value: "impuestos", label: "Impuestos" },
+  { value: "otros", label: "Otros" },
+] as const;
+
 function getStatusBadge(status: string) {
   const opt = STATUS_OPTIONS.find((o) => o.value === status);
   if (!opt) return { label: status, color: "bg-gray-500/15 text-gray-400 border-gray-500/20" };
@@ -56,15 +77,74 @@ function formatShortDate(dateStr: string | null): string {
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
 }
 
-interface FormCostItem {
+type FormLineType = "manual" | "product" | "service";
+
+interface FormOrderLine {
   key: string;
+  type: FormLineType;
+  sourceId: number | null;
   title: string;
-  amount: string;
+  description: string;
+  quantity: string;
+  unitCost: string;
+  unitPrice: string;
 }
 
-let costKeyCounter = 0;
-function nextCostKey() {
-  return `cost-${++costKeyCounter}`;
+let lineKeyCounter = 0;
+function nextLineKey() {
+  return `line-${++lineKeyCounter}`;
+}
+
+function toNumericString(value: unknown, fallback = 0): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? String(parsed) : String(fallback);
+}
+
+function parseLineNumber(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+  return parsed;
+}
+
+function resolveFormLineType(lineType?: string | null, sourceType?: string | null): FormLineType {
+  if (sourceType === "product" || lineType === "product_line") {
+    return "product";
+  }
+
+  if (sourceType === "service" || lineType === "service_line") {
+    return "service";
+  }
+
+  return "manual";
+}
+
+function createEmptyFormLine(type: FormLineType = "manual"): FormOrderLine {
+  return {
+    key: nextLineKey(),
+    type,
+    sourceId: null,
+    title: "",
+    description: "",
+    quantity: "1",
+    unitCost: "0",
+    unitPrice: "0",
+  };
+}
+
+function calculateLineTotals(line: FormOrderLine) {
+  const quantity = Math.max(0, parseLineNumber(line.quantity));
+  const unitCost = Math.max(0, parseLineNumber(line.unitCost));
+  const unitPrice = Math.max(0, parseLineNumber(line.unitPrice));
+
+  return {
+    quantity,
+    unitCost,
+    unitPrice,
+    totalCost: quantity * unitCost,
+    totalPrice: quantity * unitPrice,
+  };
 }
 
 interface OrderFormProps {
@@ -77,6 +157,7 @@ interface OrderFormProps {
 function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
   const isEdit = !!order;
   const { clients: allClients } = useAllClients();
+  const { products } = useProducts();
   const [selectedClientId, setSelectedClientId] = useState<number | null>(order?.clientId ?? draft?.clientId ?? null);
   const [clientName, setClientName] = useState(order?.clientName ?? draft?.clientName ?? "");
   const [title, setTitle] = useState(order?.title ?? draft?.title ?? "");
@@ -88,24 +169,73 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const initialCosts: FormCostItem[] =
-    order && order.costItems && order.costItems.length > 0
-      ? order.costItems.map((ci) => ({
-          key: nextCostKey(),
-          title: ci.title,
-          amount: String(Number(ci.amount)),
-        }))
-      : draft?.costItems && draft.costItems.length > 0
-        ? draft.costItems.map((ci) => ({
-            key: nextCostKey(),
-            title: ci.title,
-            amount: String(Number(ci.amount)),
-          }))
-      : [{ key: nextCostKey(), title: "", amount: "" }];
+  const initialLines: FormOrderLine[] = (() => {
+    if (order?.lineItems && order.lineItems.length > 0) {
+      return order.lineItems.map((line) => ({
+        key: nextLineKey(),
+        type: resolveFormLineType(line.lineType, line.sourceType),
+        sourceId: line.sourceId ?? null,
+        title: line.title,
+        description: line.description || "",
+        quantity: toNumericString(line.quantity, 1),
+        unitCost: toNumericString(line.unitCost, 0),
+        unitPrice: toNumericString(line.unitPrice, 0),
+      }));
+    }
 
-  const [costItems, setCostItems] = useState<FormCostItem[]>(initialCosts);
+    if (draft?.lineItems && draft.lineItems.length > 0) {
+      return draft.lineItems.map((line) => ({
+        key: nextLineKey(),
+        type: resolveFormLineType(line.lineType, line.sourceType),
+        sourceId: line.sourceId ?? null,
+        title: line.title,
+        description: line.description || "",
+        quantity: toNumericString(line.quantity, 1),
+        unitCost: toNumericString(line.unitCost, 0),
+        unitPrice: toNumericString(line.unitPrice, 0),
+      }));
+    }
 
-  const totalPrice = costItems.reduce((sum, ci) => sum + (Number(ci.amount) || 0), 0);
+    if (order?.costItems && order.costItems.length > 0) {
+      return order.costItems.map((line) => ({
+        key: nextLineKey(),
+        type: "manual" as const,
+        sourceId: null,
+        title: line.title,
+        description: "",
+        quantity: "1",
+        unitCost: "0",
+        unitPrice: toNumericString(line.amount, 0),
+      }));
+    }
+
+    if (draft?.costItems && draft.costItems.length > 0) {
+      return draft.costItems.map((line) => ({
+        key: nextLineKey(),
+        type: "manual" as const,
+        sourceId: null,
+        title: line.title,
+        description: "",
+        quantity: "1",
+        unitCost: "0",
+        unitPrice: toNumericString(line.amount, 0),
+      }));
+    }
+
+    return [createEmptyFormLine()];
+  })();
+
+  const [orderLines, setOrderLines] = useState<FormOrderLine[]>(initialLines);
+
+  const { totalCost, totalPrice } = orderLines.reduce(
+    (acc, line) => {
+      const totals = calculateLineTotals(line);
+      acc.totalCost += totals.totalCost;
+      acc.totalPrice += totals.totalPrice;
+      return acc;
+    },
+    { totalCost: 0, totalPrice: 0 },
+  );
 
   const handleClientSelect = (val: string) => {
     if (val === "") {
@@ -120,18 +250,98 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
     }
   };
 
-  const addCostItem = () => {
-    setCostItems([...costItems, { key: nextCostKey(), title: "", amount: "" }]);
-  };
-
-  const updateCostItem = (key: string, field: "title" | "amount", value: string) => {
-    setCostItems(costItems.map((ci) => (ci.key === key ? { ...ci, [field]: value } : ci)));
-  };
-
-  const removeCostItem = (key: string) => {
-    if (costItems.length > 1) {
-      setCostItems(costItems.filter((ci) => ci.key !== key));
+  const applyProductSelection = (line: FormOrderLine, sourceId: number | null): FormOrderLine => {
+    if (!sourceId) {
+      return {
+        ...line,
+        sourceId: null,
+      };
     }
+
+    const selected = products.find((product) => product.id === sourceId);
+    if (!selected) {
+      return {
+        ...line,
+        sourceId,
+      };
+    }
+
+    return {
+      ...line,
+      sourceId,
+      title: selected.name,
+      unitCost: toNumericString(selected.costPrice, 0),
+      unitPrice: toNumericString(selected.salePrice, 0),
+    };
+  };
+
+  const addOrderLine = () => {
+    setOrderLines((prev) => [...prev, createEmptyFormLine()]);
+  };
+
+  const updateOrderLine = (key: string, field: keyof FormOrderLine, value: string | number | null) => {
+    setOrderLines((prev) =>
+      prev.map((line) => {
+        if (line.key !== key) {
+          return line;
+        }
+
+        return {
+          ...line,
+          [field]: value,
+        } as FormOrderLine;
+      }),
+    );
+  };
+
+  const changeLineType = (key: string, type: FormLineType) => {
+    setOrderLines((prev) =>
+      prev.map((line) => {
+        if (line.key !== key) {
+          return line;
+        }
+
+        if (type === "product") {
+          const preferredProductId = line.sourceId ?? products[0]?.id ?? null;
+          const productLine: FormOrderLine = {
+            ...line,
+            type,
+            sourceId: preferredProductId,
+            quantity: line.quantity || "1",
+          };
+          return applyProductSelection(productLine, preferredProductId);
+        }
+
+        return {
+          ...line,
+          type,
+          sourceId: null,
+          title: line.title || (type === "service" ? "Servicio" : ""),
+        };
+      }),
+    );
+  };
+
+  const changeLineProduct = (key: string, sourceId: number | null) => {
+    setOrderLines((prev) =>
+      prev.map((line) => {
+        if (line.key !== key) {
+          return line;
+        }
+
+        return applyProductSelection(line, sourceId);
+      }),
+    );
+  };
+
+  const removeOrderLine = (key: string) => {
+    setOrderLines((prev) => {
+      if (prev.length <= 1) {
+        return prev;
+      }
+
+      return prev.filter((line) => line.key !== key);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -141,12 +351,46 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
       return;
     }
 
-    const validCosts: CostItemInput[] = costItems
-      .filter((ci) => ci.title.trim().length > 0)
-      .map((ci) => ({ title: ci.title.trim(), amount: Math.max(0, Number(ci.amount) || 0) }));
+    const validLines: OrderLineInput[] = [];
 
-    if (validCosts.length === 0) {
-      setError("Agregá al menos un ítem de costo con título");
+    for (const line of orderLines) {
+      const totals = calculateLineTotals(line);
+      const selectedProduct =
+        line.type === "product" && line.sourceId
+          ? products.find((product) => product.id === line.sourceId)
+          : null;
+
+      const resolvedTitle = line.title.trim() || selectedProduct?.name || "";
+      if (!resolvedTitle || totals.quantity <= 0) {
+        continue;
+      }
+
+      const sourceType = line.type === "manual" ? "manual" : line.type;
+      const lineType =
+        line.type === "product"
+          ? "product_line"
+          : line.type === "service"
+            ? "service_line"
+            : "manual_line";
+
+      validLines.push({
+        lineType,
+        sourceType,
+        sourceId: line.type === "manual" ? null : line.sourceId,
+        title: resolvedTitle,
+        description: line.description.trim() || undefined,
+        quantity: totals.quantity,
+        unitCost: totals.unitCost,
+        unitPrice: totals.unitPrice,
+        totalCost: totals.totalCost,
+        totalPrice: totals.totalPrice,
+        affectsStock: line.type === "product",
+        affectsFinance: true,
+      });
+    }
+
+    if (validLines.length === 0) {
+      setError("Agregá al menos una línea válida con título y cantidad");
       return;
     }
 
@@ -180,10 +424,11 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
       quantity: 1,
       unitPrice: 0,
       totalPrice,
+      quotedTotal: totalPrice,
       status,
       dueDate: dueDate || null,
       notes: notes.trim() || undefined,
-      costItems: validCosts,
+      lineItems: validLines,
       pricingInput: draft?.pricingInput,
     };
 
@@ -269,49 +514,144 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
 
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block flex items-center gap-1.5">
-              Ítems del pedido *
-              <HelpTooltip text="Cargá el detalle económico que va a quedar dentro del pedido. Puede ser DTF, prendas, envío u otros conceptos." iconSize={12} />
+              Líneas del pedido *
+              <HelpTooltip text="Podés mezclar líneas manuales, productos y servicios. Cada línea impacta en costos, precio final y trazabilidad del pedido." iconSize={12} />
             </label>
-            <div className="space-y-2">
-              {costItems.map((ci, idx) => (
-                <div key={ci.key} className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={ci.title}
-                    onChange={(e) => updateCostItem(ci.key, "title", e.target.value)}
-                    placeholder={idx === 0 ? "Ej: Remera" : "Ej: DTF, Uber, etc."}
-                    className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
-                  />
-                  <div className="relative w-28">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={ci.amount}
-                      onChange={(e) => updateCostItem(ci.key, "amount", e.target.value)}
-                      placeholder="0"
-                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
-                    />
+            <div className="space-y-3">
+              {orderLines.map((line, index) => {
+                const selectedProduct =
+                  line.type === "product" && line.sourceId
+                    ? products.find((product) => product.id === line.sourceId)
+                    : null;
+                const totals = calculateLineTotals(line);
+
+                return (
+                  <div key={line.key} className="rounded-xl border border-border/70 bg-white/3 p-3 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      <div className="sm:col-span-4">
+                        <select
+                          value={line.type}
+                          onChange={(e) => changeLineType(line.key, e.target.value as FormLineType)}
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                        >
+                          <option value="manual">Manual</option>
+                          <option value="product">Producto</option>
+                          <option value="service">Servicio</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-8">
+                        {line.type === "product" ? (
+                          <select
+                            value={line.sourceId ?? ""}
+                            onChange={(e) => changeLineProduct(line.key, e.target.value ? Number(e.target.value) : null)}
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                          >
+                            <option value="">Seleccionar producto</option>
+                            {products.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={line.title}
+                            onChange={(e) => updateOrderLine(line.key, "title", e.target.value)}
+                            placeholder={line.type === "service" ? "Ej: Estampado, logística, diseño" : `Ej: Línea ${index + 1}`}
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {line.type === "product" && (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={line.title}
+                          onChange={(e) => updateOrderLine(line.key, "title", e.target.value)}
+                          placeholder="Nombre visible de la línea"
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                        />
+                        {selectedProduct && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Stock actual: {Number(selectedProduct.currentStock)} {selectedProduct.unit}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[11px] text-muted-foreground block mb-1">Cantidad</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={line.quantity}
+                          onChange={(e) => updateOrderLine(line.key, "quantity", e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-muted-foreground block mb-1">Costo unit.</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={line.unitCost}
+                          onChange={(e) => updateOrderLine(line.key, "unitCost", e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-muted-foreground block mb-1">Precio unit.</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={line.unitPrice}
+                          onChange={(e) => updateOrderLine(line.key, "unitPrice", e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <input
+                        type="text"
+                        value={line.description}
+                        onChange={(e) => updateOrderLine(line.key, "description", e.target.value)}
+                        placeholder="Descripción opcional"
+                        className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeOrderLine(line.key)}
+                        disabled={orderLines.length <= 1}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-20 disabled:hover:text-muted-foreground disabled:hover:bg-transparent transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between px-2 text-xs">
+                      <span className="text-muted-foreground">Subtotal línea</span>
+                      <span className="font-semibold text-foreground">{formatCurrency(totals.totalPrice)}</span>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeCostItem(ci.key)}
-                    disabled={costItems.length <= 1}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-20 disabled:hover:text-muted-foreground disabled:hover:bg-transparent transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <button
               type="button"
-              onClick={addCostItem}
+              onClick={addOrderLine}
               className="mt-2 flex items-center gap-1.5 text-xs text-primary font-semibold hover:text-primary/80 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              Agregar ítem
+              Agregar línea
             </button>
           </div>
 
@@ -329,9 +669,15 @@ function OrderFormModal({ order, draft, onClose, onSaved }: OrderFormProps) {
             </label>
           )}
 
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
-            <span className="text-sm font-medium text-muted-foreground">Total del pedido</span>
-            <span className="text-base font-display font-bold text-primary">{formatCurrency(totalPrice)}</span>
+          <div className="grid grid-cols-2 gap-3 px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Costo estimado</p>
+              <p className="text-sm font-semibold text-foreground">{formatCurrency(totalCost)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-medium text-muted-foreground">Total del pedido</p>
+              <p className="text-base font-display font-bold text-primary">{formatCurrency(totalPrice)}</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -397,14 +743,19 @@ interface OrderDetailProps {
   onEdit: () => void;
   onDelete: () => void;
   onRegisterPayment: () => void;
+  onRegisterCost: () => void;
   onMarkDelivered: () => void;
 }
 
-function OrderDetailModal({ order, onClose, onEdit, onDelete, onRegisterPayment, onMarkDelivered }: OrderDetailProps) {
+function OrderDetailModal({ order, onClose, onEdit, onDelete, onRegisterPayment, onRegisterCost, onMarkDelivered }: OrderDetailProps) {
   const badge = getStatusBadge(order.status);
   const [deleting, setDeleting] = useState(false);
   const paidAmount = Number(order.paidAmount || 0);
   const balanceDue = Number(order.balanceDue || order.totalPrice || 0);
+  const lineBreakdown =
+    order.lineItems && order.lineItems.length > 0
+      ? order.lineItems.map((line) => ({ id: line.id, title: line.title, amount: Number(line.totalPrice || 0) }))
+      : order.costItems.map((line) => ({ id: line.id, title: line.title, amount: Number(line.amount || 0) }));
 
   const handleDelete = async () => {
     if (!confirm("¿Estás seguro de eliminar este pedido?")) return;
@@ -412,7 +763,7 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete, onRegisterPayment,
     await onDelete();
   };
 
-  const hasCostItems = order.costItems && order.costItems.length > 0;
+  const hasCostItems = lineBreakdown.length > 0;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center">
@@ -467,10 +818,10 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete, onRegisterPayment,
               <div>
                 <p className="text-xs text-muted-foreground font-medium mb-2">Desglose de costos</p>
                 <div className="space-y-1.5">
-                  {order.costItems.map((ci) => (
-                    <div key={ci.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-border/50">
-                      <span className="text-sm text-foreground">{ci.title}</span>
-                      <span className="text-sm font-semibold text-foreground">{formatCurrency(Number(ci.amount))}</span>
+                  {lineBreakdown.map((line) => (
+                    <div key={line.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-border/50">
+                      <span className="text-sm text-foreground">{line.title}</span>
+                      <span className="text-sm font-semibold text-foreground">{formatCurrency(line.amount)}</span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 mt-2">
@@ -512,18 +863,25 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete, onRegisterPayment,
             )}
           </div>
 
-          <div className="flex gap-3 pt-2 border-t border-border">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border">
             <button
               onClick={onRegisterPayment}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-sm font-bold hover:bg-emerald-500/15 transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-sm font-bold hover:bg-emerald-500/15 transition-colors"
             >
               <DollarSign className="w-4 h-4" />
               Registrar pago
             </button>
+            <button
+              onClick={onRegisterCost}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm font-bold hover:bg-red-500/15 transition-colors"
+            >
+              <DollarSign className="w-4 h-4" />
+              Registrar costo
+            </button>
             {order.status !== "entregado" && (
               <button
                 onClick={onMarkDelivered}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-white/5 transition-colors"
+                className="px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-white/5 transition-colors"
               >
                 Marcar entregado
               </button>
@@ -552,8 +910,371 @@ function OrderDetailModal({ order, onClose, onEdit, onDelete, onRegisterPayment,
   );
 }
 
+interface PaymentModalProps {
+  order: OrderItem;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function RegisterOrderPaymentModal({ order, onClose, onSaved }: PaymentModalProps) {
+  const { accounts } = useAllFinancialAccounts();
+  const [amount, setAmount] = useState(Math.max(0, Number(order.balanceDue || order.totalPrice || 0)) || Number(order.totalPrice || 0));
+  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHOD_OPTIONS)[number]["value"]>("cash");
+  const [financialAccountId, setFinancialAccountId] = useState<number | null>(null);
+  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (amount <= 0) {
+      setError("El monto debe ser mayor a 0");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const result = await registerOrderPayment(order.id, {
+      amount,
+      paymentMethod,
+      financialAccountId: financialAccountId || undefined,
+      paidAt: paidAt || undefined,
+      notes: notes.trim() || undefined,
+    });
+
+    setSaving(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    onSaved();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md mx-4 bg-card border border-border rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-lg font-display font-bold text-foreground">Registrar pago</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
+          )}
+
+          <div className="text-xs text-muted-foreground">
+            Pedido #{order.id} · Pendiente: <span className="font-semibold text-foreground">{formatCurrency(Number(order.balanceDue || 0))}</span>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Monto *</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={amount || ""}
+              onChange={(e) => setAmount(Number(e.target.value))}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Medio de pago</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as (typeof PAYMENT_METHOD_OPTIONS)[number]["value"])}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            >
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {accounts.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">Cuenta financiera</label>
+              <select
+                value={financialAccountId ?? ""}
+                onChange={(e) => setFinancialAccountId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+              >
+                <option value="">Sin cuenta</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Fecha</label>
+            <input
+              type="date"
+              value={paidAt}
+              onChange={(e) => setPaidAt(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Notas</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={`Cobro pedido #${order.id}`}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-white/5 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {saving ? "Guardando..." : "Registrar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface CostPaymentModalProps {
+  order: OrderItem;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function RegisterOrderCostPaymentModal({ order, onClose, onSaved }: CostPaymentModalProps) {
+  const { accounts } = useAllFinancialAccounts();
+  const lineOptions =
+    order.lineItems && order.lineItems.length > 0
+      ? order.lineItems.map((line) => ({ id: line.id, title: line.title }))
+      : order.costItems.map((line) => ({ id: line.id, title: line.title }));
+  const [amount, setAmount] = useState(0);
+  const [category, setCategory] = useState<(typeof EXPENSE_CATEGORIES)[number]["value"]>("materiales");
+  const [description, setDescription] = useState(`Costo pedido #${order.id}`);
+  const [financialAccountId, setFinancialAccountId] = useState<number | null>(null);
+  const [orderItemId, setOrderItemId] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"" | (typeof PAYMENT_METHOD_OPTIONS)[number]["value"]>("");
+  const [reportArea, setReportArea] = useState("");
+  const [reportConcept, setReportConcept] = useState("");
+  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (amount <= 0) {
+      setError("El monto debe ser mayor a 0");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const result = await registerOrderCostPayment(order.id, {
+      amount,
+      category,
+      description: description.trim() || undefined,
+      financialAccountId: financialAccountId || undefined,
+      orderItemId: orderItemId || undefined,
+      paymentMethod: paymentMethod || undefined,
+      reportArea: reportArea.trim() || undefined,
+      reportConcept: reportConcept.trim() || undefined,
+      paidAt: paidAt || undefined,
+    });
+
+    setSaving(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    onSaved();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md mx-4 bg-card border border-border rounded-2xl shadow-2xl max-h-[90dvh] overflow-y-auto custom-scrollbar">
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-lg font-display font-bold text-foreground">Registrar costo pagado</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Monto *</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={amount || ""}
+              onChange={(e) => setAmount(Number(e.target.value))}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Categoría</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as (typeof EXPENSE_CATEGORIES)[number]["value"])}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            >
+              {EXPENSE_CATEGORIES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Línea del pedido</label>
+            <select
+              value={orderItemId ?? ""}
+              onChange={(e) => setOrderItemId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            >
+              <option value="">Sin línea específica</option>
+              {lineOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Medio de pago</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as "" | (typeof PAYMENT_METHOD_OPTIONS)[number]["value"])}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            >
+              <option value="">Sin especificar</option>
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {accounts.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">Cuenta financiera</label>
+              <select
+                value={financialAccountId ?? ""}
+                onChange={(e) => setFinancialAccountId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+              >
+                <option value="">Sin cuenta</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">Área reporte</label>
+              <input
+                type="text"
+                value={reportArea}
+                onChange={(e) => setReportArea(e.target.value)}
+                placeholder="Producción"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">Concepto reporte</label>
+              <input
+                type="text"
+                value={reportConcept}
+                onChange={(e) => setReportConcept(e.target.value)}
+                placeholder="Insumos"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Fecha</label>
+            <input
+              type="date"
+              value={paidAt}
+              onChange={(e) => setPaidAt(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Descripción</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-border text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-white/5 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {saving ? "Guardando..." : "Registrar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function OrdersPage() {
-  const [, setLocation] = useLocation();
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -574,6 +1295,8 @@ export function OrdersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editOrder, setEditOrder] = useState<OrderItem | null>(null);
   const [detailOrder, setDetailOrder] = useState<OrderItem | null>(null);
+  const [paymentOrder, setPaymentOrder] = useState<OrderItem | null>(null);
+  const [costPaymentOrder, setCostPaymentOrder] = useState<OrderItem | null>(null);
   const [draftOrder, setDraftOrder] = useState<Partial<CreateOrderData> | null>(null);
 
   const handleSearch = useCallback(() => {
@@ -585,6 +1308,8 @@ export function OrdersPage() {
     setShowForm(false);
     setEditOrder(null);
     setDetailOrder(null);
+    setPaymentOrder(null);
+    setCostPaymentOrder(null);
     setDraftOrder(null);
     refresh();
     stats.refresh();
@@ -612,25 +1337,21 @@ export function OrdersPage() {
   }, [detailOrder, refresh, stats]);
 
   const handleRegisterPayment = useCallback((order: OrderItem) => {
-    const pendingAmount = Math.max(0, Number(order.balanceDue || order.totalPrice || 0));
-    saveFinanceDraft({
-      type: "income",
-      category: "venta",
-      amount: pendingAmount > 0 ? pendingAmount : Number(order.totalPrice),
-      clientId: order.clientId ?? undefined,
-      orderId: order.id,
-      description: `Pago pedido #${order.id}${order.title ? ` - ${order.title}` : ""}`,
-    });
     setDetailOrder(null);
-    setLocation("/finance");
-  }, [setLocation]);
+    setPaymentOrder(order);
+  }, []);
+
+  const handleRegisterCost = useCallback((order: OrderItem) => {
+    setDetailOrder(null);
+    setCostPaymentOrder(order);
+  }, []);
 
   const handleMarkDelivered = useCallback(async () => {
     if (!detailOrder) {
       return;
     }
 
-    await updateOrder(detailOrder.id, { status: "entregado" });
+    await markOrderDelivered(detailOrder.id);
     setDetailOrder(null);
     refresh();
     stats.refresh();
@@ -751,7 +1472,7 @@ export function OrdersPage() {
           <div className="divide-y divide-border">
             {orders.map((order) => {
               const badge = getStatusBadge(order.status);
-              const costCount = order.costItems?.length || 0;
+              const costCount = order.lineItems?.length || order.costItems?.length || 0;
               return (
                 <button
                   key={order.id}
@@ -862,7 +1583,24 @@ export function OrdersPage() {
           }}
           onDelete={handleDeleteFromDetail}
           onRegisterPayment={() => handleRegisterPayment(detailOrder)}
+          onRegisterCost={() => handleRegisterCost(detailOrder)}
           onMarkDelivered={handleMarkDelivered}
+        />
+      )}
+
+      {paymentOrder && (
+        <RegisterOrderPaymentModal
+          order={paymentOrder}
+          onClose={() => setPaymentOrder(null)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      {costPaymentOrder && (
+        <RegisterOrderCostPaymentModal
+          order={costPaymentOrder}
+          onClose={() => setCostPaymentOrder(null)}
+          onSaved={handleSaved}
         />
       )}
     </div>

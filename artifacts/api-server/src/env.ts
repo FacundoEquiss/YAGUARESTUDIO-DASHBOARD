@@ -100,11 +100,11 @@ export function buildRuntimeEnv(source: NodeJS.ProcessEnv = process.env): Runtim
   }
 
   if (isHosted && !runtimeEnv.supabaseUrl) {
-    errors.push("SUPABASE_URL is required in production when using Google Auth.");
+    errors.push("SUPABASE_URL is required in production for auth.");
   }
 
   if (isHosted && !runtimeEnv.supabaseAnonKey) {
-    errors.push("SUPABASE_ANON_KEY is required in production when using Google Auth.");
+    errors.push("SUPABASE_ANON_KEY is required in production for auth.");
   }
 
   if (errors.length > 0) {

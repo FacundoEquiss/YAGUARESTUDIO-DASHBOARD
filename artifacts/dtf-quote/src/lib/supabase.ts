@@ -32,7 +32,7 @@ function getOrCreateSupabaseClient(): BrowserSupabaseClient {
       flowType: "pkce",
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false,
       storageKey,
       storage: window.localStorage,
     },

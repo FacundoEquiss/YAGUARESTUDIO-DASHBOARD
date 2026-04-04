@@ -2,7 +2,7 @@ import { pgTable, serial, integer, varchar, timestamp, text, numeric } from "dri
 import { users } from "./users";
 import { clients } from "./clients";
 import { suppliers } from "./suppliers";
-import { orders } from "./orders";
+import { orders, orderItems, orderPayments } from "./orders";
 import { financialAccounts } from "./financial-accounts";
 
 export const transactions = pgTable("transactions", {
@@ -12,9 +12,14 @@ export const transactions = pgTable("transactions", {
   amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
   description: text("description"),
   category: varchar("category", { length: 50 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }),
+  reportArea: varchar("report_area", { length: 100 }),
+  reportConcept: varchar("report_concept", { length: 100 }),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
   supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
   orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+  orderItemId: integer("order_item_id").references(() => orderItems.id, { onDelete: "set null" }),
+  orderPaymentId: integer("order_payment_id").references(() => orderPayments.id, { onDelete: "set null" }),
   financialAccountId: integer("financial_account_id").references(() => financialAccounts.id, { onDelete: "set null" }),
   date: timestamp("date").notNull().defaultNow(),
   deletedAt: timestamp("deleted_at"),

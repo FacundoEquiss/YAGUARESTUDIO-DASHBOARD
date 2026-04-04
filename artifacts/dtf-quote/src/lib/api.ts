@@ -12,7 +12,6 @@ const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL);
 const RETRYABLE_AUTH_PATHS = new Set([
   "/auth/login",
   "/auth/register",
-  "/auth/supabase/sync",
 ]);
 
 function sleep(ms: number): Promise<void> {

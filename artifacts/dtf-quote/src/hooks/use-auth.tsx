@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { getStorage, setStorage } from "@/lib/storage";
 import { apiFetch, waitForApiReady } from "@/lib/api";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export interface AuthUser {
   id: string;
@@ -26,6 +26,7 @@ export interface SubscriptionInfo {
 }
 
 const SESSION_KEY = "dtf:session";
+const POST_AUTH_WELCOME_KEY = "dtf:post-auth-welcome";
 
 interface ApiUser {
   id: number;
@@ -66,14 +67,12 @@ interface AuthContextValue {
     email: string;
     password: string;
     name: string;
-    lastName: string;
-    username: string;
-    birthDate: string;
-    phone: string;
-    businessName: string;
+    lastName?: string;
+    username?: string;
+    birthDate?: string;
+    phone?: string;
+    businessName?: string;
   }) => Promise<string | null>;
-  signInWithGoogle: (nextPath?: string) => Promise<string | null>;
-  syncSupabaseSession: (accessToken: string) => Promise<string | null>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => void;
@@ -130,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data?.user) {
       setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
+      setStorage(POST_AUTH_WELCOME_KEY, { kind: "login", ts: Date.now() });
 
       const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me");
       setSubscription(meRes.data?.subscription || null);
@@ -141,11 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string;
     password: string;
     name: string;
-    lastName: string;
-    username: string;
-    birthDate: string;
-    phone: string;
-    businessName: string;
+    lastName?: string;
+    username?: string;
+    birthDate?: string;
+    phone?: string;
+    businessName?: string;
   }): Promise<string | null> => {
     const apiReady = await waitForApiReady();
     if (!apiReady) {
@@ -160,67 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data?.user) {
       setCurrentUser(mapUser(data.user));
       setStorage(SESSION_KEY, "api");
+      setStorage(POST_AUTH_WELCOME_KEY, { kind: "register", ts: Date.now() });
 
       const meRes = await apiFetch<{ subscription: SubscriptionInfo | null }>("/auth/me");
       setSubscription(meRes.data?.subscription || null);
     }
-    return null;
-  }, []);
-
-  const signInWithGoogle = useCallback(async (nextPath = "/dashboard"): Promise<string | null> => {
-    if (!isSupabaseConfigured || !supabase) {
-      return "Supabase Auth no está configurado en el frontend";
-    }
-
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: redirectTo.toString(),
-        queryParams: {
-          prompt: "select_account",
-        },
-        skipBrowserRedirect: false,
-      },
-    });
-
-    if (error) {
-      return error.message || "No se pudo iniciar sesión con Google";
-    }
-
-    return null;
-  }, []);
-
-  const syncSupabaseSession = useCallback(async (accessToken: string): Promise<string | null> => {
-    if (!accessToken) {
-      return "No se recibió un token válido de Supabase";
-    }
-
-    const apiReady = await waitForApiReady();
-    if (!apiReady) {
-      return "El servidor está despertando. Probá de nuevo en unos segundos.";
-    }
-
-    const { data, error } = await apiFetch<{ user: ApiUser; subscription: SubscriptionInfo | null }>("/auth/supabase/sync", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (error) {
-      return error;
-    }
-
-    if (!data?.user) {
-      return "No se pudo sincronizar el usuario local";
-    }
-
-    setCurrentUser(mapUser(data.user));
-    setSubscription(data.subscription || null);
-    setStorage(SESSION_KEY, "api");
-
     return null;
   }, []);
 
@@ -249,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, signInWithGoogle, syncSupabaseSession, logout, refreshSession, updateProfile }}>
+    <AuthContext.Provider value={{ currentUser, subscription, loading, login, register, logout, refreshSession, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

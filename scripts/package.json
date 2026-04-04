@@ -9,6 +9,8 @@
     "db:reset-users": "tsx ./src/reset-and-seed-demo.ts reset-users",
     "db:seed-demo": "tsx ./src/reset-and-seed-demo.ts seed-demo",
     "db:reset-and-seed-demo": "tsx ./src/reset-and-seed-demo.ts reset-and-seed-demo",
+    "db:orders-cutover:dry-run": "tsx ./src/historical-cutover.ts dry-run",
+    "db:orders-cutover:apply": "tsx ./src/historical-cutover.ts apply",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

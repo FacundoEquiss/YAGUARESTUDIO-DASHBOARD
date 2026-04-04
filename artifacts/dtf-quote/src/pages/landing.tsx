@@ -151,7 +151,7 @@ export function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex items-center justify-center"
+              className="flex flex-col sm:flex-row items-center justify-center gap-3"
             >
               <button
                 onClick={() => document.getElementById("herramientas")?.scrollIntoView({ behavior: "smooth" })}
@@ -159,6 +159,14 @@ export function LandingPage() {
               >
                 Ver herramientas
                 <ChevronDown className="w-5 h-5" />
+              </button>
+
+              <button
+                onClick={() => setLocation(currentUser ? "/dashboard" : "/auth?next=/dashboard")}
+                className="px-8 py-3.5 rounded-2xl bg-primary text-primary-foreground text-base font-bold hover:opacity-90 transition-all shadow-md shadow-primary/25 flex items-center gap-2"
+              >
+                Ir al dashboard
+                <ArrowRight className="w-5 h-5" />
               </button>
             </motion.div>
           </div>

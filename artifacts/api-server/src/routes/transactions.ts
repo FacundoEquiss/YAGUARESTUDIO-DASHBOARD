@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, transactions, clients, suppliers, orders, financialAccounts } from "@workspace/db";
+import { db, transactions, clients, suppliers, orders, financialAccounts, orderItems, orderPayments } from "@workspace/db";
 import { eq, and, isNull, desc, asc, ilike, sql, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -73,9 +73,14 @@ transactionsRouter.get("/transactions", requireAuth, async (req, res) => {
           amount: transactions.amount,
           description: transactions.description,
           category: transactions.category,
+          paymentMethod: transactions.paymentMethod,
+          reportArea: transactions.reportArea,
+          reportConcept: transactions.reportConcept,
           clientId: transactions.clientId,
           supplierId: transactions.supplierId,
           orderId: transactions.orderId,
+          orderItemId: transactions.orderItemId,
+          orderPaymentId: transactions.orderPaymentId,
           financialAccountId: transactions.financialAccountId,
           date: transactions.date,
           createdAt: transactions.createdAt,
@@ -234,7 +239,22 @@ transactionsRouter.get("/transactions/balances", requireAuth, async (req, res) =
 transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { type, amount, description, category, clientId, supplierId, orderId, financialAccountId, date } = req.body;
+    const {
+      type,
+      amount,
+      description,
+      category,
+      paymentMethod,
+      reportArea,
+      reportConcept,
+      clientId,
+      supplierId,
+      orderId,
+      orderItemId,
+      orderPaymentId,
+      financialAccountId,
+      date,
+    } = req.body;
 
     if (!type || !isValidType(type)) {
       res.status(400).json({ error: "Tipo inválido (income o expense)" });
@@ -285,6 +305,28 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
       }
     }
 
+    let validOrderItemId: number | null = null;
+    if (orderItemId) {
+      const parsed = Number(orderItemId);
+      if (!isNaN(parsed) && parsed > 0) {
+        const [item] = await db.select({ id: orderItems.id }).from(orderItems)
+          .where(and(eq(orderItems.id, parsed), eq(orderItems.userId, userId), isNull(orderItems.deletedAt)));
+        if (!item) { res.status(400).json({ error: "Línea de pedido no encontrada" }); return; }
+        validOrderItemId = parsed;
+      }
+    }
+
+    let validOrderPaymentId: number | null = null;
+    if (orderPaymentId) {
+      const parsed = Number(orderPaymentId);
+      if (!isNaN(parsed) && parsed > 0) {
+        const [payment] = await db.select({ id: orderPayments.id }).from(orderPayments)
+          .where(and(eq(orderPayments.id, parsed), eq(orderPayments.userId, userId), isNull(orderPayments.deletedAt)));
+        if (!payment) { res.status(400).json({ error: "Pago de pedido no encontrado" }); return; }
+        validOrderPaymentId = parsed;
+      }
+    }
+
     let validFinancialAccountId: number | null = null;
     if (financialAccountId) {
       const parsed = Number(financialAccountId);
@@ -304,9 +346,14 @@ transactionsRouter.post("/transactions", requireAuth, async (req, res) => {
         amount: parsedAmount.toFixed(2),
         description: description?.trim() || null,
         category,
+        paymentMethod: paymentMethod?.trim() || null,
+        reportArea: reportArea?.trim() || null,
+        reportConcept: reportConcept?.trim() || null,
         clientId: validClientId,
         supplierId: validSupplierId,
         orderId: validOrderId,
+        orderItemId: validOrderItemId,
+        orderPaymentId: validOrderPaymentId,
         financialAccountId: validFinancialAccountId,
         date: date ? new Date(date) : new Date(),
       })
@@ -330,7 +377,22 @@ transactionsRouter.put("/transactions/:id", requireAuth, async (req, res) => {
 
     if (!existing) { res.status(404).json({ error: "Transacción no encontrada" }); return; }
 
-    const { type, amount, description, category, clientId, supplierId, orderId, financialAccountId, date } = req.body;
+    const {
+      type,
+      amount,
+      description,
+      category,
+      paymentMethod,
+      reportArea,
+      reportConcept,
+      clientId,
+      supplierId,
+      orderId,
+      orderItemId,
+      orderPaymentId,
+      financialAccountId,
+      date,
+    } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (type !== undefined) {
@@ -348,6 +410,9 @@ transactionsRouter.put("/transactions/:id", requireAuth, async (req, res) => {
       if (!isValidCategoryForType(category, effectiveType)) { res.status(400).json({ error: "Categoría inválida para este tipo" }); return; }
       updates.category = category;
     }
+    if (paymentMethod !== undefined) updates.paymentMethod = paymentMethod?.trim() || null;
+    if (reportArea !== undefined) updates.reportArea = reportArea?.trim() || null;
+    if (reportConcept !== undefined) updates.reportConcept = reportConcept?.trim() || null;
     if (clientId !== undefined) {
       if (clientId) {
         const parsed = Number(clientId);
@@ -385,6 +450,32 @@ transactionsRouter.put("/transactions/:id", requireAuth, async (req, res) => {
         }
       } else {
         updates.orderId = null;
+      }
+    }
+    if (orderItemId !== undefined) {
+      if (orderItemId) {
+        const parsed = Number(orderItemId);
+        if (!isNaN(parsed) && parsed > 0) {
+          const [item] = await db.select({ id: orderItems.id }).from(orderItems)
+            .where(and(eq(orderItems.id, parsed), eq(orderItems.userId, userId), isNull(orderItems.deletedAt)));
+          if (!item) { res.status(400).json({ error: "Línea de pedido no encontrada" }); return; }
+          updates.orderItemId = parsed;
+        }
+      } else {
+        updates.orderItemId = null;
+      }
+    }
+    if (orderPaymentId !== undefined) {
+      if (orderPaymentId) {
+        const parsed = Number(orderPaymentId);
+        if (!isNaN(parsed) && parsed > 0) {
+          const [payment] = await db.select({ id: orderPayments.id }).from(orderPayments)
+            .where(and(eq(orderPayments.id, parsed), eq(orderPayments.userId, userId), isNull(orderPayments.deletedAt)));
+          if (!payment) { res.status(400).json({ error: "Pago de pedido no encontrado" }); return; }
+          updates.orderPaymentId = parsed;
+        }
+      } else {
+        updates.orderPaymentId = null;
       }
     }
     if (financialAccountId !== undefined) {

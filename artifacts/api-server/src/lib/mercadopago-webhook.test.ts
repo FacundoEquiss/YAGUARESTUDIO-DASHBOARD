@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { describe, it } from "vitest";
 import {
   buildMercadoPagoSignatureManifest,
   computeMercadoPagoSignature,
@@ -12,17 +13,16 @@ async function runCase(name: string, fn: () => void | Promise<void>) {
   console.log(`  [ok] ${name}`);
 }
 
-export default async function runMercadoPagoWebhookTests(): Promise<void> {
-  await runCase("parseMercadoPagoSignatureHeader extracts ts and v1", () => {
+const webhookCases: Array<[string, () => void | Promise<void>]> = [
+  ["parseMercadoPagoSignatureHeader extracts ts and v1", () => {
     const result = parseMercadoPagoSignatureHeader("ts=1710000000,v1=ABC123");
 
     assert.deepEqual(result, {
       ts: "1710000000",
       v1: "abc123",
     });
-  });
-
-  await runCase("buildMercadoPagoSignatureManifest lowercases alphanumeric data ids", () => {
+  }],
+  ["buildMercadoPagoSignatureManifest lowercases alphanumeric data ids", () => {
     const manifest = buildMercadoPagoSignatureManifest({
       dataId: "ABC123XYZ",
       requestId: "request-123",
@@ -33,18 +33,16 @@ export default async function runMercadoPagoWebhookTests(): Promise<void> {
       manifest,
       "id:abc123xyz;request-id:request-123;ts:1710000000;",
     );
-  });
-
-  await runCase("buildMercadoPagoSignatureManifest omits missing values", () => {
+  }],
+  ["buildMercadoPagoSignatureManifest omits missing values", () => {
     const manifest = buildMercadoPagoSignatureManifest({
       requestId: "request-123",
       ts: "1710000000",
     });
 
     assert.equal(manifest, "request-id:request-123;ts:1710000000;");
-  });
-
-  await runCase("verifyMercadoPagoWebhookSignature accepts a valid signature", () => {
+  }],
+  ["verifyMercadoPagoWebhookSignature accepts a valid signature", () => {
     const secret = "super-secret";
     const manifest = buildMercadoPagoSignatureManifest({
       dataId: "PreApprovalABC",
@@ -65,9 +63,8 @@ export default async function runMercadoPagoWebhookTests(): Promise<void> {
       assert.equal(result.manifest, manifest);
       assert.equal(result.expectedSignature, signature);
     }
-  });
-
-  await runCase("verifyMercadoPagoWebhookSignature rejects a mismatched signature", () => {
+  }],
+  ["verifyMercadoPagoWebhookSignature rejects a mismatched signature", () => {
     const result = verifyMercadoPagoWebhookSignature({
       secret: "super-secret",
       header: "ts=1710000000,v1=0123456789abcdef",
@@ -79,9 +76,8 @@ export default async function runMercadoPagoWebhookTests(): Promise<void> {
       valid: false,
       reason: "signature_mismatch",
     });
-  });
-
-  await runCase("getMercadoPagoResourceId falls back from body to query", () => {
+  }],
+  ["getMercadoPagoResourceId falls back from body to query", () => {
     assert.equal(
       getMercadoPagoResourceId({
         body: { data: { id: "body-id" } },
@@ -96,5 +92,19 @@ export default async function runMercadoPagoWebhookTests(): Promise<void> {
       }),
       "query-id",
     );
-  });
+  }],
+];
+
+export default async function runMercadoPagoWebhookTests(): Promise<void> {
+  for (const [name, fn] of webhookCases) {
+    await runCase(name, fn);
+  }
 }
+
+describe("mercadopago-webhook", () => {
+  for (const [name, fn] of webhookCases) {
+    it(name, async () => {
+      await fn();
+    });
+  }
+});

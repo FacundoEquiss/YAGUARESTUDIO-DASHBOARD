@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
+import { getStorage, setStorage } from "@/lib/storage";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
 import { useUsageEvents } from "@/hooks/use-usage-events";
@@ -8,6 +9,13 @@ import { useOrderStats } from "@/hooks/use-orders";
 import { useTransactionSummary } from "@/hooks/use-transactions";
 import { HelpTooltip } from "@/components/help-tooltip";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   BarChart,
   Bar,
@@ -32,6 +40,12 @@ import {
   Clock,
   Crown,
   Zap,
+  CheckCircle2,
+  Circle,
+  UserRound,
+  Rocket,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 function getDayLabel(date: Date): string {
@@ -60,6 +74,78 @@ const EVENT_COLORS: Record<string, string> = {
   pdf_exports: "text-emerald-500 bg-emerald-500/10",
 };
 
+type PostAuthWelcomePayload = {
+  kind: "login" | "register";
+  ts: number;
+};
+
+type ChecklistItemKey = "firstQuote" | "firstOrder" | "profileSetup";
+
+type ChecklistStorage = {
+  dismissed: boolean;
+  completed: Partial<Record<ChecklistItemKey, boolean>>;
+};
+
+type TourStorage = {
+  completed: boolean;
+  dismissedAt: number | null;
+};
+
+type TourStep = {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  cta: string;
+  icon: typeof Calculator;
+  accent: string;
+};
+
+const POST_AUTH_WELCOME_KEY = "dtf:post-auth-welcome";
+const POST_AUTH_WELCOME_MAX_AGE_MS = 1000 * 60 * 30;
+const CHECKLIST_STORAGE_PREFIX = "dtf:onboarding-checklist";
+const TOUR_STORAGE_PREFIX = "dtf:dashboard-tour";
+
+const CHECKLIST_DEFAULT_STATE: ChecklistStorage = {
+  dismissed: false,
+  completed: {},
+};
+
+const TOUR_DEFAULT_STATE: TourStorage = {
+  completed: false,
+  dismissedAt: null,
+};
+
+const TOUR_STEPS: TourStep[] = [
+  {
+    id: "dashboard",
+    title: "Leé tu tablero en 10 segundos",
+    description: "Acá vas a ver métricas del mes, actividad semanal y lo más urgente para operar rápido.",
+    href: "/dashboard",
+    cta: "Quedarme en dashboard",
+    icon: Rocket,
+    accent: "from-primary to-orange-500",
+  },
+  {
+    id: "quotes",
+    title: "Empezá por cotizar",
+    description: "El cotizador es el flujo más rápido para pasar de idea a precio con criterio de margen.",
+    href: "/app",
+    cta: "Abrir cotizador",
+    icon: Calculator,
+    accent: "from-orange-500 to-amber-500",
+  },
+  {
+    id: "ops",
+    title: "Convertí cotizaciones en pedidos",
+    description: "En Pedidos vas a seguir estados, pagos y ejecución. Ese es tu centro operativo diario.",
+    href: "/orders",
+    cta: "Ir a pedidos",
+    icon: ClipboardList,
+    accent: "from-emerald-500 to-teal-500",
+  },
+];
+
 function CustomTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
   return (
@@ -84,6 +170,198 @@ export function DashboardPage() {
   const isMaster = currentUser?.role === "master";
   const isGuest = currentUser?.role === "guest";
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [pendingWelcome, setPendingWelcome] = useState<PostAuthWelcomePayload | null>(null);
+  const [checklistState, setChecklistState] = useState<ChecklistStorage>(CHECKLIST_DEFAULT_STATE);
+  const [tourState, setTourState] = useState<TourStorage>(TOUR_DEFAULT_STATE);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourStepIndex, setTourStepIndex] = useState(0);
+
+  const checklistStorageKey = currentUser ? `${CHECKLIST_STORAGE_PREFIX}:${currentUser.id}` : null;
+  const tourStorageKey = currentUser ? `${TOUR_STORAGE_PREFIX}:${currentUser.id}` : null;
+
+  const checklistItems: Array<{
+    key: ChecklistItemKey;
+    title: string;
+    description: string;
+    href: string;
+    cta: string;
+    icon: typeof Calculator;
+  }> = [
+    {
+      key: "firstQuote",
+      title: "Crear primera cotización",
+      description: "Lanzá tu primer presupuesto desde el cotizador DTF.",
+      href: "/app",
+      cta: "Ir al cotizador",
+      icon: Calculator,
+    },
+    {
+      key: "firstOrder",
+      title: "Registrar primer pedido",
+      description: "Pasá una cotización a ejecución para tener control operativo.",
+      href: "/orders",
+      cta: "Ir a pedidos",
+      icon: ClipboardList,
+    },
+    {
+      key: "profileSetup",
+      title: "Completar perfil de negocio",
+      description: "Añadí datos clave para personalizar tu gestión.",
+      href: "/profile",
+      cta: "Editar perfil",
+      icon: UserRound,
+    },
+  ];
+
+  const autoChecklistCompletion = useMemo<Record<ChecklistItemKey, boolean>>(
+    () => ({
+      firstQuote: usage.dtfQuotes > 0,
+      firstOrder: orderStats.activeOrders > 0 || orderStats.monthOrders > 0,
+      profileSetup: Boolean(
+        currentUser?.businessName?.trim() || currentUser?.phone?.trim() || currentUser?.profilePhotoUrl
+      ),
+    }),
+    [
+      usage.dtfQuotes,
+      orderStats.activeOrders,
+      orderStats.monthOrders,
+      currentUser?.businessName,
+      currentUser?.phone,
+      currentUser?.profilePhotoUrl,
+    ]
+  );
+
+  const updateChecklistState = (updater: (prev: ChecklistStorage) => ChecklistStorage) => {
+    if (!checklistStorageKey) return;
+    setChecklistState((prev) => {
+      const next = updater(prev);
+      setStorage(checklistStorageKey, next);
+      return next;
+    });
+  };
+
+  const updateTourState = (updater: (prev: TourStorage) => TourStorage) => {
+    if (!tourStorageKey) return;
+    setTourState((prev) => {
+      const next = updater(prev);
+      setStorage(tourStorageKey, next);
+      return next;
+    });
+  };
+
+  const openTour = () => {
+    setTourStepIndex(0);
+    setTourOpen(true);
+  };
+
+  const closeTour = () => {
+    setTourOpen(false);
+    updateTourState((prev) => {
+      if (prev.completed) return prev;
+      return { ...prev, dismissedAt: Date.now() };
+    });
+  };
+
+  const nextTourStep = () => {
+    if (tourStepIndex >= TOUR_STEPS.length - 1) {
+      setTourOpen(false);
+      updateTourState(() => ({ completed: true, dismissedAt: Date.now() }));
+      return;
+    }
+    setTourStepIndex((prev) => prev + 1);
+  };
+
+  const prevTourStep = () => {
+    setTourStepIndex((prev) => (prev > 0 ? prev - 1 : prev));
+  };
+
+  const markChecklistDone = (key: ChecklistItemKey) => {
+    updateChecklistState((prev) => ({
+      ...prev,
+      completed: { ...prev.completed, [key]: true },
+    }));
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !currentUser || isGuest) {
+      return;
+    }
+
+    const payload = getStorage<PostAuthWelcomePayload | null>(POST_AUTH_WELCOME_KEY, null);
+    if (!payload) {
+      return;
+    }
+
+    if ((payload.kind !== "login" && payload.kind !== "register") || typeof payload.ts !== "number") {
+      setStorage(POST_AUTH_WELCOME_KEY, null);
+      return;
+    }
+
+    const isFresh = Date.now() - payload.ts <= POST_AUTH_WELCOME_MAX_AGE_MS;
+    if (!isFresh) {
+      setStorage(POST_AUTH_WELCOME_KEY, null);
+      return;
+    }
+
+    setPendingWelcome(payload);
+    setStorage(POST_AUTH_WELCOME_KEY, null);
+  }, [currentUser, isGuest]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !checklistStorageKey || isGuest) {
+      setChecklistState(CHECKLIST_DEFAULT_STATE);
+      return;
+    }
+    const payload = getStorage<ChecklistStorage | null>(checklistStorageKey, null);
+    setChecklistState({
+      dismissed: Boolean(payload?.dismissed),
+      completed: payload?.completed ?? {},
+    });
+  }, [checklistStorageKey, isGuest]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !tourStorageKey || isGuest) {
+      setTourState(TOUR_DEFAULT_STATE);
+      return;
+    }
+    const payload = getStorage<TourStorage | null>(tourStorageKey, null);
+    setTourState({
+      completed: Boolean(payload?.completed),
+      dismissedAt: typeof payload?.dismissedAt === "number" ? payload.dismissedAt : null,
+    });
+  }, [tourStorageKey, isGuest]);
+
+  useEffect(() => {
+    if (!checklistStorageKey || isGuest) return;
+    setChecklistState((prev) => {
+      const merged = { ...prev.completed };
+      let changed = false;
+
+      for (const key of Object.keys(autoChecklistCompletion) as ChecklistItemKey[]) {
+        if (autoChecklistCompletion[key] && !merged[key]) {
+          merged[key] = true;
+          changed = true;
+        }
+      }
+
+      if (!changed) return prev;
+      const next = { ...prev, completed: merged };
+      setStorage(checklistStorageKey, next);
+      return next;
+    });
+  }, [
+    autoChecklistCompletion.firstQuote,
+    autoChecklistCompletion.firstOrder,
+    autoChecklistCompletion.profileSetup,
+    checklistStorageKey,
+    isGuest,
+  ]);
+
+  useEffect(() => {
+    if (!pendingWelcome || pendingWelcome.kind !== "register") return;
+    if (!currentUser || isGuest || tourState.completed || tourState.dismissedAt) return;
+    openTour();
+  }, [pendingWelcome, currentUser, isGuest, tourState.completed, tourState.dismissedAt]);
 
   const greeting = currentUser?.name
     ? `Hola, ${currentUser.name.split(" ")[0]}`
@@ -175,6 +453,16 @@ export function DashboardPage() {
   ];
 
   const showUsageBars = !isMaster && !isGuest && limits.dtfQuotes !== -1;
+  const activeTourStep = TOUR_STEPS[Math.min(tourStepIndex, TOUR_STEPS.length - 1)];
+  const isLastTourStep = tourStepIndex === TOUR_STEPS.length - 1;
+  const tourProgress = ((tourStepIndex + 1) / TOUR_STEPS.length) * 100;
+
+  const checklistProgress = checklistItems.reduce((sum, item) => {
+    const isDone = autoChecklistCompletion[item.key] || checklistState.completed[item.key];
+    return sum + (isDone ? 1 : 0);
+  }, 0);
+  const checklistCompleted = checklistProgress === checklistItems.length;
+  const showChecklist = Boolean(currentUser) && !isGuest && !checklistState.dismissed;
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-6 space-y-6 max-w-6xl">
@@ -204,6 +492,154 @@ export function DashboardPage() {
           </div>
         )}
       </div>
+
+      {pendingWelcome && (
+        <div className="bg-gradient-to-r from-primary/12 via-primary/5 to-transparent border border-primary/20 rounded-2xl p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-primary/90 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                {pendingWelcome.kind === "register" ? "Cuenta creada" : "Sesión iniciada"}
+              </p>
+              <h2 className="text-base sm:text-lg font-display font-bold text-foreground mt-1">
+                Todo listo, {currentUser?.name?.split(" ")[0] ?? "bienvenido"}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {pendingWelcome.kind === "register"
+                  ? "Empezá con una cotización y construí tu primer flujo de trabajo en minutos."
+                  : "Entraste correctamente. Acá tenés tus accesos más usados para continuar rápido."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/app"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                <Calculator className="w-4 h-4" />
+                Nueva cotización
+              </Link>
+              <Link
+                href="/orders"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-card/70 transition-colors"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Ver pedidos
+              </Link>
+              {!tourState.completed && (
+                <button
+                  type="button"
+                  onClick={openTour}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-primary/30 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <Rocket className="w-4 h-4" />
+                  Tour rápido
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPendingWelcome(null)}
+                className="px-3 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+              >
+                Ocultar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showChecklist && (
+        <div className="bg-card/60 backdrop-blur rounded-2xl p-4 sm:p-5 border border-border space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-base font-display font-bold text-foreground flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Primeros pasos
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                {checklistProgress}/{checklistItems.length} completados
+                {checklistCompleted ? " · Ya tenés el onboarding completo" : " · Avanzá para activar todo tu flujo"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {!tourState.completed && (
+                <button
+                  type="button"
+                  onClick={openTour}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/30 text-xs font-bold text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <Rocket className="w-3.5 h-3.5" />
+                  Ver tour
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => updateChecklistState((prev) => ({ ...prev, dismissed: true }))}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+              >
+                Ocultar checklist
+              </button>
+            </div>
+          </div>
+
+          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-orange-500 transition-all duration-500"
+              style={{ width: `${(checklistProgress / checklistItems.length) * 100}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {checklistItems.map((item) => {
+              const Icon = item.icon;
+              const isDone = autoChecklistCompletion[item.key] || checklistState.completed[item.key];
+              return (
+                <div
+                  key={item.key}
+                  className={`rounded-2xl border p-3.5 ${isDone ? "border-primary/30 bg-primary/5" : "border-border bg-card/40"}`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                      <Icon className="w-[18px] h-[18px] text-primary" />
+                    </div>
+                    {isDone ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Listo
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+                        <Circle className="w-3.5 h-3.5" />
+                        Pendiente
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-sm font-bold text-foreground">{item.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1 min-h-[34px]">{item.description}</p>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <Link
+                      href={item.href}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold text-foreground transition-colors"
+                    >
+                      {item.cta}
+                    </Link>
+                    {!isDone && (
+                      <button
+                        type="button"
+                        onClick={() => markChecklistDone(item.key)}
+                        className="px-2.5 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                      >
+                        Marcar listo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         {metrics.map((m) => {
@@ -402,6 +838,74 @@ export function DashboardPage() {
           </div>
         </div>
       )}
+
+      <Dialog
+        open={tourOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setTourOpen(true);
+            return;
+          }
+          closeTour();
+        }}
+      >
+        <DialogContent className="sm:max-w-xl rounded-2xl border-border bg-card/95 backdrop-blur">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">Tour de inicio</DialogTitle>
+            <DialogDescription>
+              Paso {tourStepIndex + 1} de {TOUR_STEPS.length}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-orange-500 transition-all duration-500"
+              style={{ width: `${tourProgress}%` }}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border bg-background/50 p-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${activeTourStep.accent} flex items-center justify-center shrink-0 shadow-lg`}>
+                <activeTourStep.icon className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-base font-display font-bold text-foreground">{activeTourStep.title}</p>
+                <p className="text-sm text-muted-foreground mt-1">{activeTourStep.description}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={activeTourStep.href}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              {activeTourStep.cta}
+            </Link>
+
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={prevTourStep}
+                disabled={tourStepIndex === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={nextTourStep}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 text-sm font-semibold text-foreground hover:bg-white/15 transition-colors"
+              >
+                {isLastTourStep ? "Finalizar" : "Siguiente"}
+                {!isLastTourStep && <ChevronRight className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <UpgradePrompt
         open={showUpgrade}

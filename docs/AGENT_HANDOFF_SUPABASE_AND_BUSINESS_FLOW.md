@@ -16,13 +16,12 @@ Este documento esta pensado para que cualquier agente futuro entienda rapido:
 ## Estado actual del auth
 
 ### Hoy existe
-- Auth propio en backend con JWT cookie y password hash local.
-- Tabla local `users`.
-- Login y registro propios.
+- Auth con Supabase para email y contraseña (sin OAuth social).
+- Cookie `token` con access token de Supabase validado en backend.
+- Tabla local `users` vinculada con `supabase_auth_id`.
 - Suscripciones locales con Mercado Pago.
 
 ### Hoy falta
-- Google login.
 - Recuperacion de contraseña por mail.
 - Verificacion de correo.
 - Proveedor de identidad serio para salida publica.
@@ -41,9 +40,7 @@ Este documento esta pensado para que cualquier agente futuro entienda rapido:
 - Hacer sincronizacion entre usuario Supabase y perfil local.
 
 ### Fase 2
-- Activar Google OAuth.
 - Activar reset de password.
-- Agregar callback/redirect de auth.
 - Ajustar middleware backend para aceptar el usuario autenticado por Supabase.
 
 ### Fase 3
@@ -54,8 +51,6 @@ Este documento esta pensado para que cualquier agente futuro entienda rapido:
 ### Datos externos que va a tener que tocar el usuario
 - Supabase URL.
 - Supabase anon key.
-- Google OAuth client ID.
-- Google OAuth client secret.
 - Proveedor SMTP o servicio de mail para recuperacion de contraseña.
 
 ## Flujo de negocio deseado por el usuario

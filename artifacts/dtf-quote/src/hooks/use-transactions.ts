@@ -8,9 +8,14 @@ export interface TransactionItem {
   amount: string;
   description: string | null;
   category: string;
+  paymentMethod: string | null;
+  reportArea: string | null;
+  reportConcept: string | null;
   clientId: number | null;
   supplierId: number | null;
   orderId: number | null;
+  orderItemId: number | null;
+  orderPaymentId: number | null;
   financialAccountId: number | null;
   date: string;
   createdAt: string;

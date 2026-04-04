@@ -264,6 +264,69 @@ create policy product_stock_movements_delete_policy on public.product_stock_move
   for delete
   using (app.is_tenant_owner(user_id));
 
+-- Services
+alter table if exists public.services enable row level security;
+alter table if exists public.services force row level security;
+drop policy if exists services_select_policy on public.services;
+create policy services_select_policy on public.services
+  for select
+  using (app.is_tenant_owner(user_id));
+drop policy if exists services_insert_policy on public.services;
+create policy services_insert_policy on public.services
+  for insert
+  with check (app.is_tenant_owner(user_id));
+drop policy if exists services_update_policy on public.services;
+create policy services_update_policy on public.services
+  for update
+  using (app.is_tenant_owner(user_id))
+  with check (app.is_tenant_owner(user_id));
+drop policy if exists services_delete_policy on public.services;
+create policy services_delete_policy on public.services
+  for delete
+  using (app.is_tenant_owner(user_id));
+
+-- Order items
+alter table if exists public.order_items enable row level security;
+alter table if exists public.order_items force row level security;
+drop policy if exists order_items_select_policy on public.order_items;
+create policy order_items_select_policy on public.order_items
+  for select
+  using (app.is_tenant_owner(user_id));
+drop policy if exists order_items_insert_policy on public.order_items;
+create policy order_items_insert_policy on public.order_items
+  for insert
+  with check (app.is_tenant_owner(user_id));
+drop policy if exists order_items_update_policy on public.order_items;
+create policy order_items_update_policy on public.order_items
+  for update
+  using (app.is_tenant_owner(user_id))
+  with check (app.is_tenant_owner(user_id));
+drop policy if exists order_items_delete_policy on public.order_items;
+create policy order_items_delete_policy on public.order_items
+  for delete
+  using (app.is_tenant_owner(user_id));
+
+-- Order payments
+alter table if exists public.order_payments enable row level security;
+alter table if exists public.order_payments force row level security;
+drop policy if exists order_payments_select_policy on public.order_payments;
+create policy order_payments_select_policy on public.order_payments
+  for select
+  using (app.is_tenant_owner(user_id));
+drop policy if exists order_payments_insert_policy on public.order_payments;
+create policy order_payments_insert_policy on public.order_payments
+  for insert
+  with check (app.is_tenant_owner(user_id));
+drop policy if exists order_payments_update_policy on public.order_payments;
+create policy order_payments_update_policy on public.order_payments
+  for update
+  using (app.is_tenant_owner(user_id))
+  with check (app.is_tenant_owner(user_id));
+drop policy if exists order_payments_delete_policy on public.order_payments;
+create policy order_payments_delete_policy on public.order_payments
+  for delete
+  using (app.is_tenant_owner(user_id));
+
 -- User DTF settings
 alter table if exists public.user_dtf_settings enable row level security;
 alter table if exists public.user_dtf_settings force row level security;

@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   supabaseAuthId: text("supabase_auth_id").unique(),
   name: varchar("name", { length: 255 }).notNull(),
   lastName: varchar("last_name", { length: 255 }),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   role: varchar("role", { length: 20 }).notNull().default("user"),
   phone: varchar("phone", { length: 50 }),
   businessName: varchar("business_name", { length: 255 }),

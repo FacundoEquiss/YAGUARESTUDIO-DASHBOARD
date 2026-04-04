@@ -13,6 +13,8 @@
     "db:reset-users": "pnpm --filter @workspace/scripts run db:reset-users",
     "db:seed-demo": "pnpm --filter @workspace/scripts run db:seed-demo",
     "db:reset-and-seed-demo": "pnpm --filter @workspace/scripts run db:reset-and-seed-demo",
+    "db:orders-cutover:dry-run": "pnpm --filter @workspace/scripts run db:orders-cutover:dry-run",
+    "db:orders-cutover:apply": "pnpm --filter @workspace/scripts run db:orders-cutover:apply",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --workspace-concurrency=1 --filter \"./artifacts/**\" --filter \"!./artifacts/mockup-sandbox\" --filter \"./scripts\" --if-present run typecheck"
   },
