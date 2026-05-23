@@ -8,6 +8,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
 import { RequireAuth } from "@/components/require-auth";
+import { ToolShell } from "@/components/tool-shell";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 
@@ -57,11 +58,9 @@ function App() {
                       <AuthPage />
                     </Route>
                     <Route path="/app">
-                      <RequireAuth>
-                        <DashboardLayout>
-                          <CalculatorPage />
-                        </DashboardLayout>
-                      </RequireAuth>
+                      <ToolShell>
+                        <CalculatorPage />
+                      </ToolShell>
                     </Route>
                     <Route path="/mockups">
                       <RequireAuth>
@@ -71,11 +70,9 @@ function App() {
                       </RequireAuth>
                     </Route>
                     <Route path="/bg-remover">
-                      <RequireAuth>
-                        <DashboardLayout>
-                          <BgRemoverPage />
-                        </DashboardLayout>
-                      </RequireAuth>
+                      <ToolShell>
+                        <BgRemoverPage />
+                      </ToolShell>
                     </Route>
                     <Route path="/history">
                       <RequireAuth>
