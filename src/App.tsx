@@ -11,6 +11,7 @@ import { LandingPage } from "@/pages/landing";
 import { ComingSoonPage } from "@/pages/coming-soon";
 import { AuthPage } from "@/pages/auth";
 import { ProfilePage } from "@/pages/profile";
+import { ClientsPage } from "@/pages/clients";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
 import { RequireAuth } from "@/components/require-auth";
@@ -59,6 +60,13 @@ function App() {
                     <RequireAuth>
                       <DashboardLayout>
                         <ProfilePage />
+                      </DashboardLayout>
+                    </RequireAuth>
+                  </Route>
+                  <Route path="/clients">
+                    <RequireAuth>
+                      <DashboardLayout>
+                        <ClientsPage />
                       </DashboardLayout>
                     </RequireAuth>
                   </Route>
