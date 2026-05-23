@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, ChevronDown, Home, Shirt, Wrench, X } from "lucide-react";
+import { Calculator, ChevronDown, Home, LogIn, Shirt, User, Wrench, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NavbarProps {
   isLanding?: boolean;
@@ -17,6 +26,7 @@ export function Navbar({ isLanding = false, onScrollTo }: NavbarProps) {
   const [location, setLocation] = useLocation();
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
+  const { currentUser, logout } = useAuth();
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -105,6 +115,51 @@ export function Navbar({ isLanding = false, onScrollTo }: NavbarProps) {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2">
+          {currentUser ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-foreground hover:bg-white/8 transition-all">
+                  <div className="h-6 w-6 rounded-full bg-primary/15 flex items-center justify-center text-[11px] font-bold text-primary">
+                    {(currentUser.displayName || currentUser.email || "Y").slice(0, 1).toUpperCase()}
+                  </div>
+                  <span className="max-w-[140px] truncate">
+                    {currentUser.displayName || currentUser.email?.split("@")[0] || "Mi cuenta"}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer">
+                  <User className="w-4 h-4 mr-2" />
+                  Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/app")} className="cursor-pointer">
+                  <Calculator className="w-4 h-4 mr-2" />
+                  Cotizador
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => logout()}
+                  className="text-destructive cursor-pointer focus:bg-destructive focus:text-destructive-foreground"
+                >
+                  Cerrar sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <button
+              onClick={() => setLocation("/auth")}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all"
+            >
+              <LogIn className="w-4 h-4" />
+              Ingresar
+            </button>
+          )}
         </div>
       </div>
 

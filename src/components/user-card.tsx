@@ -28,7 +28,7 @@ export function UserCard() {
     return (
       <button
         type="button"
-        onClick={() => setLocation("/")}
+        onClick={() => setLocation("/auth")}
         className="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all duration-200 cursor-pointer group overflow-hidden text-left"
       >
         <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
@@ -75,7 +75,7 @@ export function UserCard() {
       <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] min-w-[200px]" align="center" side="top" sideOffset={12}>
         <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setLocation("/settings")} className="cursor-pointer">
+        <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer">
           <User className="mr-2 h-4 w-4" />
           Perfil
         </DropdownMenuItem>
