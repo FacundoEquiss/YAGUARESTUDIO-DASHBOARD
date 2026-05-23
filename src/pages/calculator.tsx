@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { v4 as uuidv4 } from "uuid";
 import { setOrderDraft } from "@/lib/order-draft";
+import { useBusinessSettings } from "@/hooks/use-business-settings";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Plus, Trash2, Save, Users, MessageCircle, ChevronDown, ChevronUp, Info, ClipboardList } from "lucide-react";
@@ -40,7 +41,11 @@ function buildWhatsAppFromCalc(params: {
   totalOrderWholesale: number;
   pressPasses: number;
   talleActive: boolean;
+  businessName?: string;
+  signature?: string;
 }): string {
+  const brand = params.businessName?.trim() || "YAGUAR ESTUDIO";
+  const footer = params.signature?.trim() || `_Cotizado con ${brand}_`;
   const stampLines = params.stamps
     .filter(s => s.w > 0 && s.h > 0 && s.qty > 0)
     .map((s, i) => {
@@ -51,7 +56,7 @@ function buildWhatsAppFromCalc(params: {
 
   const date = format(new Date(), "d 'de' MMMM, yyyy", { locale: es });
 
-  let msg = `*Cotizacion DTF - YAGUAR ESTUDIO*\n`;
+  let msg = `*Cotización DTF - ${brand}*\n`;
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   if (params.clientName) msg += `👤 Cliente: ${params.clientName}\n`;
   if (params.orderName) msg += `📦 Pedido: ${params.orderName}\n`;
@@ -71,12 +76,13 @@ function buildWhatsAppFromCalc(params: {
     msg += `💰 Precio por prenda: ${formatCurrency(params.pricePerGarment)}\n`;
     msg += `\n*TOTAL PEDIDO: ${formatCurrency(params.totalOrder)}*\n`;
   }
-  msg += `\n_Cotizado con YAGUAR ESTUDIO_`;
+  msg += `\n${footer}`;
   return msg;
 }
 
 export function CalculatorPage() {
   const { settings } = useDTFSettings();
+  const { settings: biz } = useBusinessSettings();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { saveQuote } = useDTFQuotes();
@@ -249,6 +255,8 @@ export function CalculatorPage() {
       totalOrderWholesale,
       pressPasses,
       talleActive,
+      businessName: biz.businessName,
+      signature: biz.signature,
     });
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };

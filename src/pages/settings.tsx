@@ -14,12 +14,23 @@ import {
   Sun,
   Moon,
   Loader2,
+  Tags,
+  MessageSquare,
+  Plus,
+  X,
 } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { deleteUser } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 import { useBusinessSettings, type BusinessSettings } from "@/hooks/use-business-settings";
+import {
+  useAppCategories,
+  type AppCategories,
+  type CategoryKind,
+  CATEGORY_KIND_LABELS,
+} from "@/hooks/use-app-categories";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 import { CURRENCIES, setCurrencyConfig } from "@/lib/currency";
@@ -47,11 +58,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DtfSettingsSection } from "@/components/settings/dtf-settings-section";
 
-type SectionId = "negocio" | "cotizador" | "apariencia" | "datos";
+type SectionId = "negocio" | "cotizador" | "categorias" | "mensajes" | "apariencia" | "datos";
 
 const SECTIONS: { id: SectionId; label: string; icon: typeof Building2 }[] = [
   { id: "negocio", label: "Mi negocio", icon: Building2 },
   { id: "cotizador", label: "Cotizador DTF", icon: Calculator },
+  { id: "categorias", label: "Categorías", icon: Tags },
+  { id: "mensajes", label: "Mensajes", icon: MessageSquare },
   { id: "apariencia", label: "Apariencia", icon: Palette },
   { id: "datos", label: "Datos y cuenta", icon: Database },
 ];
@@ -127,6 +140,8 @@ export function SettingsPage() {
         <div className="flex-1 min-w-0">
           {active === "negocio" && <BusinessSection />}
           {active === "cotizador" && <DtfSettingsSection />}
+          {active === "categorias" && <CategoriesSection />}
+          {active === "mensajes" && <MessagesSection />}
           {active === "apariencia" && <AppearanceSection />}
           {active === "datos" && <DataSection />}
         </div>
@@ -286,6 +301,175 @@ function AppearanceSection() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+const CATEGORY_KINDS: CategoryKind[] = ["income", "expense", "product", "service", "supplier"];
+
+function CategoriesSection() {
+  const { categories, loading, save } = useAppCategories();
+  const { toast } = useToast();
+  const [lists, setLists] = useState<AppCategories>(categories);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!loading) setLists(categories);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  function addCategory(kind: CategoryKind, value: string) {
+    const v = value.trim();
+    if (!v) return;
+    setLists((l) => (l[kind].includes(v) ? l : { ...l, [kind]: [...l[kind], v] }));
+  }
+
+  function removeCategory(kind: CategoryKind, value: string) {
+    setLists((l) => ({ ...l, [kind]: l[kind].filter((c) => c !== value) }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await save(lists);
+      toast({ title: "Categorías guardadas" });
+    } catch {
+      toast({ title: "Error", description: "No se pudo guardar.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-lg">
+      <p className="text-sm text-muted-foreground">
+        Personalizá las categorías que aparecen como sugerencias al cargar gastos, ingresos,
+        productos, servicios y proveedores.
+      </p>
+      {CATEGORY_KINDS.map((kind) => (
+        <Card key={kind}>
+          <CardContent className="p-5 space-y-3">
+            <h3 className="text-sm font-bold">{CATEGORY_KIND_LABELS[kind]}</h3>
+            <div className="flex flex-wrap gap-2">
+              {lists[kind].map((cat) => (
+                <span
+                  key={cat}
+                  className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-secondary text-sm"
+                >
+                  {cat}
+                  <button
+                    onClick={() => removeCategory(kind, cat)}
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Quitar ${cat}`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ))}
+              {lists[kind].length === 0 ? (
+                <span className="text-xs text-muted-foreground">Sin categorías.</span>
+              ) : null}
+            </div>
+            <CategoryInput onAdd={(v) => addCategory(kind, v)} />
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button size="lg" className="w-full rounded-2xl" onClick={handleSave} disabled={saving || loading}>
+        <Save className="w-5 h-5 mr-2" />
+        {saving ? "Guardando…" : "Guardar categorías"}
+      </Button>
+    </div>
+  );
+}
+
+function CategoryInput({ onAdd }: { onAdd: (value: string) => void }) {
+  const [value, setValue] = useState("");
+  function commit() {
+    onAdd(value);
+    setValue("");
+  }
+  return (
+    <div className="flex gap-2">
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          }
+        }}
+        placeholder="Agregar categoría…"
+        className="h-9"
+      />
+      <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={commit}>
+        <Plus className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
+function MessagesSection() {
+  const { settings, loading, save } = useBusinessSettings();
+  const { toast } = useToast();
+  const [signature, setSignature] = useState(settings.signature);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!loading) setSignature(settings.signature);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  const businessName = settings.businessName || "Yaguar Estudio";
+  const defaultSignature = `_Cotizado con ${businessName}_`;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await save({ signature: signature.trim() });
+      toast({ title: "Mensaje guardado" });
+    } catch {
+      toast({ title: "Error", description: "No se pudo guardar.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-lg">
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h3 className="text-base font-bold">Firma de tus cotizaciones</h3>
+          <p className="text-sm text-muted-foreground -mt-2">
+            Este texto aparece al final de las cotizaciones que compartís por WhatsApp. Dejalo vacío
+            para usar el predeterminado.
+          </p>
+          <Textarea
+            value={signature}
+            onChange={(e) => setSignature(e.target.value)}
+            rows={3}
+            placeholder={defaultSignature}
+          />
+          <div className="rounded-xl bg-secondary/50 p-4 text-sm">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+              Vista previa del pie
+            </div>
+            <div className="whitespace-pre-wrap text-foreground/90">
+              {signature.trim() || defaultSignature}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Tip: podés incluir tu teléfono, Instagram o un agradecimiento. Ej: "¡Gracias por tu
+            consulta! 📱 {settings.contactPhone || "tu WhatsApp"} · 📷 {settings.instagram || "@tunegocio"}".
+          </p>
+        </CardContent>
+      </Card>
+
+      <Button size="lg" className="w-full rounded-2xl" onClick={handleSave} disabled={saving || loading}>
+        <Save className="w-5 h-5 mr-2" />
+        {saving ? "Guardando…" : "Guardar mensaje"}
+      </Button>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Truck, Pencil, Trash2, Mail, Phone, User, Tag, StickyNote, Loader2 } from "lucide-react";
 import { useSuppliers, type Supplier, type SupplierInput } from "@/hooks/use-suppliers";
+import { useAppCategories } from "@/hooks/use-app-categories";
+import { ConfigureButton } from "@/components/configure-button";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,15 +37,6 @@ const EMPTY_INPUT: SupplierInput = {
   notes: "",
 };
 
-const COMMON_CATEGORIES = [
-  "Insumos DTF",
-  "Telas",
-  "Plotter / Estampado",
-  "Tintas",
-  "Prendas",
-  "Logística",
-  "Otros",
-];
 
 function normalizeForSearch(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -102,9 +95,12 @@ export function SuppliersPage() {
             Quién te vende qué, organizado.
           </p>
         </div>
-        <Button onClick={openCreate} size="lg" className="rounded-2xl">
-          <Plus className="w-4 h-4 mr-2" /> Nuevo proveedor
-        </Button>
+        <div className="flex gap-2">
+          <ConfigureButton section="categorias" title="Configurar categorías" />
+          <Button onClick={openCreate} size="lg" className="rounded-2xl">
+            <Plus className="w-4 h-4 mr-2" /> Nuevo proveedor
+          </Button>
+        </div>
       </header>
 
       <div className="relative">
@@ -283,6 +279,7 @@ function SupplierFormDialog({
   onSave: (data: SupplierInput) => Promise<void>;
 }) {
   const isEdit = !!supplier;
+  const { categories: appCategories } = useAppCategories();
   const [form, setForm] = useState<SupplierInput>(EMPTY_INPUT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -365,7 +362,7 @@ function SupplierFormDialog({
               placeholder="Insumos DTF, Telas, Plotter…"
             />
             <datalist id="supplier-categories">
-              {COMMON_CATEGORIES.map((cat) => (
+              {appCategories.supplier.map((cat) => (
                 <option key={cat} value={cat} />
               ))}
             </datalist>

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { FileText, Trash2, Calculator, MessageCircle, User } from "lucide-react";
 import { useDTFQuotes, type Quote } from "@/hooks/use-dtf-store";
+import { useBusinessSettings } from "@/hooks/use-business-settings";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,14 +20,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-function buildWhatsAppMessage(quote: Quote): string {
+function buildWhatsAppMessage(quote: Quote, businessName?: string, signature?: string): string {
+  const brand = businessName?.trim() || "YAGUAR ESTUDIO";
+  const footer = signature?.trim() || `_Cotizado con ${brand}_`;
   const stampLines = quote.stamps
     .filter((s) => s.w > 0 && s.h > 0 && s.qty > 0)
     .map((s, i) => `• ${s.title || `Estampa ${i + 1}`}: ${s.w}cm × ${s.h}cm × ${s.qty} unid`)
     .join("\n");
 
   const date = format(new Date(quote.createdAt), "d 'de' MMMM, yyyy", { locale: es });
-  let msg = `*Cotización DTF - YAGUAR ESTUDIO*\n`;
+  let msg = `*Cotización DTF - ${brand}*\n`;
   msg += `━━━━━━━━━━━━━━━━━━\n`;
   if (quote.clientName) msg += `👤 Cliente: ${quote.clientName}\n`;
   if (quote.orderName) msg += `📦 Pedido: ${quote.orderName}\n`;
@@ -37,17 +40,19 @@ function buildWhatsAppMessage(quote: Quote): string {
   if (quote.garmentsCount) msg += `👕 Prendas: ${quote.garmentsCount} unid\n`;
   if (quote.pricePerGarment) msg += `💰 Precio por prenda: ${formatCurrency(quote.pricePerGarment)}\n`;
   msg += `\n*TOTAL PEDIDO: ${formatCurrency(quote.totalPrice)}*\n`;
+  msg += `\n${footer}`;
   return msg;
 }
 
 export function HistoryPage() {
   const { quotes, deleteQuote } = useDTFQuotes();
+  const { settings: biz } = useBusinessSettings();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [confirmDelete, setConfirmDelete] = useState<Quote | null>(null);
 
   function shareWhatsApp(quote: Quote) {
-    const url = `https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage(quote))}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage(quote, biz.businessName, biz.signature))}`;
     window.open(url, "_blank");
   }
 

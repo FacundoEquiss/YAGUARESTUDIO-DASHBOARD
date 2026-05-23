@@ -10,13 +10,10 @@ import {
   Minus,
   Plus as PlusIcon,
 } from "lucide-react";
-import {
-  useProducts,
-  type Product,
-  type ProductInput,
-  PRODUCT_CATEGORIES,
-} from "@/hooks/use-products";
+import { useProducts, type Product, type ProductInput } from "@/hooks/use-products";
 import { useSuppliers } from "@/hooks/use-suppliers";
+import { useAppCategories } from "@/hooks/use-app-categories";
+import { ConfigureButton } from "@/components/configure-button";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -147,9 +144,12 @@ export function ProductsPage() {
             Controlá tu inventario, precios y alertas de stock bajo.
           </p>
         </div>
-        <Button onClick={openCreate} size="lg" className="rounded-2xl">
-          <Plus className="w-4 h-4 mr-2" /> Nuevo producto
-        </Button>
+        <div className="flex gap-2">
+          <ConfigureButton section="categorias" title="Configurar categorías" />
+          <Button onClick={openCreate} size="lg" className="rounded-2xl">
+            <Plus className="w-4 h-4 mr-2" /> Nuevo producto
+          </Button>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -395,6 +395,7 @@ function ProductFormDialog({
 }) {
   const isEdit = !!product;
   const { items: suppliers } = useSuppliers();
+  const { categories: appCategories } = useAppCategories();
   const [form, setForm] = useState<ProductInput>(EMPTY_INPUT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -496,7 +497,7 @@ function ProductFormDialog({
                 placeholder="Remeras"
               />
               <datalist id="product-categories">
-                {PRODUCT_CATEGORIES.map((cat) => (
+                {appCategories.product.map((cat) => (
                   <option key={cat} value={cat} />
                 ))}
               </datalist>

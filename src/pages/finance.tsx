@@ -18,12 +18,12 @@ import {
   type TransactionType,
   type PaymentMethod,
   PAYMENT_METHOD_LABELS,
-  INCOME_CATEGORIES,
-  EXPENSE_CATEGORIES,
 } from "@/hooks/use-transactions";
 import { useFinancialAccounts } from "@/hooks/use-financial-accounts";
 import { useClients } from "@/hooks/use-clients";
 import { useSuppliers } from "@/hooks/use-suppliers";
+import { useAppCategories } from "@/hooks/use-app-categories";
+import { ConfigureButton } from "@/components/configure-button";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,7 @@ export function FinancePage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ConfigureButton section="categorias" title="Configurar categorías" />
           <Button onClick={() => openCreate("expense")} variant="outline" size="lg" className="rounded-2xl">
             <ArrowDownCircle className="w-4 h-4 mr-2 text-red-400" /> Gasto
           </Button>
@@ -391,12 +392,13 @@ function TransactionFormDialog({
   const { items: accounts } = useFinancialAccounts();
   const { items: clients } = useClients();
   const { items: suppliers } = useSuppliers();
+  const { categories: appCategories } = useAppCategories();
   const [form, setForm] = useState<TransactionInput>(buildEmptyInput(type));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isIncome = form.type === "income";
-  const categories = isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const categories = isIncome ? appCategories.income : appCategories.expense;
 
   useEffect(() => {
     if (!open) return;

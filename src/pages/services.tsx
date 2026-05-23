@@ -6,8 +6,9 @@ import {
   type ServiceInput,
   type PriceUnit,
   PRICE_UNIT_LABELS,
-  SERVICE_CATEGORIES,
 } from "@/hooks/use-services";
+import { useAppCategories } from "@/hooks/use-app-categories";
+import { ConfigureButton } from "@/components/configure-button";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -114,9 +115,12 @@ export function ServicesPage() {
             Lo que ofrecés además de productos: personalización, diseño, cursos…
           </p>
         </div>
-        <Button onClick={openCreate} size="lg" className="rounded-2xl">
-          <Plus className="w-4 h-4 mr-2" /> Nuevo servicio
-        </Button>
+        <div className="flex gap-2">
+          <ConfigureButton section="categorias" title="Configurar categorías" />
+          <Button onClick={openCreate} size="lg" className="rounded-2xl">
+            <Plus className="w-4 h-4 mr-2" /> Nuevo servicio
+          </Button>
+        </div>
       </header>
 
       <div className="relative">
@@ -270,6 +274,7 @@ function ServiceFormDialog({
   onSave: (data: ServiceInput) => Promise<void>;
 }) {
   const isEdit = !!service;
+  const { categories: appCategories } = useAppCategories();
   const [form, setForm] = useState<ServiceInput>(EMPTY_INPUT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -347,7 +352,7 @@ function ServiceFormDialog({
               placeholder="Diseño gráfico, Personalización…"
             />
             <datalist id="service-categories">
-              {SERVICE_CATEGORIES.map((cat) => (
+              {appCategories.service.map((cat) => (
                 <option key={cat} value={cat} />
               ))}
             </datalist>
