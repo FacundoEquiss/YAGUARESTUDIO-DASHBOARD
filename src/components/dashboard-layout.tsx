@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Menu, Bell, Search } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,7 +24,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { currentUser } = useAuth();
 
   const pageLabel = BREADCRUMB_LABELS[location] || "Yaguar Estudio";
@@ -72,15 +72,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <div className="flex-1" />
 
             <ThemeToggle />
-            <button type="button" aria-label="Buscar" className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors" title="Buscar">
-              <Search className="w-[18px] h-[18px]" />
-            </button>
-            <button type="button" aria-label="Notificaciones" className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors relative" title="Notificaciones">
-              <Bell className="w-[18px] h-[18px]" />
-            </button>
-            <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary">
+            <button
+              type="button"
+              onClick={() => setLocation("/profile")}
+              aria-label="Mi perfil"
+              title="Mi perfil"
+              className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary hover:bg-primary/25 transition-colors"
+            >
               {initials}
-            </div>
+            </button>
           </header>
 
           <main className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth pb-8">

@@ -35,8 +35,9 @@ export function SupportPage() {
             <AccordionItem value="item-2">
               <AccordionTrigger>Donde se guardan mis datos?</AccordionTrigger>
               <AccordionContent>
-                Las cotizaciones y la configuracion del cotizador se guardan localmente en tu navegador. Pronto vas a
-                poder acceder a tu cuenta desde cualquier dispositivo.
+                Tus clientes, pedidos, productos, finanzas y configuración se guardan de forma privada en tu
+                cuenta (en la nube) y los podés ver desde cualquier dispositivo iniciando sesión. Solo vos
+                tenés acceso a tus datos.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3">

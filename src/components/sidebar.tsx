@@ -9,7 +9,6 @@ import {
   Calculator,
   Shirt,
   Scissors,
-  BookOpen,
   DollarSign,
   BarChart3,
   Landmark,
