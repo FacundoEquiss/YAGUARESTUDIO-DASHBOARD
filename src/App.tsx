@@ -9,6 +9,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
 import { RequireAuth } from "@/components/require-auth";
 import { ToolShell } from "@/components/tool-shell";
+import { RouteTitle } from "@/components/route-title";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 
@@ -45,6 +46,7 @@ function App() {
       <AuthProvider>
         <ThemeProvider defaultTheme="dark" storageKey="app-theme">
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <RouteTitle />
             <AppErrorBoundary>
               <AuthLoadingBoundary>
                 <Suspense fallback={<RouteFallback />}>

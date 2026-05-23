@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -185,12 +187,47 @@ const fadeUp = {
   }),
 };
 
+const STATS = [
+  { value: "7", label: "herramientas en una" },
+  { value: "$0", label: "para siempre" },
+  { value: "100%", label: "privado y tuyo" },
+  { value: "30s", label: "por cotización" },
+];
+
+const MARQUEE_ITEMS = [
+  "Cotizador DTF",
+  "Mockups",
+  "Quita-fondos",
+  "Clientes",
+  "Pedidos",
+  "Stock",
+  "Proveedores",
+  "Ingresos y gastos",
+  "Cuentas corrientes",
+  "Reportes",
+  "Servicios",
+];
+
 export function LandingPage() {
   const [, setLocation] = useLocation();
   const { currentUser } = useAuth();
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [showStickyBar, setShowStickyBar] = useState(false);
 
   const primaryCta = () => setLocation(currentUser ? "/dashboard" : "/auth");
   const primaryLabel = currentUser ? "Ir a mi panel" : "Crear cuenta gratis";
+
+  // Show the floating CTA bar once the hero scrolls out of view.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowStickyBar(!entry.isIntersecting && entry.boundingClientRect.top < 0),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <>
@@ -281,6 +318,62 @@ export function LandingPage() {
           </motion.div>
         </div>
       </section>
+
+      {/* Sentinel for the sticky CTA bar */}
+      <div ref={sentinelRef} aria-hidden="true" />
+
+      {/* STATS STRIP */}
+      <section className="px-4 sm:px-6 py-8">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {STATS.map((s, i) => (
+            <motion.div
+              key={s.label}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ delay: i * 0.08, duration: 0.5 }}
+              className="text-center"
+            >
+              <div className="text-3xl sm:text-4xl font-display font-black bg-gradient-to-r from-primary to-amber-400 bg-clip-text text-transparent">
+                {s.value}
+              </div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-1">{s.label}</div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* MARQUEE */}
+      <section className="py-6 border-y border-border bg-white/[0.02] overflow-hidden">
+        <Marquee items={MARQUEE_ITEMS} />
+      </section>
+
+      {/* Floating sticky CTA bar */}
+      {showStickyBar &&
+        createPortal(
+          <motion.div
+            initial={{ y: -60, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="fixed top-0 left-0 right-0 z-[100] backdrop-blur-xl bg-gray-950/80 border-b border-white/10"
+          >
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="text-base font-display font-black text-primary">YAGUAR</span>
+                <span className="text-base font-display font-light text-foreground hidden xs:inline">
+                  ESTUDIO
+                </span>
+              </div>
+              <button
+                onClick={primaryCta}
+                className="shrink-0 inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-primary/30"
+              >
+                {primaryLabel}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>,
+          document.body,
+        )}
 
       {/* BEFORE / AFTER */}
       <section className="px-4 sm:px-6 py-12 sm:py-16">
@@ -768,6 +861,24 @@ export function LandingPage() {
         </div>
       </footer>
     </>
+  );
+}
+
+function Marquee({ items }: { items: string[] }) {
+  const doubled = [...items, ...items];
+  return (
+    <motion.div
+      className="flex gap-8 whitespace-nowrap w-max"
+      animate={{ x: ["0%", "-50%"] }}
+      transition={{ duration: 28, ease: "linear", repeat: Infinity }}
+    >
+      {doubled.map((item, i) => (
+        <div key={i} className="flex items-center gap-8 text-sm font-bold text-muted-foreground/70">
+          <span>{item}</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+        </div>
+      ))}
+    </motion.div>
   );
 }
 
