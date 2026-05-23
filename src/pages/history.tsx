@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import { FileText, Trash2, Calculator, MessageCircle, User } from "lucide-react";
 import { useDTFQuotes, type Quote } from "@/hooks/use-dtf-store";
 import { useBusinessSettings } from "@/hooks/use-business-settings";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ export function HistoryPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <FileText className="w-7 h-7 text-primary" /> Historial de cotizaciones
+            <HelpTooltip text="Todas las cotizaciones que guardaste desde el cotizador. Volvé a verlas, compartilas de nuevo por WhatsApp o eliminá las que ya no necesités." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Las cotizaciones DTF que generaste y guardaste.

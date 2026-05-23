@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { HelpTooltip } from "@/components/help-tooltip";
 
 interface GarmentVariant {
   label: string;
@@ -160,6 +161,7 @@ export function MockupsPage() {
       <header>
         <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
           <Shirt className="w-7 h-7 text-primary" /> Generador de Mockups
+          <HelpTooltip text="Subí el arte de tu cliente, ubicalo sobre la prenda (elegí remera o buzo, color y vista) y descargá el mockup en PNG para mostrarlo. ¿El logo tiene fondo? Usá Quita Fondos primero." />
         </h1>
         <p className="text-muted-foreground mt-1 font-medium">
           Subí tu arte, posicionalo sobre la prenda y descargá el mockup listo.

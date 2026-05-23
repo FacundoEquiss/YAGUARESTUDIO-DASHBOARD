@@ -193,7 +193,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <>
-      <aside className="hidden sm:flex desktop-sidebar w-[240px] shrink-0 flex-col h-full">
+      <aside data-tour="sidebar" className="hidden sm:flex desktop-sidebar w-[240px] shrink-0 flex-col h-full">
         {sidebarContent}
       </aside>
 

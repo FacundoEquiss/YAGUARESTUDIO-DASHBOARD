@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
+import { HelpCircle } from "lucide-react";
+import { startAppTour, hasSeenTour, markTourSeen } from "@/lib/tour";
 import {
   ArrowRight,
   ArrowUpCircle,
@@ -129,21 +131,62 @@ export function DashboardPage() {
   }, [orders]);
 
   const displayName = currentUser?.displayName?.split(" ")[0] ?? "";
+  const [showWelcome, setShowWelcome] = useState(() => !hasSeenTour());
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col gap-6 pb-12 max-w-6xl">
-      <header>
-        <h1 className="text-3xl text-foreground font-display font-bold">
-          {greeting()}
-          {displayName ? <>, <span className="text-primary">{displayName}</span></> : null}
-        </h1>
-        <p className="text-muted-foreground mt-1 font-medium">
-          Acá está el resumen de tu negocio.
-        </p>
+      <header className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl text-foreground font-display font-bold">
+            {greeting()}
+            {displayName ? <>, <span className="text-primary">{displayName}</span></> : null}
+          </h1>
+          <p className="text-muted-foreground mt-1 font-medium">
+            Acá está el resumen de tu negocio.
+          </p>
+        </div>
+        <button
+          onClick={startAppTour}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+        >
+          <HelpCircle className="w-4 h-4" />
+          ¿Cómo funciona?
+        </button>
       </header>
 
+      {showWelcome ? (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1">
+            <h3 className="font-bold text-base mb-1">¿Primera vez por acá? 👋</h3>
+            <p className="text-sm text-muted-foreground">
+              Te hacemos un recorrido rápido para que sepas usar todo. Dura menos de un minuto.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setShowWelcome(false);
+                startAppTour();
+              }}
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-all"
+            >
+              Hacer el tour
+            </button>
+            <button
+              onClick={() => {
+                markTourSeen();
+                setShowWelcome(false);
+              }}
+              className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Ahora no
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div data-tour="dashboard-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           icon={<ArrowUpCircle className="w-4 h-4 text-emerald-400" />}
           label="Ingresos del mes"
@@ -171,7 +214,7 @@ export function DashboardPage() {
       </div>
 
       {/* Quick actions */}
-      <Card>
+      <Card data-tour="dashboard-shortcuts">
         <CardContent className="p-5">
           <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">
             Atajos

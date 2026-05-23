@@ -8,6 +8,7 @@ import {
   ACCOUNT_TYPE_LABELS,
 } from "@/hooks/use-financial-accounts";
 import { useTransactions } from "@/hooks/use-transactions";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,7 @@ export function AccountsPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <Landmark className="w-7 h-7 text-primary" /> Cuentas corrientes
+            <HelpTooltip text="Tus billeteras: banco, Mercado Pago, efectivo. El saldo de cada una se calcula solo sumando los ingresos y restando los gastos que le asignás en Finanzas." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Banco, Mercado Pago, efectivo… todo lo que manejás.

@@ -9,6 +9,7 @@ import {
 } from "@/hooks/use-services";
 import { useAppCategories } from "@/hooks/use-app-categories";
 import { ConfigureButton } from "@/components/configure-button";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,7 @@ export function ServicesPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <Wrench className="w-7 h-7 text-primary" /> Servicios
+            <HelpTooltip text="Lo que ofrecés además de productos: personalización, diseño, cursos, etc. Definí precio y modalidad (por hora, por unidad, etc.) y activá o pausá cada servicio." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Lo que ofrecés además de productos: personalización, diseño, cursos…

@@ -57,6 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { HelpTooltip } from "@/components/help-tooltip";
 
 const STATUS_ORDER: OrderStatus[] = ["draft", "in_progress", "ready", "delivered", "cancelled"];
 
@@ -187,6 +188,7 @@ export function OrdersPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <ClipboardList className="w-7 h-7 text-primary" /> Pedidos
+            <HelpTooltip text="El registro de tus ventas. Cargá los ítems, asigná un cliente, seguí el estado (borrador, en proceso, listo, entregado) y cuánto te pagaron. El total se calcula solo." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Llevá un registro claro de cada venta.

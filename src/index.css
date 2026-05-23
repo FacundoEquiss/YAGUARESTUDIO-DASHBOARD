@@ -413,3 +413,49 @@
 .animate-slide-in-left {
   animation: slideInLeft 0.25s ease-out both;
 }
+
+/* Guided tour (driver.js) — match app theme */
+.driver-popover {
+  background-color: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+.driver-popover-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: hsl(var(--foreground));
+}
+.driver-popover-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.driver-popover-progress-text {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+.driver-popover-arrow {
+  border-color: hsl(var(--popover));
+}
+.driver-popover-next-btn {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  text-shadow: none !important;
+  padding: 7px 14px !important;
+}
+.driver-popover-prev-btn {
+  background-color: hsl(var(--secondary)) !important;
+  color: hsl(var(--secondary-foreground)) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  text-shadow: none !important;
+  padding: 7px 14px !important;
+}
+.driver-popover-close-btn {
+  color: hsl(var(--muted-foreground)) !important;
+}

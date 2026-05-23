@@ -3,6 +3,7 @@ import { Scissors, Upload, Download, Loader2, ImageOff, RotateCcw } from "lucide
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { HelpTooltip } from "@/components/help-tooltip";
 
 type Stage = "idle" | "processing" | "done";
 
@@ -82,6 +83,7 @@ export function BgRemoverPage() {
       <header>
         <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
           <Scissors className="w-7 h-7 text-primary" /> Quita Fondos
+          <HelpTooltip text="Subí una imagen y la IA le saca el fondo en segundos. Todo pasa en tu dispositivo, no se sube nada a internet. Ideal para limpiar logos antes de hacer un mockup." />
         </h1>
         <p className="text-muted-foreground mt-1 font-medium">
           Remové el fondo de cualquier imagen con IA. Ideal para logos y artes de clientes.

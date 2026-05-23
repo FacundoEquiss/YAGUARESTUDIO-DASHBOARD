@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Users, Pencil, Trash2, Mail, Phone, Building2, StickyNote, Loader2 } from "lucide-react";
 import { useClients, type Client, type ClientInput } from "@/hooks/use-clients";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +87,7 @@ export function ClientsPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <Users className="w-7 h-7 text-primary" /> Clientes
+            <HelpTooltip text="Tu agenda de clientes. Guardá nombre, contacto y notas. Después podés asociarlos a pedidos y cobros. Usá el buscador para encontrarlos rápido." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Tu base de clientes, siempre a mano.

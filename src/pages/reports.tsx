@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { HelpTooltip } from "@/components/help-tooltip";
 
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -140,6 +141,7 @@ export function ReportsPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-primary" /> Reportes
+            <HelpTooltip text="Acá ves cómo evoluciona tu negocio: ingresos vs gastos por mes, costos fijos y variables, y tu punto de equilibrio (cuánto necesitás vender para no perder). Todo sale de lo que cargás en Finanzas." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Cómo evoluciona tu negocio mes a mes.

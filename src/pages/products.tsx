@@ -14,6 +14,7 @@ import { useProducts, type Product, type ProductInput } from "@/hooks/use-produc
 import { useSuppliers } from "@/hooks/use-suppliers";
 import { useAppCategories } from "@/hooks/use-app-categories";
 import { ConfigureButton } from "@/components/configure-button";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,7 @@ export function ProductsPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <Package2 className="w-7 h-7 text-primary" /> Productos / Stock
+            <HelpTooltip text="Tu inventario. Cargá productos con su costo, precio y stock. Con los botones + y − ajustás las unidades al toque, y te avisa cuando el stock está bajo." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Controlá tu inventario, precios y alertas de stock bajo.

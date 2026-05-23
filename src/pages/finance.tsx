@@ -24,6 +24,7 @@ import { useClients } from "@/hooks/use-clients";
 import { useSuppliers } from "@/hooks/use-suppliers";
 import { useAppCategories } from "@/hooks/use-app-categories";
 import { ConfigureButton } from "@/components/configure-button";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -153,6 +154,7 @@ export function FinancePage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <DollarSign className="w-7 h-7 text-primary" /> Ingresos y gastos
+            <HelpTooltip text="Toda la plata que entra y sale. Cargá ingresos y gastos, categorizalos y asignalos a una cuenta. Es la base de tus reportes y tu balance." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             La plata que entra y la que sale, en un solo lugar.

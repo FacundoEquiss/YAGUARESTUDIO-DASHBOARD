@@ -42,7 +42,8 @@ export function HelpTooltip({ text, className, side = "top", iconSize = 14 }: He
         onClick={() => setOpen((v) => !v)}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        className="p-0.5 rounded-full text-muted-foreground/50 hover:text-muted-foreground transition-colors focus:outline-none"
+        className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
+        style={{ width: iconSize + 8, height: iconSize + 8 }}
         aria-label="Ayuda"
       >
         <HelpCircle style={{ width: iconSize, height: iconSize }} />

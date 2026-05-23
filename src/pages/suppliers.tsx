@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Truck, Pencil, Trash2, Mail, Phone, User, Tag, StickyNote, Loader2 } from "lucide-react";
 import { useSuppliers, type Supplier, type SupplierInput } from "@/hooks/use-suppliers";
+import { HelpTooltip } from "@/components/help-tooltip";
 import { useAppCategories } from "@/hooks/use-app-categories";
 import { ConfigureButton } from "@/components/configure-button";
 import { useToast } from "@/hooks/use-toast";
@@ -90,6 +91,7 @@ export function SuppliersPage() {
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <Truck className="w-7 h-7 text-primary" /> Proveedores
+            <HelpTooltip text="A quién le comprás insumos, telas o servicios. Guardá su contacto y categoría para tenerlo a mano cuando cargues un gasto." />
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">
             Quién te vende qué, organizado.

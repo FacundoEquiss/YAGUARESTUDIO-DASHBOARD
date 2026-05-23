@@ -71,6 +71,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             <div className="flex-1" />
 
+            <div data-tour="header-actions" className="flex items-center gap-1">
             <ThemeToggle />
             <button
               type="button"
@@ -81,6 +82,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             >
               {initials}
             </button>
+            </div>
           </header>
 
           <main className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth pb-8">
