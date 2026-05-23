@@ -292,17 +292,17 @@
   animation: blob-drift-4 37s ease-in-out infinite alternate;
 }
 
-/* ── Dark mode blobs ── */
+/* ── Dark mode blobs (tinted with the brand accent color) ── */
 .dark .auth-blob-1 {
-  background: radial-gradient(circle at center, #c2410c 0%, #7c2d12 60%, transparent 100%);
+  background: radial-gradient(circle at center, hsl(var(--primary) / 0.55) 0%, hsl(var(--primary) / 0.22) 60%, transparent 100%);
   opacity: 0.7;
 }
 .dark .auth-blob-2 {
-  background: radial-gradient(circle at center, #1a0f06 0%, #0d0604 55%, transparent 100%);
+  background: radial-gradient(circle at center, #1c1917 0%, #0d0604 55%, transparent 100%);
   opacity: 0.9;
 }
 .dark .auth-blob-3 {
-  background: radial-gradient(circle at center, #ea580c 0%, #9a3412 55%, transparent 100%);
+  background: radial-gradient(circle at center, hsl(var(--primary) / 0.5) 0%, hsl(var(--primary) / 0.2) 55%, transparent 100%);
   opacity: 0.6;
 }
 .dark .auth-blob-4 {
