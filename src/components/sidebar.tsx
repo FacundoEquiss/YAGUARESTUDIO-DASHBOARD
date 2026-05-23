@@ -45,20 +45,19 @@ const MAIN_NAV: NavItem[] = [
   { href: "/clients", label: "Clientes", icon: Users, ready: true },
   { href: "/suppliers", label: "Proveedores", icon: Truck, ready: true },
   { href: "/products", label: "Productos / Stock", icon: Package2, ready: true },
-  { href: "/services", label: "Servicios", icon: Wrench, ready: false },
+  { href: "/services", label: "Servicios", icon: Wrench, ready: true },
 ].filter((item) => item.ready || SHOW_COMING_SOON_IN_SIDEBAR);
 
 const TOOLS_NAV: NavItem[] = [
   { href: "/app", label: "Cotizador DTF", icon: Calculator, ready: true },
-  { href: "/mockups", label: "Mockups", icon: Shirt, ready: false },
-  { href: "/history", label: "Historial", icon: FileText, ready: false },
-  { href: "/bg-remover", label: "Quita Fondos", icon: Scissors, ready: false },
-  { href: "/blog", label: "Blog", icon: BookOpen, ready: false },
+  { href: "/mockups", label: "Mockups", icon: Shirt, ready: true },
+  { href: "/history", label: "Historial", icon: FileText, ready: true },
+  { href: "/bg-remover", label: "Quita Fondos", icon: Scissors, ready: true },
 ].filter((item) => item.ready || SHOW_COMING_SOON_IN_SIDEBAR);
 
 const FINANCE_NAV: NavItem[] = [
   { href: "/finance", label: "Ingresos / Gastos", icon: DollarSign, ready: true },
-  { href: "/reports", label: "Reportes", icon: BarChart3, ready: false },
+  { href: "/reports", label: "Reportes", icon: BarChart3, ready: true },
   { href: "/accounts", label: "Cuentas Corrientes", icon: Landmark, ready: true },
 ].filter((item) => item.ready || SHOW_COMING_SOON_IN_SIDEBAR);
 

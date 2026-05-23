@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Calculator, ChevronDown, Home, LogIn, Shirt, User, Wrench, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,6 +119,7 @@ export function Navbar({ isLanding = false, onScrollTo }: NavbarProps) {
         </div>
 
         <div className="hidden sm:flex items-center gap-2">
+          <ThemeToggle />
           {currentUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -144,7 +146,10 @@ export function Navbar({ isLanding = false, onScrollTo }: NavbarProps) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => logout()}
+                  onClick={async () => {
+                    await logout();
+                    setLocation("/");
+                  }}
                   className="text-destructive cursor-pointer focus:bg-destructive focus:text-destructive-foreground"
                 >
                   Cerrar sesión

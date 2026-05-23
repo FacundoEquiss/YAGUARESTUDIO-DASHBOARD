@@ -1,0 +1,19 @@
+{
+  "name": "Yaguar Estudio",
+  "short_name": "Yaguar",
+  "description": "Panel de gestión para emprendedores textiles: cotizador DTF, clientes, pedidos, stock, ingresos y mockups.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

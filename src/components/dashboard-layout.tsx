@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Menu, Bell, Search } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
 
 const BREADCRUMB_LABELS: Record<string, string> = {
@@ -70,6 +71,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             <div className="flex-1" />
 
+            <ThemeToggle />
             <button type="button" aria-label="Buscar" className="p-2 rounded-xl hover:bg-white/8 text-muted-foreground transition-colors" title="Buscar">
               <Search className="w-[18px] h-[18px]" />
             </button>

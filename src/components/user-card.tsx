@@ -81,11 +81,14 @@ export function UserCard() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={() => logout()}
+          onClick={async () => {
+            await logout();
+            setLocation("/");
+          }}
           className="text-destructive cursor-pointer focus:bg-destructive focus:text-destructive-foreground"
         >
           <LogOut className="mr-2 h-4 w-4" />
-          Cerrar sesion
+          Cerrar sesión
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
