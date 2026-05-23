@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, ChevronDown, Home, LogIn, Shirt, User, Wrench, X } from "lucide-react";
+import { Calculator, ChevronDown, Home, LogIn, Shirt, User, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -118,7 +118,7 @@ export function Navbar({ isLanding = false, onScrollTo }: NavbarProps) {
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <ThemeToggle />
           {currentUser ? (
             <DropdownMenu>
@@ -167,83 +167,6 @@ export function Navbar({ isLanding = false, onScrollTo }: NavbarProps) {
           )}
         </div>
       </div>
-
-      {/* Mobile bottom nav */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 glass-panel border-t border-border px-2 py-3 flex items-center justify-around z-50">
-        <Link
-          href="/"
-          className={cn(
-            "flex flex-col items-center gap-1 min-w-[3.5rem] transition-all",
-            location === "/" ? "text-primary" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <div className={cn("p-2 rounded-xl transition-colors", location === "/" ? "bg-primary/10" : "bg-transparent")}>
-            <Home className="w-5 h-5" />
-          </div>
-          <span className="text-[9px] font-medium">Inicio</span>
-        </Link>
-
-        <button
-          onClick={() => setToolsOpen((v) => !v)}
-          className={cn(
-            "flex flex-col items-center gap-1 min-w-[3.5rem] transition-all",
-            isToolPage ? "text-primary" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <div className={cn("p-2 rounded-xl transition-colors", isToolPage ? "bg-primary/10" : "bg-transparent")}>
-            <Wrench className="w-5 h-5" />
-          </div>
-          <span className="text-[9px] font-medium">Herramientas</span>
-        </button>
-      </div>
-
-      {/* Mobile tools popup */}
-      {toolsOpen && (
-        <div className="sm:hidden fixed inset-0 z-[60]" onClick={() => setToolsOpen(false)}>
-          <div
-            className="absolute bottom-20 left-4 right-4 glass-panel rounded-2xl p-3 border border-border shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-2 px-2">
-              <span className="text-sm font-bold text-foreground">Herramientas</span>
-              <button
-                onClick={() => setToolsOpen(false)}
-                className="p-1 rounded-lg hover:bg-secondary text-muted-foreground"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {TOOLS.map((tool) => {
-              const Icon = tool.icon;
-              const isActive = location === tool.href;
-              return (
-                <button
-                  key={tool.href}
-                  onClick={() => {
-                    setToolsOpen(false);
-                    if (tool.ready) setLocation(tool.href);
-                  }}
-                  disabled={!tool.ready}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all text-left",
-                    !tool.ready
-                      ? "opacity-40 cursor-not-allowed"
-                      : isActive
-                        ? "bg-primary/12 text-primary font-bold"
-                        : "text-foreground hover:bg-white/8",
-                  )}
-                >
-                  <Icon className="w-5 h-5 shrink-0" />
-                  <span className="flex-1">{tool.label}</span>
-                  {!tool.ready && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 text-muted-foreground">Pronto</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </nav>
   );
 }

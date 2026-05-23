@@ -59,21 +59,42 @@ const GARMENTS: GarmentType[] = [
   },
 ];
 
-const STAGE_SIZE = 460;
+const MAX_STAGE_SIZE = 460;
 
 export function MockupsPage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stageContainerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const artRef = useRef<Konva.Image>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
 
+  const [stageSize, setStageSize] = useState(MAX_STAGE_SIZE);
   const [garmentIdx, setGarmentIdx] = useState(0);
   const [variantIdx, setVariantIdx] = useState(0);
   const [side, setSide] = useState<"front" | "back">("front");
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [selected, setSelected] = useState(false);
-  const [artNode, setArtNode] = useState({ x: STAGE_SIZE / 2 - 70, y: STAGE_SIZE / 2 - 70, width: 140, height: 140 });
+  const [artNode, setArtNode] = useState({
+    x: MAX_STAGE_SIZE / 2 - 70,
+    y: MAX_STAGE_SIZE / 2 - 70,
+    width: 140,
+    height: 140,
+  });
+
+  // Make the canvas fit the available width (responsive on mobile).
+  useEffect(() => {
+    const el = stageContainerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      if (w > 0) setStageSize(Math.min(MAX_STAGE_SIZE, w));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const garment = GARMENTS[garmentIdx];
   const variant = garment.variants[Math.min(variantIdx, garment.variants.length - 1)];
@@ -101,9 +122,10 @@ export function MockupsPage() {
       let h = maxDim;
       if (ratio > 1) h = maxDim / ratio;
       else w = maxDim * ratio;
-      setArtNode({ x: STAGE_SIZE / 2 - w / 2, y: STAGE_SIZE / 2 - h / 2, width: w, height: h });
+      setArtNode({ x: stageSize / 2 - w / 2, y: stageSize / 2 - h / 2, width: w, height: h });
       setSelected(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artImg, artStatus]);
 
   function handleUpload(file: File) {
@@ -147,26 +169,31 @@ export function MockupsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         {/* Canvas */}
         <Card>
-          <CardContent className="p-4 flex items-center justify-center">
-            <div
-              className="rounded-xl overflow-hidden"
-              style={{ background: variant.color === "white" ? "#e9e9e9" : "#0f0f0f" }}
-            >
-              <Stage
-                ref={stageRef}
-                width={STAGE_SIZE}
-                height={STAGE_SIZE}
-                onMouseDown={(e) => {
-                  if (e.target === e.target.getStage()) setSelected(false);
-                }}
-                onTouchStart={(e) => {
-                  if (e.target === e.target.getStage()) setSelected(false);
+          <CardContent className="p-4">
+            <div ref={stageContainerRef} className="w-full flex items-center justify-center">
+              <div
+                className="rounded-xl overflow-hidden"
+                style={{
+                  width: stageSize,
+                  height: stageSize,
+                  background: variant.color === "white" ? "#e9e9e9" : "#0f0f0f",
                 }}
               >
-                <Layer>
-                  {garmentImg ? (
-                    <KonvaImage image={garmentImg} width={STAGE_SIZE} height={STAGE_SIZE} listening={false} />
-                  ) : null}
+                <Stage
+                  ref={stageRef}
+                  width={stageSize}
+                  height={stageSize}
+                  onMouseDown={(e) => {
+                    if (e.target === e.target.getStage()) setSelected(false);
+                  }}
+                  onTouchStart={(e) => {
+                    if (e.target === e.target.getStage()) setSelected(false);
+                  }}
+                >
+                  <Layer>
+                    {garmentImg ? (
+                      <KonvaImage image={garmentImg} width={stageSize} height={stageSize} listening={false} />
+                    ) : null}
                   {artImg ? (
                     <KonvaImage
                       ref={artRef}
@@ -205,8 +232,9 @@ export function MockupsPage() {
                       boundBoxFunc={(oldBox, newBox) => (newBox.width < 20 ? oldBox : newBox)}
                     />
                   ) : null}
-                </Layer>
-              </Stage>
+                  </Layer>
+                </Stage>
+              </div>
             </div>
           </CardContent>
         </Card>

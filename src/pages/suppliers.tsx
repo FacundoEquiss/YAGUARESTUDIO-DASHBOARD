@@ -93,7 +93,7 @@ export function SuppliersPage() {
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col gap-6 pb-12 max-w-5xl">
-      <header className="flex items-center justify-between gap-4">
+      <header className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">
             <Truck className="w-7 h-7 text-primary" /> Proveedores
