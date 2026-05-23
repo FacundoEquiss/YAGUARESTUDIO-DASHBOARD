@@ -35,7 +35,9 @@ export function SettingsPage() {
     setTalleSurcharge(settings.talleSurcharge.toString());
   }, [settings]);
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     const numPrice = parseInt(price);
     const numWidth = parseFloat(width);
     const numBaseMargin = parseInt(baseMargin);
@@ -73,20 +75,31 @@ export function SettingsPage() {
       return;
     }
 
-    setSettings({
-      pricePerMeter: numPrice,
-      rollWidth: numWidth,
-      baseMargin: numBaseMargin,
-      wholesaleMargin: numWholesaleMargin,
-      pressPassThreshold: numPressPassThreshold,
-      pressPassExtraCost: numPressPassExtraCost,
-      talleEnabled,
-      talleSurcharge: numTalleSurcharge,
-    });
-    toast({
-      title: "Configuración guardada",
-      description: "Los valores se aplicarán a las nuevas cotizaciones.",
-    });
+    setSaving(true);
+    try {
+      await setSettings({
+        pricePerMeter: numPrice,
+        rollWidth: numWidth,
+        baseMargin: numBaseMargin,
+        wholesaleMargin: numWholesaleMargin,
+        pressPassThreshold: numPressPassThreshold,
+        pressPassExtraCost: numPressPassExtraCost,
+        talleEnabled,
+        talleSurcharge: numTalleSurcharge,
+      });
+      toast({
+        title: "Configuración guardada",
+        description: "Los valores se aplicarán a las nuevas cotizaciones.",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se pudo guardar. Probá de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -289,9 +302,9 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Button size="lg" className="w-full rounded-2xl mt-2" onClick={handleSave}>
+      <Button size="lg" className="w-full rounded-2xl mt-2" onClick={handleSave} disabled={saving}>
         <Save className="w-5 h-5 mr-2" />
-        Guardar Ajustes
+        {saving ? "Guardando…" : "Guardar Ajustes"}
       </Button>
     </div>
   );

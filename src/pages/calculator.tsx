@@ -5,7 +5,8 @@ import { es } from "date-fns/locale";
 import { Plus, Trash2, Save, Users, MessageCircle, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
-import { StampItem, packStamps, STAMP_COLORS } from "@/lib/skyline";
+import { StampItem, STAMP_COLORS } from "@/lib/skyline";
+import { calculateDtfPricing } from "@/lib/dtf-pricing";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
@@ -76,7 +77,7 @@ export function CalculatorPage() {
   const { settings } = useDTFSettings();
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const { saveQuote } = useDTFQuotes("local");
+  const { saveQuote } = useDTFQuotes();
   const { toast } = useToast();
 
   const [clientName, setClientName] = useState("");
@@ -118,28 +119,44 @@ export function CalculatorPage() {
     }
   };
 
-  const packedResult = useMemo(() => {
-    const validStamps = stamps.filter(s => s.w > 0 && s.h > 0 && s.qty > 0);
-    if (validStamps.length === 0) return { placements: [], totalHeight: 0, errors: [] };
-    return packStamps(settings.rollWidth, validStamps);
-  }, [stamps, settings.rollWidth]);
+  const pricing = useMemo(
+    () =>
+      calculateDtfPricing(
+        {
+          garments: garmentsCount,
+          pressPasses,
+          talleActive,
+          stamps,
+        },
+        {
+          pricePerMeter: settings.pricePerMeter,
+          rollWidth: settings.rollWidth,
+          baseMargin: settings.baseMargin,
+          wholesaleMargin: settings.wholesaleMargin,
+          pressPassThreshold: settings.pressPassThreshold,
+          pressPassExtraCost: settings.pressPassExtraCost,
+          talleSurcharge: settings.talleSurcharge,
+        },
+      ),
+    [stamps, garmentsCount, pressPasses, talleActive, settings],
+  );
 
-  const linearMeters = packedResult.totalHeight / 100;
+  const packedResult = {
+    placements: pricing.placements,
+    totalHeight: pricing.totalHeight,
+    errors: pricing.errors,
+  };
 
-  const rawCost = linearMeters * settings.pricePerMeter;
-  const garments = garmentsCount;
-  const dtfCostPerGarment = rawCost / garments;
-
-  const pressPassExtra = pressPasses > settings.pressPassThreshold
-    ? (pressPasses - settings.pressPassThreshold) * settings.pressPassExtraCost
-    : 0;
-
-  const talleSurchargeAmount = talleActive ? settings.talleSurcharge : 0;
-
-  const pricePerGarment = Math.ceil((dtfCostPerGarment + settings.baseMargin + pressPassExtra + talleSurchargeAmount) / 100) * 100;
-  const totalOrder = pricePerGarment * garments;
-  const pricePerGarmentWholesale = Math.ceil((dtfCostPerGarment + settings.wholesaleMargin + pressPassExtra + talleSurchargeAmount) / 100) * 100;
-  const totalOrderWholesale = pricePerGarmentWholesale * garments;
+  const garments = pricing.garments;
+  const linearMeters = pricing.linearMeters;
+  const rawCost = pricing.rawCost;
+  const dtfCostPerGarment = pricing.dtfCostPerGarment;
+  const pressPassExtra = pricing.pressPassExtra;
+  const talleSurchargeAmount = pricing.talleSurchargeAmount;
+  const pricePerGarment = pricing.pricePerGarment;
+  const totalOrder = pricing.totalOrder;
+  const pricePerGarmentWholesale = pricing.pricePerGarmentWholesale;
+  const totalOrderWholesale = pricing.totalOrderWholesale;
   const estimatedPricePerGarment = pricePerGarment;
   const estimatedTotalOrder = totalOrder;
   const estimatedPricePerGarmentWholesale = pricePerGarmentWholesale;

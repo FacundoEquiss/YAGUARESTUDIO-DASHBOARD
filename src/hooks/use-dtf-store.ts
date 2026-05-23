@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { getStorage, setStorage } from "@/lib/storage";
 import type { PlacedStamp, StampItem } from "@/lib/skyline";
+import { useAuth } from "@/hooks/use-auth";
+import { useFirestoreDoc } from "@/hooks/use-firestore-doc";
 
 export interface DTFSettings {
   pricePerMeter: number;
@@ -32,9 +34,7 @@ export interface Quote {
   talleEnabled?: boolean;
 }
 
-const SETTINGS_KEY = "dtf-settings";
-
-const DEFAULT_SETTINGS: DTFSettings = {
+export const DEFAULT_SETTINGS: DTFSettings = {
   pricePerMeter: 10000,
   rollWidth: 58,
   baseMargin: 2000,
@@ -46,21 +46,38 @@ const DEFAULT_SETTINGS: DTFSettings = {
 };
 
 export function useDTFSettings() {
-  const [settings, setSettingsState] = useState<DTFSettings>(() => getStorage(SETTINGS_KEY, DEFAULT_SETTINGS));
+  const { currentUser } = useAuth();
+  const uid = currentUser?.uid ?? null;
+  const { data, loading, exists, save } = useFirestoreDoc<DTFSettings>([
+    "users",
+    uid,
+    "dtfSettings",
+    "default",
+  ]);
 
-  const setSettings = useCallback((newSettings: Partial<DTFSettings>) => {
-    setSettingsState((prev) => {
-      const merged = { ...prev, ...newSettings };
-      setStorage(SETTINGS_KEY, merged);
-      return merged;
-    });
-  }, []);
+  const settings: DTFSettings = data ? { ...DEFAULT_SETTINGS, ...data } : DEFAULT_SETTINGS;
 
-  return { settings, setSettings, settingsLoading: false };
+  // Seed default settings the first time the user opens the calculator.
+  useEffect(() => {
+    if (!uid || loading || exists) return;
+    void save(DEFAULT_SETTINGS);
+  }, [uid, loading, exists, save]);
+
+  const setSettings = useCallback(
+    async (next: Partial<DTFSettings>) => {
+      if (!uid) return;
+      await save(next);
+    },
+    [uid, save],
+  );
+
+  return { settings, setSettings, settingsLoading: loading };
 }
 
-export function useDTFQuotes(userId: string = "local") {
-  const quotesKey = `dtf-quotes-${userId}`;
+export function useDTFQuotes() {
+  const { currentUser } = useAuth();
+  const uid = currentUser?.uid ?? "anonymous";
+  const quotesKey = `dtf-quotes-${uid}`;
 
   const [quotes, setQuotesState] = useState<Quote[]>(() => getStorage(quotesKey, []));
 
@@ -75,13 +92,11 @@ export function useDTFQuotes(userId: string = "local") {
         id: uuidv4(),
         createdAt: Date.now(),
       };
-
       setQuotesState((prev) => {
         const updated = [newQuote, ...prev];
         setStorage(quotesKey, updated);
         return updated;
       });
-
       return newQuote;
     },
     [quotesKey],
