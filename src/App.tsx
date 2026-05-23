@@ -12,6 +12,7 @@ import { ComingSoonPage } from "@/pages/coming-soon";
 import { AuthPage } from "@/pages/auth";
 import { ProfilePage } from "@/pages/profile";
 import { ClientsPage } from "@/pages/clients";
+import { SuppliersPage } from "@/pages/suppliers";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
 import { RequireAuth } from "@/components/require-auth";
@@ -67,6 +68,13 @@ function App() {
                     <RequireAuth>
                       <DashboardLayout>
                         <ClientsPage />
+                      </DashboardLayout>
+                    </RequireAuth>
+                  </Route>
+                  <Route path="/suppliers">
+                    <RequireAuth>
+                      <DashboardLayout>
+                        <SuppliersPage />
                       </DashboardLayout>
                     </RequireAuth>
                   </Route>
