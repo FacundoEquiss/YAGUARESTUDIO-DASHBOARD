@@ -20,6 +20,13 @@ import {
   TrendingUp,
   ClipboardList,
   FileSpreadsheet,
+  UserPlus,
+  Rocket,
+  Star,
+  Quote,
+  Heart,
+  Palette,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -105,6 +112,67 @@ const FAQS = [
   {
     q: "¿Puedo usarla en el celular?",
     a: "Sí, está pensada para funcionar bien en celular, tablet y computadora. Tus datos se sincronizan entre todos tus dispositivos.",
+  },
+  {
+    q: "¿Sirve si no hago DTF?",
+    a: "Claro. Aunque el cotizador está enfocado en DTF, la gestión de clientes, pedidos, stock, servicios y finanzas sirve para cualquier emprendimiento textil: sublimación, bordado, vinilo, indumentaria y más.",
+  },
+  {
+    q: "¿Pierdo mis datos si cierro sesión?",
+    a: "No. Todo queda guardado en tu cuenta en la nube. Cerrás sesión, volvés a entrar desde cualquier dispositivo y tu información sigue ahí.",
+  },
+];
+
+const STEPS = [
+  {
+    icon: UserPlus,
+    title: "Creá tu cuenta gratis",
+    description: "En menos de un minuto, con tu email o con Google. Sin tarjeta, sin compromiso.",
+  },
+  {
+    icon: Calculator,
+    title: "Cargá tus datos o cotizá",
+    description: "Configurá tu precio de DTF, sumá clientes y empezá a registrar pedidos y gastos.",
+  },
+  {
+    icon: Rocket,
+    title: "Hacé crecer tu negocio",
+    description: "Cobrá lo justo, entregá a tiempo y entendé tus números para tomar mejores decisiones.",
+  },
+];
+
+const AUDIENCE = [
+  { icon: Layers, label: "Estampado DTF", desc: "Cotizá transfers al instante." },
+  { icon: Palette, label: "Sublimación", desc: "Gestioná pedidos y stock." },
+  { icon: Shirt, label: "Indumentaria", desc: "Organizá tu producción." },
+  { icon: Scissors, label: "Vinilo y bordado", desc: "Llevá clientes y finanzas." },
+];
+
+const COMPARISON = [
+  { feature: "Costo", yaguar: "Gratis", excel: "Gratis", paid: "Mensualidad" },
+  { feature: "Cotizador DTF automático", yaguar: true, excel: false, paid: "A veces" },
+  { feature: "Clientes, pedidos y stock", yaguar: true, excel: "Manual", paid: true },
+  { feature: "Reportes y punto de equilibrio", yaguar: true, excel: "Manual", paid: true },
+  { feature: "Mockups y quita-fondos", yaguar: true, excel: false, paid: false },
+  { feature: "Funciona en el celular", yaguar: true, excel: "Incómodo", paid: "A veces" },
+  { feature: "Pensado para textil", yaguar: true, excel: false, paid: "Rara vez" },
+];
+
+const TESTIMONIALS = [
+  {
+    name: "Caro Giménez",
+    business: "Estampados Caro · Córdoba",
+    text: "Antes cotizaba a ojo y perdía plata sin darme cuenta. Ahora en 30 segundos sé exactamente cuánto cobrar. Me cambió la forma de trabajar.",
+  },
+  {
+    name: "Mati Rodríguez",
+    business: "MR Custom · Buenos Aires",
+    text: "Tenía los pedidos en mil notas del celular. Tener todo en un solo lugar, con los estados y lo que me deben, me sacó un peso de encima.",
+  },
+  {
+    name: "Flor y Lu",
+    business: "Dúo Textil · Rosario",
+    text: "Lo de los reportes es genial. Por primera vez entendimos en qué gastábamos de más y pudimos subir los precios con fundamento.",
   },
 ];
 
@@ -279,6 +347,89 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* HOW IT WORKS */}
+      <section className="px-4 sm:px-6 py-16 sm:py-20">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            className="text-center mb-14"
+          >
+            <h2 className="text-3xl sm:text-4xl font-display font-black mb-4">Empezar es facilísimo</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Sin instalaciones ni configuraciones raras. En tres pasos ya estás trabajando.
+            </p>
+          </motion.div>
+
+          <div className="grid sm:grid-cols-3 gap-6">
+            {STEPS.map((step, i) => (
+              <motion.div
+                key={step.title}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                className="relative text-center"
+              >
+                <div className="relative inline-flex items-center justify-center mb-5">
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <step.icon className="w-7 h-7 text-primary" />
+                  </div>
+                  <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-primary text-primary-foreground text-sm font-black flex items-center justify-center">
+                    {i + 1}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold mb-2">{step.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                  {step.description}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURE DEEP-DIVE */}
+      <section className="px-4 sm:px-6 py-8 sm:py-12">
+        <div className="max-w-6xl mx-auto space-y-20 sm:space-y-28">
+          <FeatureRow
+            eyebrow="Cotizador DTF"
+            title="Cobrá lo justo, sin cálculos a mano"
+            points={[
+              "Ingresá las medidas de tus estampas y la cantidad de prendas.",
+              "El sistema acomoda el rollo y calcula metros, costo y precio por prenda.",
+              "Ajustá márgenes, bajadas de plancha y recargos a tu medida.",
+              "Compartí la cotización por WhatsApp en un toque.",
+            ]}
+            preview={<CalculatorPreview />}
+          />
+          <FeatureRow
+            reverse
+            eyebrow="Mockups + Quita-fondos"
+            title="Presentaciones profesionales en segundos"
+            points={[
+              "Subí el arte del cliente y ubicalo sobre remeras o buzos.",
+              "Quitá el fondo de cualquier logo con IA, sin salir de la app.",
+              "Descargá el mockup listo para enviar y cerrar la venta.",
+              "Todo desde el navegador, sin programas pesados.",
+            ]}
+            preview={<MockupPreview />}
+          />
+          <FeatureRow
+            eyebrow="Finanzas y Reportes"
+            title="Entendé si tu negocio gana plata"
+            points={[
+              "Registrá ingresos y gastos y asignalos a tus cuentas.",
+              "Mirá tu balance, tus costos fijos y variables del mes.",
+              "Descubrí tu punto de equilibrio sin ser contador.",
+              "Compará cómo crecés mes a mes con gráficos claros.",
+            ]}
+            preview={<FinancePreview />}
+          />
+        </div>
+      </section>
+
       {/* TOOLS GRID */}
       <section id="herramientas" className="px-4 sm:px-6 py-16 sm:py-24">
         <div className="max-w-6xl mx-auto">
@@ -327,6 +478,161 @@ export function LandingPage() {
               {primaryLabel}
               <ArrowRight className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* AUDIENCE */}
+      <section className="px-4 sm:px-6 py-16 sm:py-20">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl sm:text-4xl font-display font-black mb-4">
+              Hecha para tu rubro
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Si trabajás con prendas, Yaguar Estudio se adapta a vos.
+            </p>
+          </motion.div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {AUDIENCE.map((a, i) => (
+              <motion.div
+                key={a.label}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ delay: i * 0.08, duration: 0.5 }}
+                className="glass-panel rounded-2xl p-5 border border-border text-center"
+              >
+                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <a.icon className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="font-bold text-sm mb-1">{a.label}</h3>
+                <p className="text-xs text-muted-foreground">{a.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* COMPARISON */}
+      <section className="px-4 sm:px-6 py-16 sm:py-20">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            className="text-center mb-10"
+          >
+            <h2 className="text-3xl sm:text-4xl font-display font-black mb-4">
+              ¿Por qué no una planilla?
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Mirá cómo se compara con lo que venías usando.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5 }}
+            className="overflow-x-auto rounded-3xl border border-border"
+          >
+            <table className="w-full text-sm min-w-[520px]">
+              <thead>
+                <tr className="border-b border-border bg-white/[0.02]">
+                  <th className="text-left font-semibold p-4 text-muted-foreground"> </th>
+                  <th className="p-4 text-center">
+                    <span className="font-display font-black text-primary">YAGUAR</span>
+                  </th>
+                  <th className="p-4 text-center font-semibold text-muted-foreground">Excel</th>
+                  <th className="p-4 text-center font-semibold text-muted-foreground">Software pago</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON.map((row, i) => (
+                  <tr key={row.feature} className={i % 2 ? "bg-white/[0.01]" : ""}>
+                    <td className="p-4 font-medium">{row.feature}</td>
+                    <td className="p-4 text-center"><CompareCell value={row.yaguar} highlight /></td>
+                    <td className="p-4 text-center"><CompareCell value={row.excel} /></td>
+                    <td className="p-4 text-center"><CompareCell value={row.paid} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* WHY FREE */}
+      <section className="px-4 sm:px-6 py-12 sm:py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.5 }}
+          className="max-w-3xl mx-auto rounded-3xl border border-border p-8 sm:p-10 text-center"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 0%, rgba(249,115,22,0.12), transparent 70%), rgba(255,255,255,0.02)",
+          }}
+        >
+          <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-4">
+            <Heart className="w-6 h-6 text-primary" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-display font-black mb-3">¿Por qué es gratis?</h2>
+          <p className="text-muted-foreground leading-relaxed">
+            Porque arrancar un emprendimiento textil ya es bastante difícil. Yaguar Estudio nació para
+            darle a la comunidad las herramientas que nosotros hubiéramos querido tener al empezar.
+            No hay letra chica: es gratis, tus datos son tuyos y siempre vas a poder usarla.
+          </p>
+        </motion.div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section className="px-4 sm:px-6 py-16 sm:py-20">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl sm:text-4xl font-display font-black mb-4">
+              Emprendedores que ya se ordenaron
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Lo que dicen quienes dejaron el caos atrás.
+            </p>
+          </motion.div>
+          <div className="grid sm:grid-cols-3 gap-5">
+            {TESTIMONIALS.map((t, i) => (
+              <motion.div
+                key={t.name}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                className="glass-panel rounded-3xl p-6 border border-border flex flex-col"
+              >
+                <Quote className="w-7 h-7 text-primary/40 mb-3" />
+                <div className="flex gap-0.5 mb-3">
+                  {Array.from({ length: 5 }).map((_, s) => (
+                    <Star key={s} className="w-3.5 h-3.5 fill-primary text-primary" />
+                  ))}
+                </div>
+                <p className="text-sm text-foreground/90 leading-relaxed flex-1">"{t.text}"</p>
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="font-bold text-sm">{t.name}</div>
+                  <div className="text-xs text-muted-foreground">{t.business}</div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
@@ -462,6 +768,206 @@ export function LandingPage() {
         </div>
       </footer>
     </>
+  );
+}
+
+function FeatureRow({
+  eyebrow,
+  title,
+  points,
+  preview,
+  reverse,
+}: {
+  eyebrow: string;
+  title: string;
+  points: string[];
+  preview: React.ReactNode;
+  reverse?: boolean;
+}) {
+  return (
+    <div className="grid lg:grid-cols-2 gap-8 lg:gap-14 items-center">
+      <motion.div
+        initial={{ opacity: 0, x: reverse ? 30 : -30 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true, margin: "-80px" }}
+        transition={{ duration: 0.6 }}
+        className={reverse ? "lg:order-2" : ""}
+      >
+        <div className="text-xs font-bold uppercase tracking-widest text-primary mb-3">{eyebrow}</div>
+        <h3 className="text-2xl sm:text-3xl font-display font-black mb-5">{title}</h3>
+        <ul className="space-y-3">
+          {points.map((p) => (
+            <li key={p} className="flex gap-3 text-muted-foreground">
+              <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <span>{p}</span>
+            </li>
+          ))}
+        </ul>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 20 }}
+        whileInView={{ opacity: 1, scale: 1, y: 0 }}
+        viewport={{ once: true, margin: "-80px" }}
+        transition={{ duration: 0.6 }}
+        className={`relative ${reverse ? "lg:order-1" : ""}`}
+      >
+        <div className="absolute -inset-6 bg-primary/15 blur-3xl rounded-full opacity-40" aria-hidden="true" />
+        <div className="relative">{preview}</div>
+      </motion.div>
+    </div>
+  );
+}
+
+function PreviewFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-xl shadow-2xl overflow-hidden">
+      <div className="flex items-center gap-1.5 px-4 h-9 border-b border-border bg-white/[0.03]">
+        <span className="w-2.5 h-2.5 rounded-full bg-red-400/70" />
+        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/70" />
+        <span className="w-2.5 h-2.5 rounded-full bg-green-400/70" />
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+function CalculatorPreview() {
+  const stamps = [
+    { w: "55%", h: 44, label: "28×32" },
+    { w: "40%", h: 28, label: "20×14" },
+    { w: "40%", h: 28, label: "20×14" },
+  ];
+  return (
+    <PreviewFrame>
+      <div className="flex gap-4">
+        {/* Roll */}
+        <div className="w-24 shrink-0">
+          <div className="text-[9px] uppercase tracking-wide text-muted-foreground mb-1.5">Rollo 58cm</div>
+          <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-1.5 space-y-1.5">
+            {stamps.map((s, i) => (
+              <div
+                key={i}
+                className="rounded bg-gradient-to-br from-primary/70 to-amber-400/70 flex items-center justify-center text-[7px] text-white font-bold"
+                style={{ width: s.w, height: s.h }}
+              >
+                {s.label}
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Result */}
+        <div className="flex-1 space-y-2 min-w-0">
+          <div className="rounded-lg border border-border bg-white/[0.02] p-2.5">
+            <div className="text-[9px] text-muted-foreground">Metros usados</div>
+            <div className="text-base font-display font-black">1,04 m</div>
+          </div>
+          <div className="rounded-lg border border-border bg-white/[0.02] p-2.5">
+            <div className="text-[9px] text-muted-foreground">Precio por prenda</div>
+            <div className="text-base font-display font-black text-primary">$5.200</div>
+          </div>
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5">
+            <div className="text-[9px] text-emerald-400/80">Total del pedido</div>
+            <div className="text-base font-display font-black text-emerald-400">$52.000</div>
+          </div>
+        </div>
+      </div>
+    </PreviewFrame>
+  );
+}
+
+function MockupPreview() {
+  return (
+    <PreviewFrame>
+      <div className="flex items-center justify-center gap-4">
+        <div className="relative">
+          {/* T-shirt silhouette */}
+          <svg width="120" height="120" viewBox="0 0 120 120" className="drop-shadow-lg">
+            <path
+              d="M40 18 L20 30 L28 48 L38 42 L38 104 L82 104 L82 42 L92 48 L100 30 L80 18 L70 24 Q60 32 50 24 Z"
+              fill="#2a2a2a"
+              stroke="#444"
+              strokeWidth="1.5"
+            />
+          </svg>
+          {/* Art on shirt */}
+          <div className="absolute top-[46px] left-1/2 -translate-x-1/2 w-10 h-10 rounded-md bg-gradient-to-br from-primary to-amber-400 flex items-center justify-center">
+            <Palette className="w-5 h-5 text-white" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-[10px] rounded-lg border border-border bg-white/[0.02] px-2.5 py-2">
+            <Layers className="w-3.5 h-3.5 text-primary" /> Arte cargado
+          </div>
+          <div className="flex items-center gap-2 text-[10px] rounded-lg border border-border bg-white/[0.02] px-2.5 py-2">
+            <Scissors className="w-3.5 h-3.5 text-emerald-400" /> Fondo removido
+          </div>
+          <div className="flex items-center gap-2 text-[10px] rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 font-bold text-primary">
+            <Check className="w-3.5 h-3.5" /> Mockup listo
+          </div>
+        </div>
+      </div>
+    </PreviewFrame>
+  );
+}
+
+function FinancePreview() {
+  const bars = [40, 65, 50, 80, 58, 92];
+  return (
+    <PreviewFrame>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5">
+            <div className="text-[9px] text-emerald-400/80">Ingresos</div>
+            <div className="text-sm font-display font-black text-emerald-400">$248.000</div>
+          </div>
+          <div className="rounded-lg border border-border bg-white/[0.02] p-2.5">
+            <div className="text-[9px] text-muted-foreground">Punto de equilibrio</div>
+            <div className="text-sm font-display font-black">$140.000</div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-white/[0.02] p-3">
+          <div className="text-[9px] uppercase tracking-wide text-muted-foreground mb-2">
+            Resultado por mes
+          </div>
+          <div className="flex items-end gap-1.5 h-16">
+            {bars.map((h, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-t bg-gradient-to-t from-primary to-amber-400"
+                style={{ height: `${h}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </PreviewFrame>
+  );
+}
+
+function CompareCell({ value, highlight }: { value: boolean | string; highlight?: boolean }) {
+  if (value === true) {
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${
+          highlight ? "bg-primary/20 text-primary" : "bg-emerald-500/15 text-emerald-400"
+        }`}
+      >
+        <Check className="w-4 h-4" />
+      </span>
+    );
+  }
+  if (value === false) {
+    return (
+      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/5 text-muted-foreground/50">
+        <X className="w-4 h-4" />
+      </span>
+    );
+  }
+  return (
+    <span className={`text-xs font-medium ${highlight ? "text-primary font-bold" : "text-muted-foreground"}`}>
+      {value}
+    </span>
   );
 }
 
