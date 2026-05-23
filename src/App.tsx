@@ -14,6 +14,8 @@ import { ProfilePage } from "@/pages/profile";
 import { ClientsPage } from "@/pages/clients";
 import { SuppliersPage } from "@/pages/suppliers";
 import { OrdersPage } from "@/pages/orders";
+import { FinancePage } from "@/pages/finance";
+import { AccountsPage } from "@/pages/accounts";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
 import { RequireAuth } from "@/components/require-auth";
@@ -83,6 +85,20 @@ function App() {
                     <RequireAuth>
                       <DashboardLayout>
                         <OrdersPage />
+                      </DashboardLayout>
+                    </RequireAuth>
+                  </Route>
+                  <Route path="/finance">
+                    <RequireAuth>
+                      <DashboardLayout>
+                        <FinancePage />
+                      </DashboardLayout>
+                    </RequireAuth>
+                  </Route>
+                  <Route path="/accounts">
+                    <RequireAuth>
+                      <DashboardLayout>
+                        <AccountsPage />
                       </DashboardLayout>
                     </RequireAuth>
                   </Route>

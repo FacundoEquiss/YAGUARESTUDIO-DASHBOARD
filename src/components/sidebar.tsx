@@ -57,9 +57,9 @@ const TOOLS_NAV: NavItem[] = [
 ].filter((item) => item.ready || SHOW_COMING_SOON_IN_SIDEBAR);
 
 const FINANCE_NAV: NavItem[] = [
-  { href: "/finance", label: "Ingresos / Gastos", icon: DollarSign, ready: false },
+  { href: "/finance", label: "Ingresos / Gastos", icon: DollarSign, ready: true },
   { href: "/reports", label: "Reportes", icon: BarChart3, ready: false },
-  { href: "/accounts", label: "Cuentas Corrientes", icon: Landmark, ready: false },
+  { href: "/accounts", label: "Cuentas Corrientes", icon: Landmark, ready: true },
 ].filter((item) => item.ready || SHOW_COMING_SOON_IN_SIDEBAR);
 
 const TELEGRAM_LINK = "https://t.me/+IhEEsOPYZ-MzZDYx";
