@@ -20,7 +20,7 @@ interface NavbarProps {
 
 const TOOLS = [
   { href: "/app", label: "Cotizador DTF", icon: Calculator, ready: true },
-  { href: "/mockups", label: "Generador de Mockups", icon: Shirt, ready: false },
+  { href: "/mockups", label: "Generador de Mockups", icon: Shirt, ready: true },
 ];
 
 export function Navbar({ isLanding = false, onScrollTo }: NavbarProps) {
