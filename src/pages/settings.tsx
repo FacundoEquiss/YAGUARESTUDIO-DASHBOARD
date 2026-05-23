@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Plus,
   X,
+  Check,
 } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { deleteUser } from "firebase/auth";
@@ -34,6 +35,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 import { CURRENCIES, setCurrencyConfig } from "@/lib/currency";
+import {
+  ACCENT_THEMES,
+  accentFromHex,
+  getStoredAccent,
+  setStoredAccent,
+  type StoredAccent,
+} from "@/lib/theme-accent";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -276,6 +284,28 @@ function AppearanceSection() {
     { id: "light", label: "Claro", icon: Sun },
   ] as const;
 
+  const [accent, setAccent] = useState<StoredAccent>(
+    () => getStoredAccent() ?? { primary: ACCENT_THEMES[0].primary, primaryForeground: ACCENT_THEMES[0].primaryForeground, presetId: ACCENT_THEMES[0].id },
+  );
+  const [customHex, setCustomHex] = useState("#f97316");
+
+  function selectPreset(t: (typeof ACCENT_THEMES)[number]) {
+    const next: StoredAccent = { primary: t.primary, primaryForeground: t.primaryForeground, presetId: t.id };
+    setAccent(next);
+    setStoredAccent(next);
+  }
+
+  function selectCustom(hex: string) {
+    setCustomHex(hex);
+    const next = accentFromHex(hex);
+    if (next) {
+      setAccent(next);
+      setStoredAccent(next);
+    }
+  }
+
+  const isCustom = !accent.presetId;
+
   return (
     <div className="space-y-6 max-w-lg">
       <Card>
@@ -299,6 +329,71 @@ function AppearanceSection() {
               </button>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h3 className="text-base font-bold">Color de tu marca</h3>
+          <p className="text-sm text-muted-foreground -mt-2">
+            Elegí el color principal de la app. Dale la impronta de tu negocio.
+          </p>
+
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+            {ACCENT_THEMES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => selectPreset(t)}
+                title={t.name}
+                aria-label={t.name}
+                className={cn(
+                  "aspect-square rounded-xl border-2 transition-transform hover:scale-105 flex items-center justify-center",
+                  accent.presetId === t.id ? "border-foreground" : "border-transparent",
+                )}
+                style={{ background: t.swatch }}
+              >
+                {accent.presetId === t.id ? <Check className="w-4 h-4 text-white drop-shadow" /> : null}
+              </button>
+            ))}
+          </div>
+
+          <div className="pt-2 border-t border-border">
+            <Label htmlFor="custom-accent" className="text-sm font-bold">
+              Color personalizado
+            </Label>
+            <div className="flex items-center gap-3 mt-2">
+              <input
+                id="custom-accent"
+                type="color"
+                value={customHex}
+                onChange={(e) => selectCustom(e.target.value)}
+                className="w-12 h-12 rounded-lg border border-border bg-transparent cursor-pointer"
+              />
+              <div className="flex-1">
+                <Input value={customHex} onChange={(e) => selectCustom(e.target.value)} className="font-mono" />
+              </div>
+              <span
+                className={cn(
+                  "text-xs px-2 py-1 rounded-md font-semibold",
+                  isCustom ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground",
+                )}
+              >
+                {isCustom ? "Activo" : "—"}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border p-4 flex items-center gap-3">
+            <div className="text-xs text-muted-foreground">Vista previa:</div>
+            <button className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+              Botón
+            </button>
+            <span className="text-primary font-bold text-sm">Texto destacado</span>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            El color se guarda en este dispositivo y se aplica al instante.
+          </p>
         </CardContent>
       </Card>
     </div>
