@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { v4 as uuidv4 } from "uuid";
+import { setOrderDraft } from "@/lib/order-draft";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Trash2, Save, Users, MessageCircle, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Plus, Trash2, Save, Users, MessageCircle, ChevronDown, ChevronUp, Info, ClipboardList } from "lucide-react";
 import { HelpTooltip } from "@/components/help-tooltip";
 import { useDTFSettings, useDTFQuotes } from "@/hooks/use-dtf-store";
 import { StampItem, STAMP_COLORS } from "@/lib/skyline";
@@ -79,6 +81,7 @@ export function CalculatorPage() {
   const isDark = theme === "dark";
   const { saveQuote } = useDTFQuotes();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const [clientName, setClientName] = useState("");
   const [orderName, setOrderName] = useState("");
@@ -248,6 +251,34 @@ export function CalculatorPage() {
       talleActive,
     });
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
+  const handleCreateOrder = () => {
+    if (packedResult.placements.length === 0 || packedResult.errors.length > 0) {
+      toast({
+        title: "Cotización incompleta",
+        description: "Completá una cotización válida antes de crear el pedido.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const stampSummary = stamps
+      .filter((s) => s.w > 0 && s.h > 0 && s.qty > 0)
+      .map((s) => `${s.title || "Estampa"} ${s.w}×${s.h}cm`)
+      .join(", ");
+    setOrderDraft({
+      clientName: clientName.trim(),
+      orderName: orderName.trim() || "Pedido DTF",
+      items: [
+        {
+          description: `Estampado DTF${stampSummary ? ` (${stampSummary})` : ""}`,
+          quantity: garments,
+          unitPrice: pricePerGarment,
+        },
+      ],
+      notes: notes.trim(),
+    });
+    setLocation("/orders");
   };
 
   const validStampsCount = stamps.filter(s => s.w > 0 && s.h > 0).length;
@@ -823,6 +854,15 @@ export function CalculatorPage() {
         </button>
       </div>
 
+      <button
+        onClick={handleCreateOrder}
+        disabled={packedResult.errors.length > 0 || packedResult.placements.length === 0}
+        className="hidden md:flex w-full items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-border bg-white/5 hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <ClipboardList className="w-4 h-4 text-foreground shrink-0" />
+        <span className="text-foreground font-bold text-sm">Crear pedido con esta cotización</span>
+      </button>
+
       <div className="space-y-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <div className="w-2 h-6 bg-primary rounded-full"></div>
@@ -900,6 +940,15 @@ export function CalculatorPage() {
           </span>
         </button>
       </div>
+
+      <button
+        onClick={handleCreateOrder}
+        disabled={packedResult.errors.length > 0 || packedResult.placements.length === 0}
+        className="md:hidden w-full flex items-center justify-center gap-2 py-3 mt-3 rounded-2xl border border-border bg-white/5 hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <ClipboardList className="w-5 h-5 text-foreground shrink-0" />
+        <span className="text-foreground font-bold text-sm">Crear pedido con esta cotización</span>
+      </button>
 
       </div>
       </div>

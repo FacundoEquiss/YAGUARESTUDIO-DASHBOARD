@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Search,
@@ -399,30 +399,29 @@ function ProductFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setForm(
-        product
-          ? {
-              name: product.name ?? "",
-              category: product.category ?? "",
-              sku: product.sku ?? "",
-              size: product.size ?? "",
-              color: product.color ?? "",
-              stock: product.stock ?? 0,
-              minStock: product.minStock ?? 0,
-              unitCost: product.unitCost ?? 0,
-              unitPrice: product.unitPrice ?? 0,
-              supplierId: product.supplierId ?? "",
-              supplierName: product.supplierName ?? "",
-              notes: product.notes ?? "",
-            }
-          : EMPTY_INPUT,
-      );
-      setError(null);
-    }
-    onOpenChange(next);
-  }
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      product
+        ? {
+            name: product.name ?? "",
+            category: product.category ?? "",
+            sku: product.sku ?? "",
+            size: product.size ?? "",
+            color: product.color ?? "",
+            stock: product.stock ?? 0,
+            minStock: product.minStock ?? 0,
+            unitCost: product.unitCost ?? 0,
+            unitPrice: product.unitPrice ?? 0,
+            supplierId: product.supplierId ?? "",
+            supplierName: product.supplierName ?? "",
+            notes: product.notes ?? "",
+          }
+        : EMPTY_INPUT,
+    );
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   function selectSupplier(supplierId: string) {
     if (supplierId === "__none__") {
@@ -466,7 +465,7 @@ function ProductFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar producto" : "Nuevo producto"}</DialogTitle>

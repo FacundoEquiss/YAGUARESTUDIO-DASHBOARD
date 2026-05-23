@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { takeOrderDraft } from "@/lib/order-draft";
 import {
   Plus,
   Search,
@@ -101,7 +102,25 @@ export function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
+  const [draftPrefill, setDraftPrefill] = useState<OrderInput | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Order | null>(null);
+
+  // If we arrived from the DTF calculator with a draft, open the form prefilled.
+  useEffect(() => {
+    const draft = takeOrderDraft();
+    if (draft) {
+      setEditing(null);
+      setDraftPrefill({
+        ...EMPTY_INPUT,
+        clientName: draft.clientName,
+        orderName: draft.orderName,
+        items: draft.items.length ? draft.items : EMPTY_INPUT.items,
+        notes: draft.notes,
+        total: draft.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0),
+      });
+      setFormOpen(true);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const term = normalizeForSearch(search.trim());
@@ -132,11 +151,13 @@ export function OrdersPage() {
 
   function openCreate() {
     setEditing(null);
+    setDraftPrefill(null);
     setFormOpen(true);
   }
 
   function openEdit(order: Order) {
     setEditing(order);
+    setDraftPrefill(null);
     setFormOpen(true);
   }
 
@@ -249,6 +270,7 @@ export function OrdersPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         order={editing}
+        draft={draftPrefill}
         onSave={async (data) => {
           if (editing) {
             await update(editing.id, data);
@@ -404,11 +426,13 @@ function OrderFormDialog({
   open,
   onOpenChange,
   order,
+  draft,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: Order | null;
+  draft?: OrderInput | null;
   onSave: (data: OrderInput) => Promise<void>;
 }) {
   const isEdit = !!order;
@@ -417,34 +441,35 @@ function OrderFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setForm(
-        order
-          ? {
-              clientId: order.clientId ?? "",
-              clientName: order.clientName ?? "",
-              orderName: order.orderName ?? "",
-              items: order.items?.length
-                ? order.items.map((i) => ({
-                    description: i.description ?? "",
-                    quantity: i.quantity ?? 0,
-                    unitPrice: i.unitPrice ?? 0,
-                  }))
-                : [{ description: "", quantity: 1, unitPrice: 0 }],
-              total: order.total ?? 0,
-              paidAmount: order.paidAmount ?? 0,
-              paymentStatus: order.paymentStatus ?? "unpaid",
-              status: order.status ?? "draft",
-              dueDate: order.dueDate ?? "",
-              notes: order.notes ?? "",
-            }
-          : EMPTY_INPUT,
-      );
-      setError(null);
-    }
-    onOpenChange(next);
-  }
+  // Rebuild the form whenever the dialog opens, regardless of how it was
+  // triggered (user click or programmatic open from a calculator draft).
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      order
+        ? {
+            clientId: order.clientId ?? "",
+            clientName: order.clientName ?? "",
+            orderName: order.orderName ?? "",
+            items: order.items?.length
+              ? order.items.map((i) => ({
+                  description: i.description ?? "",
+                  quantity: i.quantity ?? 0,
+                  unitPrice: i.unitPrice ?? 0,
+                }))
+              : [{ description: "", quantity: 1, unitPrice: 0 }],
+            total: order.total ?? 0,
+            paidAmount: order.paidAmount ?? 0,
+            paymentStatus: order.paymentStatus ?? "unpaid",
+            status: order.status ?? "draft",
+            dueDate: order.dueDate ?? "",
+            notes: order.notes ?? "",
+          }
+        : draft ?? EMPTY_INPUT,
+    );
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const total = useMemo(() => computeTotal(form.items), [form.items]);
 
@@ -513,7 +538,7 @@ function OrderFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar pedido" : "Nuevo pedido"}</DialogTitle>

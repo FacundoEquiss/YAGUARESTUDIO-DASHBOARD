@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Users, Pencil, Trash2, Mail, Phone, Building2, StickyNote, Loader2 } from "lucide-react";
 import { useClients, type Client, type ClientInput } from "@/hooks/use-clients";
 import { useToast } from "@/hooks/use-toast";
@@ -271,23 +271,22 @@ function ClientFormDialog({
   const [error, setError] = useState<string | null>(null);
 
   // Reset form whenever the dialog opens with a new context.
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setForm(
-        client
-          ? {
-              name: client.name ?? "",
-              email: client.email ?? "",
-              phone: client.phone ?? "",
-              businessName: client.businessName ?? "",
-              notes: client.notes ?? "",
-            }
-          : EMPTY_INPUT,
-      );
-      setError(null);
-    }
-    onOpenChange(next);
-  }
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      client
+        ? {
+            name: client.name ?? "",
+            email: client.email ?? "",
+            phone: client.phone ?? "",
+            businessName: client.businessName ?? "",
+            notes: client.notes ?? "",
+          }
+        : EMPTY_INPUT,
+    );
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -314,7 +313,7 @@ function ClientFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>

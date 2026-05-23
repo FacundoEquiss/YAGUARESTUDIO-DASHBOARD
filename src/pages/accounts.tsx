@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Landmark, Pencil, Trash2, Loader2, Wallet, Banknote, Building2 } from "lucide-react";
 import {
   useFinancialAccounts,
@@ -258,22 +258,21 @@ function AccountFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setForm(
-        account
-          ? {
-              name: account.name ?? "",
-              type: account.type ?? "bank",
-              initialBalance: account.initialBalance ?? 0,
-              description: account.description ?? "",
-            }
-          : EMPTY_INPUT,
-      );
-      setError(null);
-    }
-    onOpenChange(next);
-  }
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      account
+        ? {
+            name: account.name ?? "",
+            type: account.type ?? "bank",
+            initialBalance: account.initialBalance ?? 0,
+            description: account.description ?? "",
+          }
+        : EMPTY_INPUT,
+    );
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -299,7 +298,7 @@ function AccountFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar cuenta" : "Nueva cuenta"}</DialogTitle>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Truck, Pencil, Trash2, Mail, Phone, User, Tag, StickyNote, Loader2 } from "lucide-react";
 import { useSuppliers, type Supplier, type SupplierInput } from "@/hooks/use-suppliers";
 import { useToast } from "@/hooks/use-toast";
@@ -287,24 +287,23 @@ function SupplierFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setForm(
-        supplier
-          ? {
-              name: supplier.name ?? "",
-              contactName: supplier.contactName ?? "",
-              email: supplier.email ?? "",
-              phone: supplier.phone ?? "",
-              category: supplier.category ?? "",
-              notes: supplier.notes ?? "",
-            }
-          : EMPTY_INPUT,
-      );
-      setError(null);
-    }
-    onOpenChange(next);
-  }
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      supplier
+        ? {
+            name: supplier.name ?? "",
+            contactName: supplier.contactName ?? "",
+            email: supplier.email ?? "",
+            phone: supplier.phone ?? "",
+            category: supplier.category ?? "",
+            notes: supplier.notes ?? "",
+          }
+        : EMPTY_INPUT,
+    );
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -332,7 +331,7 @@ function SupplierFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar proveedor" : "Nuevo proveedor"}</DialogTitle>

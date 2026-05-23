@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Search,
@@ -398,29 +398,28 @@ function TransactionFormDialog({
   const isIncome = form.type === "income";
   const categories = isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setForm(
-        transaction
-          ? {
-              type: transaction.type,
-              amount: transaction.amount ?? 0,
-              category: transaction.category ?? "",
-              description: transaction.description ?? "",
-              date: transaction.date ?? todayISO(),
-              accountId: transaction.accountId ?? "",
-              relatedOrderId: transaction.relatedOrderId ?? "",
-              relatedClientId: transaction.relatedClientId ?? "",
-              relatedSupplierId: transaction.relatedSupplierId ?? "",
-              paymentMethod: transaction.paymentMethod ?? "transfer",
-              notes: transaction.notes ?? "",
-            }
-          : buildEmptyInput(type),
-      );
-      setError(null);
-    }
-    onOpenChange(next);
-  }
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      transaction
+        ? {
+            type: transaction.type,
+            amount: transaction.amount ?? 0,
+            category: transaction.category ?? "",
+            description: transaction.description ?? "",
+            date: transaction.date ?? todayISO(),
+            accountId: transaction.accountId ?? "",
+            relatedOrderId: transaction.relatedOrderId ?? "",
+            relatedClientId: transaction.relatedClientId ?? "",
+            relatedSupplierId: transaction.relatedSupplierId ?? "",
+            paymentMethod: transaction.paymentMethod ?? "transfer",
+            notes: transaction.notes ?? "",
+          }
+        : buildEmptyInput(type),
+    );
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -450,7 +449,7 @@ function TransactionFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
