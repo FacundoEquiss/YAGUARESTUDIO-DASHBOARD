@@ -16,6 +16,7 @@ import { SuppliersPage } from "@/pages/suppliers";
 import { OrdersPage } from "@/pages/orders";
 import { FinancePage } from "@/pages/finance";
 import { AccountsPage } from "@/pages/accounts";
+import { ProductsPage } from "@/pages/products";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AuthLoadingBoundary } from "@/components/auth-loading-boundary";
 import { RequireAuth } from "@/components/require-auth";
@@ -99,6 +100,13 @@ function App() {
                     <RequireAuth>
                       <DashboardLayout>
                         <AccountsPage />
+                      </DashboardLayout>
+                    </RequireAuth>
+                  </Route>
+                  <Route path="/products">
+                    <RequireAuth>
+                      <DashboardLayout>
+                        <ProductsPage />
                       </DashboardLayout>
                     </RequireAuth>
                   </Route>

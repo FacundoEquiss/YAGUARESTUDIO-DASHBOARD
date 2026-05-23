@@ -44,7 +44,7 @@ const MAIN_NAV: NavItem[] = [
   { href: "/orders", label: "Pedidos", icon: ClipboardList, ready: true },
   { href: "/clients", label: "Clientes", icon: Users, ready: true },
   { href: "/suppliers", label: "Proveedores", icon: Truck, ready: true },
-  { href: "/products", label: "Productos / Stock", icon: Package2, ready: false },
+  { href: "/products", label: "Productos / Stock", icon: Package2, ready: true },
   { href: "/services", label: "Servicios", icon: Wrench, ready: false },
 ].filter((item) => item.ready || SHOW_COMING_SOON_IN_SIDEBAR);
 
