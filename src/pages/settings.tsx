@@ -1,311 +1,447 @@
-import { useEffect, useState } from "react";
-import { Save, Settings } from "lucide-react";
-import { HelpTooltip } from "@/components/help-tooltip";
-import { useDTFSettings } from "@/hooks/use-dtf-store";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
+import {
+  Settings as SettingsIcon,
+  Building2,
+  Calculator,
+  Palette,
+  Database,
+  Save,
+  Download,
+  LogOut,
+  Trash2,
+  User as UserIcon,
+  Sun,
+  Moon,
+  Loader2,
+} from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { deleteUser } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/use-auth";
+import { useBusinessSettings, type BusinessSettings } from "@/hooks/use-business-settings";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
+import { CURRENCIES, setCurrencyConfig } from "@/lib/currency";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { DtfSettingsSection } from "@/components/settings/dtf-settings-section";
+
+type SectionId = "negocio" | "cotizador" | "apariencia" | "datos";
+
+const SECTIONS: { id: SectionId; label: string; icon: typeof Building2 }[] = [
+  { id: "negocio", label: "Mi negocio", icon: Building2 },
+  { id: "cotizador", label: "Cotizador DTF", icon: Calculator },
+  { id: "apariencia", label: "Apariencia", icon: Palette },
+  { id: "datos", label: "Datos y cuenta", icon: Database },
+];
+
+function getHashSection(): SectionId {
+  const h = (typeof window !== "undefined" ? window.location.hash.replace("#", "") : "") as SectionId;
+  return SECTIONS.some((s) => s.id === h) ? h : "negocio";
+}
 
 export function SettingsPage() {
-  const { settings, setSettings } = useDTFSettings();
-  const { toast } = useToast();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
-  const [price, setPrice] = useState(settings.pricePerMeter.toString());
-  const [width, setWidth] = useState(settings.rollWidth.toString());
-  const [baseMargin, setBaseMargin] = useState(settings.baseMargin.toString());
-  const [wholesaleMargin, setWholesaleMargin] = useState(settings.wholesaleMargin.toString());
-  const [pressPassThreshold, setPressPassThreshold] = useState(settings.pressPassThreshold.toString());
-  const [pressPassExtraCost, setPressPassExtraCost] = useState(settings.pressPassExtraCost.toString());
-  const [talleEnabled, setTalleEnabled] = useState(settings.talleEnabled);
-  const [talleSurcharge, setTalleSurcharge] = useState(settings.talleSurcharge.toString());
+  const [active, setActive] = useState<SectionId>(getHashSection);
 
   useEffect(() => {
-    setPrice(settings.pricePerMeter.toString());
-    setWidth(settings.rollWidth.toString());
-    setBaseMargin(settings.baseMargin.toString());
-    setWholesaleMargin(settings.wholesaleMargin.toString());
-    setPressPassThreshold(settings.pressPassThreshold.toString());
-    setPressPassExtraCost(settings.pressPassExtraCost.toString());
-    setTalleEnabled(settings.talleEnabled);
-    setTalleSurcharge(settings.talleSurcharge.toString());
-  }, [settings]);
+    const onHash = () => setActive(getHashSection());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
+  function selectSection(id: SectionId) {
+    setActive(id);
+    if (typeof window !== "undefined") window.history.replaceState(null, "", `#${id}`);
+  }
+
+  return (
+    <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col gap-6 pb-12 max-w-5xl">
+      <header className="flex items-center gap-2">
+        <SettingsIcon className="w-7 h-7 text-primary" />
+        <div>
+          <h1 className="text-3xl font-display font-bold">Configuración</h1>
+          <p className="text-muted-foreground text-sm">Ajustá tu negocio y tus preferencias.</p>
+        </div>
+      </header>
+
+      {/* Section nav */}
+      <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
+        {SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => selectSection(s.id)}
+            className={cn(
+              "shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors",
+              active === s.id
+                ? "bg-primary/12 text-primary border-primary/30"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <s.icon className="w-4 h-4" />
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-8">
+        {/* Desktop sidebar nav */}
+        <nav className="hidden lg:flex flex-col gap-1 w-52 shrink-0">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => selectSection(s.id)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left",
+                active === s.id
+                  ? "bg-primary/12 text-primary font-bold"
+                  : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+              )}
+            >
+              <s.icon className="w-4 h-4 shrink-0" />
+              {s.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex-1 min-w-0">
+          {active === "negocio" && <BusinessSection />}
+          {active === "cotizador" && <DtfSettingsSection />}
+          {active === "apariencia" && <AppearanceSection />}
+          {active === "datos" && <DataSection />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BusinessSection() {
+  const { settings, loading, save } = useBusinessSettings();
+  const { toast } = useToast();
+  const [form, setForm] = useState<BusinessSettings>(settings);
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
-    const numPrice = parseInt(price);
-    const numWidth = parseFloat(width);
-    const numBaseMargin = parseInt(baseMargin);
-    const numWholesaleMargin = parseInt(wholesaleMargin);
-    const numPressPassThreshold = parseInt(pressPassThreshold);
-    const numPressPassExtraCost = parseInt(pressPassExtraCost);
-    const numTalleSurcharge = parseInt(talleSurcharge);
+  useEffect(() => {
+    if (!loading) setForm(settings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
-    if (isNaN(numPrice) || numPrice <= 0) {
-      toast({ title: "Error", description: "El precio por metro debe ser un número válido mayor a 0.", variant: "destructive" });
-      return;
-    }
-    if (isNaN(numWidth) || numWidth < 20 || numWidth > 120) {
-      toast({ title: "Error", description: "El ancho del rollo debe estar entre 20cm y 120cm.", variant: "destructive" });
-      return;
-    }
-    if (isNaN(numBaseMargin) || numBaseMargin < 0) {
-      toast({ title: "Error", description: "El margen base debe ser 0 o mayor.", variant: "destructive" });
-      return;
-    }
-    if (isNaN(numWholesaleMargin) || numWholesaleMargin < 0) {
-      toast({ title: "Error", description: "El margen mayorista debe ser 0 o mayor.", variant: "destructive" });
-      return;
-    }
-    if (isNaN(numPressPassThreshold) || numPressPassThreshold < 1) {
-      toast({ title: "Error", description: "El umbral de bajadas debe ser al menos 1.", variant: "destructive" });
-      return;
-    }
-    if (isNaN(numPressPassExtraCost) || numPressPassExtraCost < 0) {
-      toast({ title: "Error", description: "El costo extra por bajada debe ser 0 o mayor.", variant: "destructive" });
-      return;
-    }
-    if (isNaN(numTalleSurcharge) || numTalleSurcharge < 0) {
-      toast({ title: "Error", description: "El recargo por talle debe ser 0 o mayor.", variant: "destructive" });
-      return;
-    }
-
+  async function handleSave() {
     setSaving(true);
     try {
-      await setSettings({
-        pricePerMeter: numPrice,
-        rollWidth: numWidth,
-        baseMargin: numBaseMargin,
-        wholesaleMargin: numWholesaleMargin,
-        pressPassThreshold: numPressPassThreshold,
-        pressPassExtraCost: numPressPassExtraCost,
-        talleEnabled,
-        talleSurcharge: numTalleSurcharge,
-      });
-      toast({
-        title: "Configuración guardada",
-        description: "Los valores se aplicarán a las nuevas cotizaciones.",
-      });
+      await save(form);
+      const match = CURRENCIES.find((c) => c.code === form.currency) ?? CURRENCIES[0];
+      setCurrencyConfig({ currency: match.code, locale: match.locale });
+      toast({ title: "Datos guardados", description: "Tu información de negocio se actualizó." });
     } catch {
-      toast({
-        title: "Error",
-        description: "No se pudo guardar. Probá de nuevo.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No se pudo guardar.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
-  };
+  }
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-6 flex flex-col gap-6 pb-12 md:max-w-lg">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-foreground font-display font-bold flex items-center gap-2">Ajustes <HelpTooltip text="Configurá los parámetros de tu cotizador DTF: precios, márgenes, bajadas de plancha y recargo por talle." /></h1>
-          <p className="text-muted-foreground mt-1 font-medium">Configurá tu cotizador</p>
-        </div>
-        <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
-          <Settings className="w-6 h-6 text-primary" />
-        </div>
-      </div>
-
-      <Card className="border-none shadow-md bg-card">
-        <CardContent className="p-6 space-y-6">
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            Material y Rollo
-            <HelpTooltip text="Precio del material DTF por metro lineal y ancho físico de tu rollo." iconSize={13} />
-          </h3>
+    <div className="space-y-6 max-w-lg">
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h3 className="text-base font-bold">Datos de tu negocio</h3>
+          <p className="text-sm text-muted-foreground -mt-2">
+            Aparecen en tus cotizaciones y presupuestos.
+          </p>
 
           <div className="space-y-2">
-            <Label htmlFor="price" className="text-sm font-bold flex items-center justify-between">
-              Precio por Metro Lineal
-              <span className="text-xs font-normal bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-400 px-2 py-1 rounded">CLP ($)</span>
-            </Label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">$</span>
-              <Input
-                id="price"
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="pl-9 font-bold text-lg h-14"
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">El valor a cobrar por cada 1 metro de material utilizado.</p>
-          </div>
-
-          <div className="w-full h-px bg-border" />
-
-          <div className="space-y-2">
-            <Label htmlFor="width" className="text-sm font-bold flex items-center justify-between">
-              Ancho del Rollo
-              <span className="text-xs font-normal bg-secondary px-2 py-1 rounded">Centímetros (cm)</span>
-            </Label>
-            <div className="relative">
-              <Input
-                id="width"
-                type="number"
-                value={width}
-                onChange={(e) => setWidth(e.target.value)}
-                className="pr-12 font-bold text-lg h-14"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">cm</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Ancho físico del rollo DTF (estándar: 58cm o 60cm).</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-none shadow-md bg-card">
-        <CardContent className="p-6 space-y-6">
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            Márgenes de Ganancia
-            <HelpTooltip text="Montos que se suman al costo del material por prenda para calcular el precio de venta." iconSize={13} />
-          </h3>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="baseMargin" className="text-sm font-bold">Margen Base (común)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
-                <Input
-                  id="baseMargin"
-                  type="number"
-                  value={baseMargin}
-                  onChange={(e) => setBaseMargin(e.target.value)}
-                  className="pl-8 font-bold h-12"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Se suma al costo DTF por prenda.</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="wholesaleMargin" className="text-sm font-bold">Margen Mayorista</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
-                <Input
-                  id="wholesaleMargin"
-                  type="number"
-                  value={wholesaleMargin}
-                  onChange={(e) => setWholesaleMargin(e.target.value)}
-                  className="pl-8 font-bold h-12"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Se usa cuando activás la opción mayorista.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-none shadow-md bg-card">
-        <CardContent className="p-6 space-y-6">
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            Bajadas de Plancha
-            <HelpTooltip text="Cuando un diseño requiere más pasadas por la plancha térmica que el umbral, se cobra un extra por cada pasada adicional." iconSize={13} />
-          </h3>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="pressPassThreshold" className="text-sm font-bold">Umbral (incluidas)</Label>
-              <Input
-                id="pressPassThreshold"
-                type="number"
-                min="1"
-                value={pressPassThreshold}
-                onChange={(e) => setPressPassThreshold(e.target.value)}
-                className="font-bold h-12"
-              />
-              <p className="text-xs text-muted-foreground">Bajadas incluidas en el precio base.</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pressPassExtraCost" className="text-sm font-bold">Costo Extra por Bajada</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
-                <Input
-                  id="pressPassExtraCost"
-                  type="number"
-                  min="0"
-                  value={pressPassExtraCost}
-                  onChange={(e) => setPressPassExtraCost(e.target.value)}
-                  className="pl-8 font-bold h-12"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Se cobra por cada bajada que exceda el umbral.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-none shadow-md bg-card">
-        <CardContent className="p-6 space-y-6">
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            Recargo por Talle
-            <HelpTooltip text="Cuando el diseño lleva talle (número o letra estampada), se suma un recargo adicional por prenda." iconSize={13} />
-          </h3>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold text-foreground">Talle habilitado por defecto</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Activar talle automáticamente en cada cotización.</p>
-            </div>
-            <button
-              onClick={() => setTalleEnabled(v => !v)}
-              aria-label="Toggle talle"
-              style={{
-                width: 51,
-                height: 31,
-                borderRadius: 999,
-                backgroundColor: talleEnabled ? "#f97316" : isDark ? "#374151" : "#d1d5db",
-                position: "relative",
-                border: "none",
-                cursor: "pointer",
-                transition: "background-color 0.25s ease",
-                flexShrink: 0,
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: talleEnabled ? 22 : 2,
-                  width: 27,
-                  height: 27,
-                  borderRadius: "50%",
-                  backgroundColor: "#ffffff",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
-                  transition: "left 0.25s ease",
-                  display: "block",
-                }}
-              />
-            </button>
+            <Label htmlFor="biz-name">Nombre del negocio</Label>
+            <Input
+              id="biz-name"
+              value={form.businessName}
+              onChange={(e) => setForm((f) => ({ ...f, businessName: e.target.value }))}
+              placeholder="Mi Emprendimiento Textil"
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="talleSurcharge" className="text-sm font-bold">Recargo por Talle</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
-              <Input
-                id="talleSurcharge"
-                type="number"
-                min="0"
-                value={talleSurcharge}
-                onChange={(e) => setTalleSurcharge(e.target.value)}
-                className="pl-8 font-bold h-12"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">Monto adicional por prenda cuando el diseño lleva talle.</p>
+            <Label htmlFor="biz-tax">CUIT / Identificación fiscal (opcional)</Label>
+            <Input
+              id="biz-tax"
+              value={form.taxId}
+              onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
+              placeholder="20-12345678-9"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="biz-currency">Moneda</Label>
+            <Select value={form.currency} onValueChange={(v) => setForm((f) => ({ ...f, currency: v }))}>
+              <SelectTrigger id="biz-currency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CURRENCIES.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Se usa para mostrar todos los precios de la app.
+            </p>
           </div>
         </CardContent>
       </Card>
 
-      <Button size="lg" className="w-full rounded-2xl mt-2" onClick={handleSave} disabled={saving}>
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h3 className="text-base font-bold">Contacto</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="biz-phone">Teléfono / WhatsApp</Label>
+              <Input
+                id="biz-phone"
+                value={form.contactPhone}
+                onChange={(e) => setForm((f) => ({ ...f, contactPhone: e.target.value }))}
+                placeholder="+54 9 11 …"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="biz-email">Email</Label>
+              <Input
+                id="biz-email"
+                type="email"
+                value={form.contactEmail}
+                onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))}
+                placeholder="contacto@minegocio.com"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="biz-ig">Instagram</Label>
+            <Input
+              id="biz-ig"
+              value={form.instagram}
+              onChange={(e) => setForm((f) => ({ ...f, instagram: e.target.value }))}
+              placeholder="@minegocio"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Button size="lg" className="w-full rounded-2xl" onClick={handleSave} disabled={saving || loading}>
         <Save className="w-5 h-5 mr-2" />
-        {saving ? "Guardando…" : "Guardar Ajustes"}
+        {saving ? "Guardando…" : "Guardar datos del negocio"}
       </Button>
+    </div>
+  );
+}
+
+function AppearanceSection() {
+  const { theme, setTheme } = useTheme();
+  const options = [
+    { id: "dark", label: "Oscuro", icon: Moon },
+    { id: "light", label: "Claro", icon: Sun },
+  ] as const;
+
+  return (
+    <div className="space-y-6 max-w-lg">
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h3 className="text-base font-bold">Tema</h3>
+          <p className="text-sm text-muted-foreground -mt-2">Elegí cómo se ve la app.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {options.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => setTheme(o.id)}
+                className={cn(
+                  "flex flex-col items-center gap-2 p-5 rounded-2xl border transition-colors",
+                  theme === o.id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <o.icon className="w-6 h-6" />
+                <span className="text-sm font-bold">{o.label}</span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+const EXPORT_COLLECTIONS = [
+  "clients",
+  "suppliers",
+  "orders",
+  "products",
+  "services",
+  "transactions",
+  "financialAccounts",
+];
+
+function DataSection() {
+  const { currentUser, logout } = useAuth();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [exporting, setExporting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const uid = currentUser?.uid;
+
+  async function handleExport() {
+    if (!uid) return;
+    setExporting(true);
+    try {
+      const data: Record<string, unknown> = {
+        exportedAt: new Date().toISOString(),
+        account: { uid, email: currentUser?.email },
+      };
+      for (const name of EXPORT_COLLECTIONS) {
+        const snap = await getDocs(collection(db, "users", uid, name));
+        data[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `yaguar-estudio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Backup descargado", description: "Guardá el archivo en un lugar seguro." });
+    } catch {
+      toast({ title: "Error", description: "No se pudo exportar.", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!auth.currentUser) return;
+    setDeleting(true);
+    try {
+      await deleteUser(auth.currentUser);
+      toast({ title: "Cuenta eliminada" });
+      setLocation("/");
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code;
+      if (code === "auth/requires-recent-login") {
+        toast({
+          title: "Verificación requerida",
+          description: "Por seguridad, cerrá sesión y volvé a entrar antes de eliminar la cuenta.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Error", description: "No se pudo eliminar la cuenta.", variant: "destructive" });
+      }
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
+  async function handleLogout() {
+    await logout();
+    setLocation("/");
+  }
+
+  return (
+    <div className="space-y-6 max-w-lg">
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h3 className="text-base font-bold">Tu cuenta</h3>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-primary/15 flex items-center justify-center text-primary font-bold">
+              {(currentUser?.displayName || currentUser?.email || "Y").slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold truncate">{currentUser?.displayName || "Usuario"}</div>
+              <div className="text-sm text-muted-foreground truncate">{currentUser?.email}</div>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setLocation("/profile")}>
+              <UserIcon className="w-4 h-4 mr-2" /> Editar perfil
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" /> Cerrar sesión
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-base font-bold">Tus datos</h3>
+          <p className="text-sm text-muted-foreground">
+            Descargá una copia de toda tu información (clientes, pedidos, productos, finanzas) en un
+            archivo.
+          </p>
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? "Generando…" : "Exportar mis datos"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/30">
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-base font-bold text-destructive">Zona de peligro</h3>
+          <p className="text-sm text-muted-foreground">
+            Eliminar tu cuenta es permanente. Te recomendamos exportar tus datos antes.
+          </p>
+          <Button
+            variant="outline"
+            className="border-destructive/40 text-destructive hover:bg-destructive/10"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" /> Eliminar mi cuenta
+          </Button>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar tu cuenta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es permanente. Perderás el acceso a tu cuenta. Asegurate de exportar tus
+              datos primero.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Eliminando…" : "Sí, eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
