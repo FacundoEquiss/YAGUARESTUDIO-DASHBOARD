@@ -15,12 +15,12 @@ function getNextFromSearch(): string {
   if (typeof window === "undefined") return "/app";
   const params = new URLSearchParams(window.location.search);
   const next = params.get("next");
-  if (!next) return "/app";
+  if (!next) return "/dashboard";
   try {
     const decoded = decodeURIComponent(next);
-    return decoded.startsWith("/") ? decoded : "/app";
+    return decoded.startsWith("/") ? decoded : "/dashboard";
   } catch {
-    return "/app";
+    return "/dashboard";
   }
 }
 

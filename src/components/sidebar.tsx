@@ -40,7 +40,7 @@ interface NavItem {
 const SHOW_COMING_SOON_IN_SIDEBAR = true;
 
 const MAIN_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: false },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: true },
   { href: "/orders", label: "Pedidos", icon: ClipboardList, ready: true },
   { href: "/clients", label: "Clientes", icon: Users, ready: true },
   { href: "/suppliers", label: "Proveedores", icon: Truck, ready: true },
