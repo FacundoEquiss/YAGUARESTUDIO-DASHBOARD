@@ -26,11 +26,23 @@ function getNextFromSearch(): string {
 
 export function AuthPage() {
   const [, setLocation] = useLocation();
-  const { currentUser, loading, login, register, resetPassword } = useAuth();
+  const { currentUser, loading, login, loginWithGoogle, register, resetPassword } = useAuth();
   const { toast } = useToast();
 
   const next = useMemo(() => getNextFromSearch(), []);
   const [tab, setTab] = useState<"login" | "register">("login");
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+
+  async function handleGoogle() {
+    setGoogleSubmitting(true);
+    const err = await loginWithGoogle();
+    setGoogleSubmitting(false);
+    if (err) {
+      toast({ title: "No se pudo entrar con Google", description: err, variant: "destructive" });
+      return;
+    }
+    setLocation(next);
+  }
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -225,6 +237,9 @@ export function AuthPage() {
                 {resetting ? "Enviando…" : "¿Olvidaste tu contraseña?"}
               </button>
             </form>
+
+            <AuthDivider />
+            <GoogleButton onClick={handleGoogle} loading={googleSubmitting} />
           </TabsContent>
 
           <TabsContent value="register" className="mt-6">
@@ -315,9 +330,73 @@ export function AuthPage() {
                 Es 100% gratis. Tus datos son privados y sólo vos los ves.
               </p>
             </form>
+
+            <AuthDivider />
+            <GoogleButton onClick={handleGoogle} loading={googleSubmitting} label="Registrarme con Google" />
           </TabsContent>
         </Tabs>
       </motion.div>
     </div>
+  );
+}
+
+function AuthDivider() {
+  return (
+    <div className="flex items-center gap-3 my-5">
+      <div className="flex-1 h-px bg-border" />
+      <span className="text-xs text-muted-foreground">o</span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+function GoogleButton({
+  onClick,
+  loading,
+  label = "Continuar con Google",
+}: {
+  onClick: () => void;
+  loading: boolean;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="w-full flex items-center justify-center gap-3 h-11 rounded-xl border border-border bg-white text-gray-800 font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-60"
+    >
+      {loading ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <>
+          <GoogleIcon />
+          {label}
+        </>
+      )}
+    </button>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.63z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.97 10.71a5.41 5.41 0 0 1 0-3.42V4.96H.96a9 9 0 0 0 0 8.08l3.01-2.33z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
+      />
+    </svg>
   );
 }

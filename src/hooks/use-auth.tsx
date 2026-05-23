@@ -9,9 +9,11 @@ import {
 } from "react";
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
   type User,
@@ -44,6 +46,7 @@ interface AuthContextValue {
   currentUser: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>;
+  loginWithGoogle: () => Promise<string | null>;
   register: (payload: RegisterPayload) => Promise<string | null>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<string | null>;
@@ -77,6 +80,17 @@ function friendlyAuthError(code: string | undefined): string {
       return "Demasiados intentos. Probá de nuevo más tarde.";
     case "auth/network-request-failed":
       return "Sin conexión. Revisá tu internet.";
+    case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
+      return "Cancelaste el inicio de sesión.";
+    case "auth/popup-blocked":
+      return "El navegador bloqueó la ventana. Permití las ventanas emergentes e intentá de nuevo.";
+    case "auth/account-exists-with-different-credential":
+      return "Ya tenés una cuenta con ese email usando otro método de ingreso.";
+    case "auth/unauthorized-domain":
+      return "Este dominio no está autorizado para Google. Avisanos para habilitarlo.";
+    case "auth/operation-not-allowed":
+      return "El ingreso con Google no está habilitado en este momento.";
     default:
       return "No se pudo completar la solicitud. Intentá de nuevo.";
   }
@@ -113,6 +127,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      return null;
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code;
+      return friendlyAuthError(code);
+    }
+  }, []);
+
+  const loginWithGoogle = useCallback(async (): Promise<string | null> => {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const credential = await signInWithPopup(auth, provider);
+      await ensureUserDoc(credential.user);
+      setCurrentUser(mapUser(credential.user));
       return null;
     } catch (error: unknown) {
       const code = (error as { code?: string }).code;
@@ -158,8 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ currentUser, loading, login, register, logout, resetPassword, updateDisplayName }),
-    [currentUser, loading, login, register, logout, resetPassword, updateDisplayName],
+    () => ({ currentUser, loading, login, loginWithGoogle, register, logout, resetPassword, updateDisplayName }),
+    [currentUser, loading, login, loginWithGoogle, register, logout, resetPassword, updateDisplayName],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
